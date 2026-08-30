@@ -10,6 +10,7 @@
 ## Guides
 
 * [SCBA and air](guides/scba-and-air.md)
+* [Reading smoke](guides/reading-smoke.md)
 
 ## Configuration
 

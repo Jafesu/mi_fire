@@ -19,7 +19,9 @@ Start with [Installation](getting-started/installation.md).
 
 ## For firefighters
 
-Guides are written as their feature ships, so this section fills in over time. Each one is
+* [SCBA and air](guides/scba-and-air.md)
+
+Remaining guides are written as their feature ships, so this section fills in over time. Each one is
 written as a training manual rather than an API reference: short numbered steps, what you
 see on screen, what goes wrong and how to recognise it. Where mi_fire models a real
 fireground concept — friction loss, the 1:4 ladder rule, percent-drop hydrant testing —
@@ -35,7 +37,6 @@ Planned, in the order they land:
 | Pump operations | Phase 4 — the pump panel |
 | Water supply | Phase 5 — hydrants and relay |
 | Ground ladders | Phase 5 — ladders |
-| SCBA and PASS | Phase 6 — air management |
 | Hazmat | Phase 6 — hazmat operations |
 | Station operations | Phase 6b — station alerting |
 | Water rescue | Phase 7 — water rescue |

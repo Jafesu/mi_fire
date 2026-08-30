@@ -15,6 +15,7 @@ local incidents = {}      ---@type table<string, table>
 local nodes = {}          ---@type table<string, table>  every node, keyed by node id
 local nodesByIncident = {}---@type table<string, table<string, true>>
 local gearByPlayer = {}   ---@type table<integer, table>
+local scbaByPlayer = {}   ---@type table<integer, table>
 local counters = { incident = 0, node = 0 }
 
 -- ---------------------------------------------------------------------------
@@ -190,6 +191,49 @@ function State.clearGear(source)
     gearByPlayer[source] = nil
 end
 
+-- ---------------------------------------------------------------------------
+-- SCBA
+-- ---------------------------------------------------------------------------
+
+--- Breathing apparatus, kept separate from turnout because they are independent.
+---
+--- `worn` is having the set on your back. `active` is the valve open and the mask sealed.
+--- Only `active` protects, and only `active` burns air -- that distinction is the whole
+--- reason there are two appearance sets.
+---@param source integer
+---@return table entry { worn, active, air, exertion, inSmoke, fromRack }
+function State.getScba(source)
+    local entry = scbaByPlayer[source]
+    if not entry then
+        entry = { worn = false, active = false, air = 0.0, exertion = 'idle', inSmoke = false }
+        scbaByPlayer[source] = entry
+    end
+    return entry
+end
+
+---@param source integer
+---@param entry table
+function State.setScba(source, entry)
+    local current = State.getScba(source)
+    for key, value in pairs(entry) do current[key] = value end
+end
+
+---@param source integer
+function State.clearScba(source)
+    scbaByPlayer[source] = nil
+end
+
+--- Is this player protected from smoke right now?
+---
+--- The single question the exposure model asks. Deliberately one function so there is one
+--- place to get it wrong, and so "wearing a set" can never be mistaken for "breathing air".
+---@param source integer
+---@return boolean
+function State.hasAir(source)
+    local entry = scbaByPlayer[source]
+    return entry ~= nil and entry.worn and entry.active and entry.air > 0
+end
+
 --- Resolved tier table for a player, never nil -- falls back to the default tier so
 --- the exposure model never has to nil-check mid-calculation.
 ---@param source integer
@@ -211,11 +255,13 @@ function State.reset()
     nodes = {}
     nodesByIncident = {}
     gearByPlayer = {}
+    scbaByPlayer = {}
     counters = { incident = 0, node = 0 }
 end
 
 AddEventHandler('playerDropped', function()
     gearByPlayer[source] = nil
+    scbaByPlayer[source] = nil
 end)
 
 MIFire.State = State

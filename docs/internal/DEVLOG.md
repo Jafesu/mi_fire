@@ -679,3 +679,88 @@ against 6.0 in a gale — so a gale still does nothing to a sofa fire indoors.
 
 **Next:** `EXPO-001`. Fire is visible, spreads, and can be put out; it still cannot hurt
 anyone.
+
+---
+
+## 2026-08-30 · session 011
+
+**Scope:** `TURN-001`, `TURN-002`, `TURN-004`, `SCBA-001`…`SCBA-004`, `DOC-006`
+
+**Changed:** `config/scba.lua` (new), `config/gear.lua`, `config/config.lua`,
+`bridge/appearance/illenium.lua` (rewritten), `server/modules/turnout/init.lua` (new),
+`server/modules/turnout/appearance.lua` (new), `server/core/state.lua`,
+`install/migrations/0003_gear_appearance.sql` (new), `install/items.lua` (new),
+`client/modules/turnout/init.lua` (new), `tools/tests/scba_spec.lua` (new),
+`docs/guides/scba-and-air.md` (new).
+
+**Decisions:**
+
+- **Wearing a set is not breathing from it.** SCBA has two states: on the back with the
+  valve shut, which uses no air and protects from nothing, and mask sealed, which is total
+  smoke immunity and a running clock. One boolean separates them and it is the only thing
+  the exposure model will ask about, via `State.hasAir`.
+- **Turnout and SCBA are independent**, on different ped slots -- `torso2` for the coat,
+  `t-shirt` for the harness. Partial states are legal and meaningful: SCBA without turnout
+  means you breathe but burn; turnout without SCBA means you survive flame but not smoke.
+  Both are real mistakes worth being able to make.
+- **A helmet is a prop, not a component.** They go through different natives with different
+  key names, and a helmet listed among components silently does nothing. The bridge now
+  splits a `{ slot = drawable }` set into the two shapes illenium wants, and *warns* about
+  an unknown slot rather than dropping it in silence. There is a test.
+- Slot names follow illenium's own vocabulary (`hat`, `torso2`, `arms`, `t-shirt`) so a set
+  written in our config reads the same as one written in theirs.
+- **Air is on the item, not the player.** A bottle carried between rigs keeps its pressure,
+  and racking it is what refills it -- so a firefighter cannot hoard full cylinders and
+  never visit a station. Same pattern as `mi_diving`.
+- Exertion drives consumption far more than time. Sprinting costs three times standing
+  still, so a rated 30-minute bottle gives well under half that under work. That gap is the
+  feature: air management is a skill, not a countdown.
+- The valve toggle is a **keybind**, not an ox_target option. Opening your own mask is an
+  action on yourself; the ox_target rule is about interacting with the world.
+
+**Two changes made mid-session on the user's word:**
+
+- They already have an SCBA item, so the integration is an **ox_inventory item export**
+  (`server.export = 'mi_fire.useScba'`) rather than `registerUsableItem`. Repointing one
+  string beats redefining an item. Verified the call signature against ox_inventory's
+  `useExport` in `modules/items/shared.lua:1`, which invokes it as
+  `export(nil, event, item, inventory, slot)` -- so the first argument seen is the event
+  and `inventory.id` is the player.
+- **Turnout markings are per-character.** Their gear carries name tapes and ranks, so the
+  drawable is departmental and the texture is personal. That makes it *identity, not
+  equipment*, and it became `mi_fire_gear_appearance` keyed on the character rather than
+  item metadata. Item metadata would have been wrong twice over: gear issued from an
+  apparatus rack has no item at all, and a coat handed to another firefighter would carry
+  the previous owner's name across with it. Merged over the tier's base set at don time,
+  so a character stores only what differs.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **390 passed, 0 failed** (was 321).
+- New SCBA suite asserts the state machine at its boundaries: a worn set with a shut valve
+  protects from nothing, an open valve on an empty bottle protects from nothing, the valve
+  will not open on an empty bottle, doffing turnout leaves SCBA on, and wearing the turnout
+  *skin* through a clothing menu grants no resistance at all.
+- Appearance slot resolution is tested directly, including that `hat` routes to props and
+  an invented slot name is reported rather than dropped.
+- All 37 Lua files parse.
+- **Not** tested in game.
+
+**Harness note:** `bridge/appearance/illenium.lua` is now loaded by the boot simulation.
+It is a client file, but its slot resolution is arithmetic on tables and is exactly the
+kind of logic worth testing -- a helmet routed to the wrong native fails silently. Files
+that genuinely need natives at load time stay excluded.
+
+**Open:**
+
+- `EXPO-001` still not built, so none of this protects against anything yet. SCBA burns air
+  and turnout records a tier, but nothing is hurting the player.
+- `SCBA-005`, the PASS device, is configured but not implemented.
+- `TURN-003`: gear does not yet survive a disconnect.
+- Only `structural` has a real appearance. The other tiers are `nil` until their EUP
+  drawables are known.
+- The apparatus check is loose -- any emergency-class vehicle -- until `config/apparatus.lua`
+  exists.
+
+**Next:** `EXPO-001`. Everything built this session is protection against damage that does
+not exist yet.

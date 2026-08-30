@@ -67,10 +67,16 @@ Set a task to `in-progress` before you start it, not after.
 | `APP-003` | Offset finder: export to clipboard and to config | todo | `APP-002` |
 | `APP-004` | Tank state: water and foam, per vehicle | todo | `APP-001` |
 | `APP-005` | Pump engage and disengage | todo | `APP-004` |
-| `TURN-001` | Gear compartment target on apparatus | todo | `APP-001` |
-| `TURN-002` | Don and doff through illenium-appearance | todo | `TURN-001` |
+| `TURN-001` | Gear compartment target on apparatus | done | `APP-001` |
+| `TURN-002` | Don and doff through illenium-appearance | done | `TURN-001` |
 | `TURN-003` | Gear state survives disconnect and reconnect | todo | `TURN-002` |
-| `TURN-004` | Real gear tiers wired to the Phase 1 exposure hooks | todo | `TURN-002`, `EXPO-002` |
+| `SCBA-001` | SCBA state machine: worn, active, air on item metadata | done | `TURN-002` |
+| `SCBA-002` | Three equip routes: item, station rack, apparatus | done | `SCBA-001` |
+| `SCBA-003` | Air consumption driven by exertion | done | `SCBA-001` |
+| `SCBA-004` | Low-air warnings and automatic shutoff | done | `SCBA-003` |
+| `SCBA-005` | PASS device, four phases | todo | `SCBA-001` |
+| `DOC-006` | `docs/guides/scba-and-air.md` | done | `SCBA-004` |
+| `TURN-004` | Real gear tiers wired to the Phase 1 exposure hooks | done | `TURN-002`, `EXPO-002` |
 | `HYD-001` | Hydrant registry and prop offsets | todo | `APP-002` |
 
 ## Later phases

@@ -46,6 +46,7 @@ return function(t)
 
         -- Deliberately deny everything: the interesting case for permissions is the
         -- player who has nothing, since that is the one that produces a support ticket.
+        IsPedMale = function() return true end,
         IsPlayerAceAllowed = function() return false end,
         IsPrincipalAceAllowed = function() return false end,
         GetPlayerPed = function() return 0 end,
@@ -105,6 +106,7 @@ return function(t)
         'config/gear.lua',
         'config/stations.lua',
         'config/sprinklers.lua',
+        'config/scba.lua',
     }
 
     local serverFiles = {
@@ -117,8 +119,20 @@ return function(t)
         'server/main.lua',
         'server/modules/fire/init.lua',
         'server/modules/fire/spread.lua',
+        'server/modules/turnout/appearance.lua',
+        'server/modules/turnout/init.lua',
         'server/modules/admin/init.lua',
         'server/api/exports.lua',
+    }
+
+    --- Client files whose top level is pure enough to load here.
+    ---
+    --- The appearance bridge is client-side but its slot resolution is arithmetic on
+    --- tables, and it is exactly the kind of logic worth testing -- a helmet routed to the
+    --- wrong native fails silently. Files that genuinely need natives at load time stay
+    --- out; a fake pass there would be worse than no test.
+    local pureClientFiles = {
+        'bridge/appearance/illenium.lua',
     }
 
     local function load(path)
@@ -136,6 +150,7 @@ return function(t)
 
     for _, path in ipairs(sharedFiles) do load(path) end
     for _, path in ipairs(serverFiles) do load(path) end
+    for _, path in ipairs(pureClientFiles) do load(path) end
 
     -- -----------------------------------------------------------------------
 
@@ -156,14 +171,15 @@ return function(t)
         local known = {}
         for _, path in ipairs(sharedFiles) do known[path] = true end
         for _, path in ipairs(serverFiles) do known[path] = true end
+        for _, path in ipairs(pureClientFiles) do known[path] = true end
         -- Client files are not loadable here; they are excluded on purpose.
         for _, path in ipairs({
             'bridge/target/ox_target.lua',
-            'bridge/appearance/illenium.lua',
             'client/main.lua',
             'client/modules/notify.lua',
             'client/modules/fire/render.lua',
             'client/modules/fire/init.lua',
+            'client/modules/turnout/init.lua',
         }) do known[path] = true end
 
         for path in pairs(declared) do
@@ -179,7 +195,7 @@ return function(t)
     local expected = {
         'Enums', 'Util', 'Hydraulics', 'Validate', 'FireClass', 'Suppression',
         'Framework', 'Dispatch', 'Inventory', 'DB', 'State', 'Permissions',
-        'Fire', 'Spread', 'Admin',
+        'Fire', 'Spread', 'Admin', 'Turnout', 'Appearance', 'GearAppearance',
     }
     for _, name in ipairs(expected) do
         t.ok(type(MIFire) == 'table' and MIFire[name] ~= nil,
@@ -188,7 +204,7 @@ return function(t)
 
     local configGlobals = {
         'Config', 'MIFireGear', 'MIFireZones', 'MIFireClasses', 'MIFireAgents',
-        'MIFireStations', 'MIFireSprinklers',
+        'MIFireStations', 'MIFireSprinklers', 'MIFireScba',
     }
     for _, name in ipairs(configGlobals) do
         t.ok(rawget(_G, name) ~= nil, ('%s is set after load'):format(name))

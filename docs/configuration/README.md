@@ -16,6 +16,7 @@ Changes need a resource restart unless noted otherwise.
 | `fire_classes.lua` | How each class of fire behaves |
 | `agents.lua` | What puts each class out, and what makes it worse |
 | `gear.lua` | Turnout, proximity, and hazmat protection |
+| `scba.lua` | Breathing apparatus: appearance, air, racks, PASS |
 
 Files for later phases — `hose.lua`, `apparatus.lua`, `hydrants.lua`, `ladders.lua`,
 `stations.lua`, `scba.lua`, `hazmat.lua`, `rescue.lua` — are documented as they ship.
@@ -148,6 +149,57 @@ nothing may grant immunity to fire. If you want a more forgiving fireground, rai
 
 Note there is no smoke field anywhere in this file. Smoke is stopped by SCBA and nothing
 else, by design. Turnout gear will not help a firefighter who is breathing.
+
+### Gear and SCBA appearance
+
+Both use illenium-appearance's slot names, so a set written here reads the same as one
+written there: `hat`, `torso2`, `pants`, `shoes`, `arms`, `t-shirt`, `vest`, `mask`,
+`glass`, `bag`, `accessory`, `decals`, `ear`.
+
+```lua
+-- config/gear.lua
+appearance = {
+    male = { hat = 251, torso2 = 692, pants = 11, shoes = 164, arms = 179 },
+    female = { ... },
+}
+```
+
+A bare number is a drawable with texture 0. Use `{ drawable = 692, texture = 3 }` when you
+need a different texture, and `-1` to clear a slot.
+
+**`hat` is a prop, not a component.** Props and components go through different natives,
+and a helmet listed among the components silently does nothing — no error, no helmet. The
+bridge sorts them out, but only for slots it knows; an invented slot name is warned about
+rather than dropped in silence.
+
+SCBA has two sets, and they must differ or the mask never visibly goes on:
+
+```lua
+-- config/scba.lua
+MIFireScba.appearance = {
+    inactive = { male = { ['t-shirt'] = 308 } },   -- on the back, mask off
+    active   = { male = { ['t-shirt'] = 311 } },   -- breathing
+}
+```
+
+These sit on `t-shirt` (component 8) while turnout uses `torso2` (component 11), so the
+two are independent and can be worn in any combination. That is deliberate — see the
+guide.
+
+### How long an air bottle lasts
+
+```lua
+MIFireScba.air.capacitySeconds = 1800.0
+MIFireScba.air.exertion = { idle = 1.0, walking = 1.3, running = 2.1, sprinting = 3.2 }
+```
+
+`capacitySeconds` is the **rated** duration, at rest. Exertion multipliers are what make
+it a working duration, and the gap between the two is the point: a rated thirty-minute
+bottle gives about fifteen under work. Flatten the multipliers and air management stops
+being a skill.
+
+To make air more forgiving, raise `capacitySeconds`. Lowering the exertion multipliers
+works too, but it removes the reason to pace yourself.
 
 ### Dispatch
 

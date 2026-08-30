@@ -1,0 +1,473 @@
+--- Turnout gear and SCBA.
+---
+--- The rule this file exists to hold: **protection is server state, never clothing.** A
+--- player wearing a turnout skin from a clothing menu has a look and nothing else. Every
+--- resistance lookup reads what is recorded here, set only by actually donning at a rack.
+---
+--- Turnout and SCBA are independent. Partial states are legal and meaningful: SCBA without
+--- turnout means you breathe but burn, turnout without SCBA means you survive flame but
+--- not smoke. Both are real fireground mistakes worth being able to make.
+---
+--- Air lives on the **item**, not the player. A bottle carried between rigs keeps its
+--- pressure, and racking it is what refills it -- which is why a firefighter cannot hoard
+--- full cylinders and never visit a station.
+
+MIFire = MIFire or {}
+
+local Turnout = {}
+
+local Util = MIFire.Util
+local State = MIFire.State
+local Permissions = MIFire.Permissions
+local Inventory = MIFire.Inventory
+
+-- ---------------------------------------------------------------------------
+-- Helpers
+-- ---------------------------------------------------------------------------
+
+---@param source integer
+---@param message string
+---@param kind string|nil
+local function notify(source, message, kind)
+    if source == 0 then return end
+    TriggerClientEvent('mi_fire:client:notify', source, message, kind or 'inform')
+end
+
+--- Tell a client to put a gear appearance on, take one off, or restore what was underneath.
+---@param source integer
+---@param action string 'apply' | 'restore'
+---@param set table|nil
+local function pushAppearance(source, action, set)
+    TriggerClientEvent('mi_fire:client:gearAppearance', source, action, set)
+end
+
+--- Tell a client what it is wearing, so its target options offer the right thing.
+--- The client uses this for menus only -- protection is still read from server state.
+---@param source integer
+local function pushGearState(source)
+    local entry = State.getGear(source)
+    TriggerClientEvent('mi_fire:client:gearState', source,
+        entry.tier, entry.tier ~= MIFireGear.defaultTier, entry.integrity)
+end
+
+-- ---------------------------------------------------------------------------
+-- Turnout
+-- ---------------------------------------------------------------------------
+
+--- Put a gear tier on.
+---@param source integer
+---@param tierName string
+---@return boolean ok
+---@return string|nil reason
+function Turnout.don(source, tierName)
+    local allowed, why = Permissions.requireFirefighter(source)
+    if not allowed then return false, why end
+
+    local tier = MIFireGear.tiers[tierName]
+    if not tier then return false, ('unknown gear tier "%s"'):format(tostring(tierName)) end
+
+    local entry = State.getGear(source)
+    if entry.tier == tierName then return false, 'you are already wearing that' end
+
+    -- Integrity carries over from the item when one is present, so a battered set stays
+    -- battered. Without ox_inventory it starts fresh each time, which is a graceful loss
+    -- rather than a broken feature.
+    local integrity = tier.integrity
+    if MIFireGear.exposure.persistence.enabled and tier.integrity and tier.integrity > 0 then
+        local stored = Inventory.getMetadata(source, 'turnout_' .. tierName,
+            MIFireGear.exposure.persistence.metadataKey, nil)
+        if stored then integrity = tonumber(stored) or integrity end
+    end
+
+    State.setGear(source, tierName, integrity)
+
+    -- Per-character markings -- name tape, rank -- merged over the department set.
+    -- Falls back to the plain tier appearance when nothing is stored for this character.
+    local appearance = MIFire.GearAppearance and MIFire.GearAppearance.forPlayer(source, tierName)
+        or tier.appearance
+
+    if appearance then
+        pushAppearance(source, 'apply', appearance)
+    end
+
+    pushGearState(source)
+    Util.debug('turnout', '%s donned %s (integrity %.0f)', tostring(source), tierName, integrity)
+    return true
+end
+
+--- Take gear off and go back to whatever was underneath.
+---@param source integer
+---@return boolean ok
+---@return string|nil reason
+function Turnout.doff(source)
+    local entry = State.getGear(source)
+    if entry.tier == MIFireGear.defaultTier then
+        return false, 'you are not wearing any gear'
+    end
+
+    -- Write the wear back to the item so a rough call costs something afterwards.
+    if MIFireGear.exposure.persistence.enabled then
+        Inventory.updateMetadata(source, 'turnout_' .. entry.tier,
+            MIFireGear.exposure.persistence.metadataKey, entry.integrity)
+    end
+
+    State.clearGear(source)
+
+    -- SCBA sits on a different slot, so doffing turnout must not silently strip it.
+    -- Restore the base appearance, then put the SCBA back if it is still worn.
+    pushAppearance(source, 'restore')
+
+    local scba = State.getScba(source)
+    if scba.worn then
+        pushAppearance(source, 'apply',
+            scba.active and MIFireScba.appearance.active or MIFireScba.appearance.inactive)
+    end
+
+    pushGearState(source)
+    Util.debug('turnout', '%s doffed gear', tostring(source))
+    return true
+end
+
+-- ---------------------------------------------------------------------------
+-- SCBA
+-- ---------------------------------------------------------------------------
+
+--- Put an SCBA set on. Does not open the air -- that is `Turnout.setScbaActive`.
+---@param source integer
+---@param opts table|nil { fromRack = boolean, air = number }
+---@return boolean ok
+---@return string|nil reason
+function Turnout.donScba(source, opts)
+    opts = opts or {}
+
+    local allowed, why = Permissions.requireFirefighter(source)
+    if not allowed then return false, why end
+
+    local scba = State.getScba(source)
+    if scba.worn then return false, 'you are already wearing a set' end
+
+    local air
+
+    if opts.fromRack then
+        -- A rack hands out a full bottle. Nothing is taken from inventory, because the
+        -- rack is where bottles live.
+        air = MIFireScba.air.capacitySeconds
+    else
+        -- Worn from a carried bottle: the item is the source of truth for its pressure.
+        if not Inventory.has(source, MIFireScba.item) then
+            return false, 'you have no SCBA set'
+        end
+        air = tonumber(Inventory.getMetadata(source, MIFireScba.item,
+            MIFireScba.air.metadataKey, MIFireScba.air.capacitySeconds))
+    end
+
+    air = Util.clamp(tonumber(opts.air) or air, 0.0, MIFireScba.air.capacitySeconds)
+
+    State.setScba(source, { worn = true, active = false, air = air, fromRack = opts.fromRack })
+    pushAppearance(source, 'apply', MIFireScba.appearance.inactive)
+
+    TriggerClientEvent('mi_fire:client:scbaState', source, false, air,
+        MIFireScba.air.capacitySeconds)
+
+    local minutes = air / 60.0
+    notify(source, ('SCBA on. %.0f minutes of air. Open the valve to breathe it.'):format(minutes),
+        'success')
+
+    Util.debug('scba', '%s donned SCBA with %.0fs air', tostring(source), air)
+    return true
+end
+
+--- Take an SCBA set off. Its remaining air goes back to the item, or to the rack.
+---@param source integer
+---@param opts table|nil { toRack = boolean }
+---@return boolean ok
+---@return string|nil reason
+function Turnout.doffScba(source, opts)
+    opts = opts or {}
+
+    local scba = State.getScba(source)
+    if not scba.worn then return false, 'you are not wearing a set' end
+
+    -- Racking a bottle refills it, which is the whole reason to go back to the rig.
+    if not opts.toRack then
+        Inventory.updateMetadata(source, MIFireScba.item, MIFireScba.air.metadataKey, scba.air)
+    end
+
+    State.clearScba(source)
+
+    -- Restoring wipes everything, so put the turnout back on if it is still worn.
+    pushAppearance(source, 'restore')
+
+    local gearEntry = State.getGear(source)
+    if gearEntry.tier ~= MIFireGear.defaultTier then
+        local appearance = MIFire.GearAppearance
+            and MIFire.GearAppearance.forPlayer(source, gearEntry.tier)
+        if appearance then pushAppearance(source, 'apply', appearance) end
+    end
+
+    TriggerClientEvent('mi_fire:client:scbaState', source, false, nil,
+        MIFireScba.air.capacitySeconds)
+    notify(source, opts.toRack and 'SCBA racked and refilled' or 'SCBA off', 'inform')
+    return true
+end
+
+--- Open or close the air valve.
+---
+--- This is the line between "carrying a set" and "protected from smoke". Inactive uses no
+--- air and gives nothing; active gives complete smoke immunity and burns the bottle.
+---@param source integer
+---@param active boolean
+---@return boolean ok
+---@return string|nil reason
+function Turnout.setScbaActive(source, active)
+    local scba = State.getScba(source)
+    if not scba.worn then return false, 'you are not wearing a set' end
+
+    if active and scba.air <= 0 then
+        return false, 'the bottle is empty'
+    end
+
+    if scba.active == active then
+        return false, active and 'the valve is already open' or 'the valve is already shut'
+    end
+
+    scba.active = active
+    pushAppearance(source, 'apply',
+        active and MIFireScba.appearance.active or MIFireScba.appearance.inactive)
+
+    if active then
+        notify(source, ('Breathing bottle air -- %s remaining'):format(Util.clock(scba.air)), 'inform')
+    else
+        notify(source, 'Air valve shut', 'inform')
+    end
+
+    TriggerClientEvent('mi_fire:client:scbaState', source, scba.active, scba.air,
+        MIFireScba.air.capacitySeconds)
+
+    Util.debug('scba', '%s set air %s', tostring(source), tostring(active))
+    return true
+end
+
+--- Refill a worn or carried set.
+---@param source integer
+---@param seconds number|nil How much air to add; nil fills it.
+---@return boolean ok
+---@return string|nil reason
+function Turnout.refillScba(source, seconds)
+    local capacity = MIFireScba.air.capacitySeconds
+    local scba = State.getScba(source)
+
+    if scba.worn then
+        if scba.air >= capacity then return false, 'the bottle is already full' end
+        scba.air = Util.clamp(scba.air + (seconds or capacity), 0.0, capacity)
+        TriggerClientEvent('mi_fire:client:scbaState', source, scba.active, scba.air, capacity)
+        notify(source, ('Bottle filled to %s'):format(Util.clock(scba.air)), 'success')
+        return true
+    end
+
+    if not Inventory.has(source, MIFireScba.item) then
+        return false, 'you have no SCBA set'
+    end
+
+    local air = tonumber(Inventory.getMetadata(source, MIFireScba.item,
+        MIFireScba.air.metadataKey, 0)) or 0
+    if air >= capacity then return false, 'the bottle is already full' end
+
+    Inventory.updateMetadata(source, MIFireScba.item, MIFireScba.air.metadataKey,
+        Util.clamp(air + (seconds or capacity), 0.0, capacity))
+    notify(source, 'Bottle filled', 'success')
+    return true
+end
+
+-- ---------------------------------------------------------------------------
+-- Air consumption
+-- ---------------------------------------------------------------------------
+
+--- Burn air for one tick.
+---
+--- Exertion matters far more than time. A rated thirty-minute bottle gives closer to
+--- fifteen under work, and that gap is the point -- air management is a skill, not a timer.
+---@param source integer
+---@param dt number Seconds.
+---@param exertion string|nil Key from `MIFireScba.air.exertion`.
+---@param inSmoke boolean|nil
+local function consumeAir(source, dt, exertion, inSmoke)
+    local scba = State.getScba(source)
+    if not scba.worn or not scba.active then return end
+
+    local rate = MIFireScba.air.baseRate
+        * (MIFireScba.air.exertion[exertion or 'idle'] or 1.0)
+        * (inSmoke and MIFireScba.air.smokeMultiplier or 1.0)
+
+    local before = scba.air
+    scba.air = math.max(0.0, scba.air - rate * dt)
+
+    local capacity = MIFireScba.air.capacitySeconds
+    local wasAbove = function(fraction) return before > capacity * fraction end
+    local nowBelow = function(fraction) return scba.air <= capacity * fraction end
+
+    -- One warning per threshold crossing, not one per tick.
+    if wasAbove(MIFireScba.air.criticalAt) and nowBelow(MIFireScba.air.criticalAt) then
+        notify(source, 'AIR CRITICAL -- get out now', 'error')
+    elseif wasAbove(MIFireScba.air.lowAirAt) and nowBelow(MIFireScba.air.lowAirAt) then
+        notify(source, 'Low air alarm -- begin your exit', 'error')
+    elseif wasAbove(MIFireScba.air.warnAt) and nowBelow(MIFireScba.air.warnAt) then
+        notify(source, ('Half a bottle left -- %s'):format(Util.clock(scba.air)), 'inform')
+    end
+
+    if scba.air <= 0 and scba.active then
+        scba.active = false
+        pushAppearance(source, 'apply', MIFireScba.appearance.inactive)
+        notify(source, 'Out of air. Smoke is no longer being kept out.', 'error')
+    end
+
+    TriggerClientEvent('mi_fire:client:scbaState', source, scba.active, scba.air, capacity)
+end
+
+--- Clients report their own exertion, since only they know whether they are sprinting.
+--- Air is still decremented server-side, so a client claiming to be idle forever only
+--- changes the rate, never the fact that the bottle empties.
+RegisterNetEvent('mi_fire:server:reportExertion', function(exertion, inSmoke)
+    local source = source
+    if type(exertion) ~= 'string' then exertion = 'idle' end
+    if not MIFireScba.air.exertion[exertion] then exertion = 'idle' end
+
+    local scba = State.getScba(source)
+    scba.exertion = exertion
+    scba.inSmoke = inSmoke == true
+end)
+
+CreateThread(function()
+    while not MIFire.ready do Wait(250) end
+
+    local interval = 1000
+    local dt = interval / 1000.0
+
+    while true do
+        Wait(interval)
+
+        for _, entry in ipairs(MIFire.Framework.getOnDutyFirefighters()) do
+            local scba = State.getScba(entry.source)
+            if scba.worn and scba.active then
+                consumeAir(entry.source, dt, scba.exertion, scba.inSmoke)
+            end
+        end
+    end
+end)
+
+-- ---------------------------------------------------------------------------
+-- Transports
+-- ---------------------------------------------------------------------------
+
+--- Every one of these is a thin wrapper. The gates live in the services above.
+
+local function respond(source, ok, reason)
+    if not ok and reason then notify(source, reason, 'error') end
+    return ok
+end
+
+RegisterNetEvent('mi_fire:server:donTurnout', function(tierName, coords)
+    local source = source
+    -- Position is re-checked here: a client saying it is at an apparatus is a request.
+    if coords and not Permissions.isNear(source, coords, 6.0) then
+        return notify(source, 'you are not at the apparatus', 'error')
+    end
+    respond(source, Turnout.don(source, tierName))
+end)
+
+RegisterNetEvent('mi_fire:server:doffTurnout', function()
+    local source = source
+    respond(source, Turnout.doff(source))
+end)
+
+RegisterNetEvent('mi_fire:server:donScba', function(opts)
+    local source = source
+    opts = type(opts) == 'table' and opts or {}
+
+    if opts.coords and not Permissions.isNear(source, opts.coords, 6.0) then
+        return notify(source, 'you are not at the rack', 'error')
+    end
+
+    -- Only a real rack hands out a free bottle. A client cannot claim one.
+    local fromRack = opts.fromRack == true and opts.coords ~= nil
+    local ok, reason = Turnout.donScba(source, { fromRack = fromRack })
+    respond(source, ok, reason)
+end)
+
+RegisterNetEvent('mi_fire:server:doffScba', function(opts)
+    local source = source
+    opts = type(opts) == 'table' and opts or {}
+    local toRack = opts.toRack == true and opts.coords ~= nil
+        and Permissions.isNear(source, opts.coords, 6.0)
+    local ok, reason = Turnout.doffScba(source, { toRack = toRack })
+    respond(source, ok, reason)
+end)
+
+RegisterNetEvent('mi_fire:server:toggleScba', function()
+    local source = source
+    local scba = State.getScba(source)
+    local ok, reason = Turnout.setScbaActive(source, not scba.active)
+    respond(source, ok, reason)
+end)
+
+RegisterNetEvent('mi_fire:server:refillScba', function(coords)
+    local source = source
+    if coords and not Permissions.isNear(source, coords, 6.0) then
+        return notify(source, 'you are not at a cascade', 'error')
+    end
+    local ok, reason = Turnout.refillScba(source)
+    respond(source, ok, reason)
+end)
+
+--- Using the item is the third route in, alongside a station rack and an apparatus.
+---
+--- Wired as an ox_inventory item export rather than `registerUsableItem`, because most
+--- servers already have an SCBA item pointing somewhere and repointing one string is a
+--- smaller change than redefining the item:
+---
+---     ['scba'] = { label = 'SCBA', weight = 220,
+---                  server = { export = 'mi_fire.useScba' } },
+---
+--- ox_inventory calls this as `export(nil, event, item, inventory, slot)`, so the first
+--- argument we see is the event. `inventory.id` is the player.
+---@param event string 'usingItem' | 'usedItem' | 'buying'
+---@param item table
+---@param inventory table
+---@return boolean|nil false cancels the use
+exports('useScba', function(event, item, inventory)
+    if event ~= 'usingItem' then return end
+
+    local source = inventory and inventory.id
+    if not source then return false end
+
+    local scba = State.getScba(source)
+    local ok, reason
+
+    if scba.worn then
+        ok, reason = Turnout.doffScba(source)
+    else
+        ok, reason = Turnout.donScba(source, { fromRack = false })
+    end
+
+    respond(source, ok, reason)
+
+    -- Returning false stops ox_inventory consuming or animating the item when the action
+    -- did not happen, so a refused use does not look like a successful one.
+    if not ok then return false end
+end)
+
+-- ---------------------------------------------------------------------------
+-- Cleanup
+-- ---------------------------------------------------------------------------
+
+AddEventHandler('playerDropped', function()
+    -- Air is written back so a bottle does not silently refill by logging out.
+    local scba = State.getScba(source)
+    if scba.worn and not scba.fromRack then
+        Inventory.updateMetadata(source, MIFireScba.item, MIFireScba.air.metadataKey, scba.air)
+    end
+end)
+
+MIFire.Turnout = Turnout
+
+return Turnout

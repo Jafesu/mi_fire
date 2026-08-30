@@ -146,6 +146,7 @@ end
 local MIGRATIONS = {
     { version = 1, name = '0001_stations' },
     { version = 2, name = '0002_sprinklers' },
+    { version = 3, name = '0003_gear_appearance' },
 }
 
 local function ensureMigrationTable()

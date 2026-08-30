@@ -96,6 +96,7 @@ Config.limits = {
     maxHoseLinesPerVehicle = 6,
 }
 
+--- Uniforms
 --- Distance beyond which a client stops rendering and simulating a node locally.
 --- The server keeps simulating; this is purely what a given player is shown.
 Config.renderDistance = 200.0

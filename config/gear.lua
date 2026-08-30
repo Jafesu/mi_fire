@@ -7,6 +7,11 @@
 --- Smoke is deliberately absent from this file. Smoke is stopped by SCBA and by nothing
 --- else -- see `config/scba.lua`. A firefighter in full turnout with no air on is still
 --- breathing smoke.
+---
+--- Appearance slot names follow illenium-appearance's vocabulary -- `hat`, `torso2`,
+--- `pants`, `shoes`, `arms`, `t-shirt`, `vest`, `mask`. Note that `hat` is a **prop**, not
+--- a component: they go through different natives, and a helmet listed as a component
+--- silently does nothing. `bridge/appearance/illenium.lua` sorts them out.
 
 MIFireGear = {}
 
@@ -58,10 +63,7 @@ MIFireGear.tiers = {
         ignitionThreshold = 0.25,
         selfExtinguish = 5.0,
         mobility = 0.97,
-        appearance = {
-            male   = { tops = { drawable = -1, texture = 0 }, legs = { drawable = -1, texture = 0 } },
-            female = { tops = { drawable = -1, texture = 0 }, legs = { drawable = -1, texture = 0 } },
-        },
+        appearance = nil,   -- not authored for this server yet
     },
 
     --- Full structural turnout. The default fireground tier.
@@ -77,8 +79,20 @@ MIFireGear.tiers = {
         selfExtinguish = 4.0,
         mobility = 0.92,
         appearance = {
-            male   = { tops = { drawable = -1, texture = 0 }, legs = { drawable = -1, texture = 0 } },
-            female = { tops = { drawable = -1, texture = 0 }, legs = { drawable = -1, texture = 0 } },
+            male = {
+                hat    = 251,   -- helmet. A prop, not a component.
+                torso2 = 692,   -- turnout coat
+                pants  = 11,    -- no separate trousers -- the boots carry them
+                shoes  = 164,   -- bunker boots with trousers
+                arms   = 179,   -- gloves
+            },
+            female = {
+                hat    = 251,
+                torso2 = 692,
+                pants  = 11,
+                shoes  = 164,
+                arms   = 179,
+            },
         },
     },
 
@@ -94,10 +108,7 @@ MIFireGear.tiers = {
         ignitionThreshold = 0.15,
         selfExtinguish = 3.5,
         mobility = 0.84,
-        appearance = {
-            male   = { tops = { drawable = -1, texture = 0 }, legs = { drawable = -1, texture = 0 } },
-            female = { tops = { drawable = -1, texture = 0 }, legs = { drawable = -1, texture = 0 } },
-        },
+        appearance = nil,   -- not authored for this server yet
     },
 
     --- Hazmat suits. Note the trade: chemical protection is excellent and fire
@@ -114,10 +125,7 @@ MIFireGear.tiers = {
         ignitionThreshold = 0.50,
         selfExtinguish = 6.0,
         mobility = 1.0,
-        appearance = {
-            male   = { tops = { drawable = -1, texture = 0 }, legs = { drawable = -1, texture = 0 } },
-            female = { tops = { drawable = -1, texture = 0 }, legs = { drawable = -1, texture = 0 } },
-        },
+        appearance = nil,   -- not authored for this server yet
     },
 
     hazmat_c = {
@@ -130,10 +138,7 @@ MIFireGear.tiers = {
         ignitionThreshold = 0.45,
         selfExtinguish = 6.0,
         mobility = 0.95,
-        appearance = {
-            male   = { tops = { drawable = -1, texture = 0 }, legs = { drawable = -1, texture = 0 } },
-            female = { tops = { drawable = -1, texture = 0 }, legs = { drawable = -1, texture = 0 } },
-        },
+        appearance = nil,   -- not authored for this server yet
     },
 
     hazmat_b = {
@@ -146,10 +151,7 @@ MIFireGear.tiers = {
         ignitionThreshold = 0.45,
         selfExtinguish = 6.5,
         mobility = 0.88,
-        appearance = {
-            male   = { tops = { drawable = -1, texture = 0 }, legs = { drawable = -1, texture = 0 } },
-            female = { tops = { drawable = -1, texture = 0 }, legs = { drawable = -1, texture = 0 } },
-        },
+        appearance = nil,   -- not authored for this server yet
     },
 
     hazmat_a = {
@@ -162,10 +164,7 @@ MIFireGear.tiers = {
         ignitionThreshold = 0.45,
         selfExtinguish = 8.0,   -- you cannot roll effectively while encapsulated
         mobility = 0.72,
-        appearance = {
-            male   = { tops = { drawable = -1, texture = 0 }, legs = { drawable = -1, texture = 0 } },
-            female = { tops = { drawable = -1, texture = 0 }, legs = { drawable = -1, texture = 0 } },
-        },
+        appearance = nil,   -- not authored for this server yet
     },
 }
 

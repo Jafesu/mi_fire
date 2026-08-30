@@ -23,6 +23,7 @@ shared_scripts {
     'config/gear.lua',
     'config/stations.lua',
     'config/sprinklers.lua',
+    'config/scba.lua',
 }
 
 client_scripts {
@@ -33,6 +34,7 @@ client_scripts {
     'client/modules/notify.lua',
     'client/modules/fire/render.lua',
     'client/modules/fire/init.lua',
+    'client/modules/turnout/init.lua',
 }
 
 server_scripts {
@@ -46,6 +48,8 @@ server_scripts {
     'server/main.lua',
     'server/modules/fire/init.lua',
     'server/modules/fire/spread.lua',
+    'server/modules/turnout/appearance.lua',
+    'server/modules/turnout/init.lua',
     'server/modules/admin/init.lua',
     'server/api/exports.lua',
 }

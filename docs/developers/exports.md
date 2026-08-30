@@ -39,6 +39,40 @@ local district = exports.mi_fire:GetDistrictAt(coords)
 local aop      = exports.mi_fire:GetActiveAop()
 ```
 
+## Gear, SCBA, and personal markings
+
+```lua
+-- Server. Assign a firefighter's name tape and rank markings.
+-- Takes an identifier, not a source: markings are usually set from an admin panel
+-- while the firefighter is offline.
+exports.mi_fire:SetGearAppearance('ABC12345', 'structural', {
+    male   = { torso2 = { drawable = 692, texture = 4 } },
+    female = { torso2 = { drawable = 692, texture = 4 } },
+}, { label = 'Casey / Deputy District Chief' })
+
+exports.mi_fire:GetGearAppearance('ABC12345')
+exports.mi_fire:ClearGearAppearance('ABC12345', 'structural')
+
+-- Client. What this player is wearing and breathing.
+local worn, active, air, capacity = exports.mi_fire:GetScbaState()
+local tier, wearingGear, integrity = exports.mi_fire:GetGearState()
+```
+
+### Wiring an existing SCBA item
+
+If you already have an SCBA item, repoint its export and change nothing else:
+
+```lua
+['scba'] = {
+    label = 'SCBA',
+    weight = 220,
+    server = { export = 'mi_fire.useScba' },
+}
+```
+
+Using the item toggles the set on and off. The air valve is a separate keybind, so using
+the item never accidentally starts burning air.
+
 ## Status
 
 **None of these are implemented yet.** Phase 1 is in progress; this page describes the

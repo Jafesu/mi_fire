@@ -1,0 +1,88 @@
+# SCBA and air
+
+Smoke will kill you, and your turnout gear will not help. SCBA is the only thing that
+stops it — and only while the valve is open and there is air in the bottle.
+
+## The two states
+
+This is the distinction that catches people out.
+
+| State | What it looks like | Air used | Protection |
+|---|---|---|---|
+| **On your back** | Set worn, mask off | None | **None** |
+| **Breathing** | Mask sealed, valve open | Yes | Smoke cannot touch you |
+
+Wearing a set is not the same as being protected. A firefighter who walks into a smoke-
+filled room with the set on their back and the mask hanging is in exactly as much trouble
+as one wearing nothing.
+
+## Getting a set
+
+Three ways, and they all end with the same thing on your back:
+
+1. **At the apparatus** — target any fire rig and choose **Take an SCBA set**. The rig
+   hands you a full bottle.
+2. **At a station rack** — same interaction, at a fixed rack.
+3. **From your inventory** — use an SCBA item you are already carrying.
+
+The item *is* the bottle. Its air level travels with it, so a set you carry between rigs
+keeps whatever pressure it had. That is also why racking a set refills it: putting it back
+is how it gets recharged.
+
+## Using it
+
+Press **J** (or `/scba`) to open and close the valve.
+
+Opening it seals the mask and starts the clock. Closing it stops using air — worth doing
+the moment you are out of the smoke, because the bottle is smaller than it sounds.
+
+## How long a bottle lasts
+
+The rating on the cylinder is not the working duration. A thirty-minute bottle gives about
+thirty minutes **standing still**. Working, it gives far less:
+
+| What you are doing | Air used |
+|---|---|
+| Standing | Normal |
+| Walking | A third faster |
+| Running | Twice as fast |
+| Sprinting | Three times as fast |
+| Carrying a line or a casualty | Nearly twice as fast |
+
+Heavy smoke makes you breathe harder even through the mask.
+
+So: **a sprint down a hallway costs you three times what walking it does.** Air management
+is a skill, and the firefighter who paces themselves comes out with a reserve.
+
+## The warnings
+
+You are told three times, and they get less polite:
+
+- **Half a bottle** — a courtesy. You are fine, but start thinking about the way out.
+- **Low air** — begin your exit *now*. Not after this room.
+- **Critical** — you should already be moving toward air.
+
+When it runs out, the valve shuts on its own and you are breathing smoke again. Nothing
+stops you working; it just starts hurting.
+
+## Refilling
+
+Target an apparatus and choose **Refill air bottle**, or rack the set and take another.
+Racking is faster if there is a spare, which is the reason to carry one.
+
+## Turnout gear is a separate decision
+
+SCBA and turnout are independent. You can wear either, both, or neither, and each protects
+against a different thing:
+
+| | Flame | Radiant heat | Smoke |
+|---|---|---|---|
+| Turnout gear | Reduced | Reduced | **No help at all** |
+| SCBA (breathing) | No help | No help | **Stopped completely** |
+
+Turnout without SCBA means you survive the flame and choke. SCBA without turnout means you
+breathe fine while you burn. Both are legal, and both are mistakes.
+
+**No combination makes you fireproof.** Turnout reduces flame damage and degrades while it
+does it. Stand in fire long enough and you burn through the gear and catch light, whatever
+you are wearing.

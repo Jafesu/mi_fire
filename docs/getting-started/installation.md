@@ -105,6 +105,15 @@ Everything is in `config/`. The two files worth looking at first:
 Every option in every config file is explained in
 [the configuration reference](../configuration/README.md).
 
+## Inventory items
+
+Optional. Copy the definitions in `install/items.lua` into `ox_inventory/data/items.lua`
+if you want firefighters to carry SCBA sets and turnout gear as possessions.
+
+Without them, SCBA is still available from apparatus and station racks and turnout still
+works — what is lost is carrying a bottle away from the rig and having gear wear persist
+between shifts.
+
 ## Migrating from another fire resource
 
 mi_fire provides exports under the same names as the resource many servers are coming

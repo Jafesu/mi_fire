@@ -10,6 +10,7 @@ The split is not "important things in MySQL". It is:
 | Fire behaviour, agent effectiveness, gear numbers | Stations, their lights, speakers, panels, bays |
 | Districts, area of play, run cards | Station coverage polygons |
 | Hose, apparatus, and hydrant profiles | Sprinkler systems and their heads |
+| Gear tiers and their department appearance | Per-character name tapes and rank markings |
 | Sprinkler head types, flow, reset procedure | Which heads exist, and their live state |
 
 A station is the clearest case for the database. Hand-editing
@@ -146,6 +147,34 @@ real kitchens have wet-chemical hood systems.
 One row per head, because heads operate **individually**. Only the heads over the fire
 fuse, each one is a separate device a crew has to replace, and storing a system as a single
 coverage volume would lose exactly the behaviour worth having.
+
+### `mi_fire_gear_appearance`
+
+Per-character turnout markings. A department shares a drawable; the texture carries a name
+tape and rank, so it is personal.
+
+| Column | Notes |
+|---|---|
+| `identifier` | citizenid on Qbox, identifier on ESX |
+| `tier` | Gear tier from `config/gear.lua` |
+| `overrides` | `JSON` -- `{ slot = { drawable, texture } }`, or split by sex |
+| `label` | Human-readable, e.g. "Casey / Deputy District Chief" |
+
+Unique on `(identifier, tier)`, so a firefighter can be marked differently on structural
+and wildland sets.
+
+**Why this is not item metadata.** Two reasons, either of which is sufficient. Gear issued
+from an apparatus rack has no item at all, so there would be nowhere to put it. And a coat
+handed to another firefighter would carry the previous owner's name tape across with it,
+which is worse than having no markings.
+
+Overrides are merged over the tier's base appearance at don time, so a character stores
+only what differs -- usually a single texture. A firefighter with no row wears the plain
+department set, which is also what happens when the database is unreachable.
+
+Written through `exports.mi_fire:SetGearAppearance(identifier, tier, overrides, opts)`,
+which takes an identifier rather than a source because markings are normally assigned from
+an admin panel while the firefighter is offline.
 
 ## Hot apply
 

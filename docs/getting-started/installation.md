@@ -30,11 +30,9 @@
    ensure mi_fire
    ```
 
-3. Grant your admins the permission for the fire commands:
-
-   ```cfg
-   add_ace group.admin mi_fire.admin allow
-   ```
+3. **No permission setup needed on Qbox.** mi_fire grants itself to `group.admin` and
+   `group.god` at boot -- the same groups Qbox gates its own admin commands on. If your
+   server uses a different scheme, see [Permissions](permissions.md).
 
 4. Start the server and check the console. mi_fire validates its configuration at boot and
    **refuses to start** if something is wrong, printing exactly what. A clean start prints

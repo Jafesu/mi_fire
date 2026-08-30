@@ -44,7 +44,10 @@ return function(t)
         TriggerEvent = function() end,
         Wait = function() error(YIELD) end,
 
+        -- Deliberately deny everything: the interesting case for permissions is the
+        -- player who has nothing, since that is the one that produces a support ticket.
         IsPlayerAceAllowed = function() return false end,
+        IsPrincipalAceAllowed = function() return false end,
         GetPlayerPed = function() return 0 end,
         GetEntityCoords = function() return { x = 0.0, y = 0.0, z = 0.0 } end,
         DoesEntityExist = function() return false end,

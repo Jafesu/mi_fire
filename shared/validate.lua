@@ -41,6 +41,56 @@ function Validate.configuration(cfg, gear, zones, classes, agents)
         fail('Config.fireJobs is empty; nobody can be a firefighter')
     end
 
+    -- --- Permissions -------------------------------------------------------
+    --
+    -- A permissions block with no ACEs and no jobs locks everyone except the server
+    -- console out of the admin commands. That is a valid thing to want and a very
+    -- annoying thing to do by accident, so it is called out rather than silently allowed.
+
+    local perms = cfg.permissions
+    if type(perms) ~= 'table' then
+        fail('Config.permissions is missing; only the server console could use admin commands')
+    else
+        local aceCount = type(perms.aces) == 'table' and #perms.aces or 0
+        local jobCount = 0
+        if type(perms.jobs) == 'table' then
+            for jobName, grade in pairs(perms.jobs) do
+                jobCount = jobCount + 1
+                if tonumber(grade) == nil then
+                    fail('Config.permissions.jobs["%s"] is not a grade number', jobName)
+                end
+            end
+        end
+
+        if aceCount == 0 and jobCount == 0 then
+            fail('Config.permissions grants nothing: no aces and no jobs, so only the '
+                .. 'server console can use the admin commands')
+        end
+
+        if type(perms.principals) == 'table' then
+            for _, principal in ipairs(perms.principals) do
+                if type(principal) ~= 'string' then
+                    fail('Config.permissions.principals contains a non-string entry')
+                end
+            end
+        end
+
+        -- A jobCommands list naming a subcommand that does not exist is silently useless,
+        -- and reads as though it works.
+        if type(perms.jobCommands) == 'table' then
+            local known = {
+                here = true, start = true, at = true, stop = true, stopall = true,
+                list = true, info = true, agent = true, classes = true, wind = true,
+                perms = true, help = true,
+            }
+            for _, name in ipairs(perms.jobCommands) do
+                if not known[name] then
+                    fail('Config.permissions.jobCommands names unknown subcommand "%s"', name)
+                end
+            end
+        end
+    end
+
     -- --- Gear ---------------------------------------------------------------
     --
     -- The invariant from ADR 0001. Enforced here as well as in a test, because a server

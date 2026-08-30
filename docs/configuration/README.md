@@ -38,6 +38,27 @@ This is the single most common installation mistake.
 `Config.requireOnDuty` means holding the job is not enough — the player has to be clocked
 on. Set it to `false` if your server has no duty system.
 
+### Who can run the fire commands
+
+Two independent routes, in `config.lua`. ACE answers "is this a server administrator"; job
+and grade answers "is this the fire chief".
+
+```lua
+Config.permissions = {
+    aces       = { 'mi_fire.admin', 'command.fire' },
+    principals = { 'group.admin', 'group.god' },
+    jobs       = { fireman = 4 },
+}
+```
+
+`principals` is granted at boot, so **Qbox admins work with no `server.cfg` edit**. Job
+grade cannot be an ACE -- it is runtime state -- which is why the commands are gated in the
+resource rather than by FiveM, and why a refused player gets told why instead of "unknown
+command".
+
+Full detail in [Permissions](../getting-started/permissions.md). If it refuses someone,
+`/fire perms` explains exactly why.
+
 ### How busy the server feels
 
 In `zones.lua`. Area of play is the strongest knob you have. It decides *where* ambient

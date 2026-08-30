@@ -4,8 +4,13 @@
 --- them contain fire logic. If a command needs to know how a fire works, the logic is in
 --- the wrong place.
 ---
---- All of them are ACE-gated on `Config.adminAce` via the permission service, and the
---- server console is always allowed.
+--- Access comes from `Config.permissions` via the permission service: either an ACE, or a
+--- job at or above a configured grade. The server console is always allowed.
+---
+--- The commands are registered **unrestricted** on purpose. `lib.addCommand`'s `restricted`
+--- maps to an ACE, and FiveM refuses the command before the handler runs -- which would make
+--- job-grade access impossible, since a grade is runtime state an ACE cannot express. So the
+--- gate is here instead, and a denied caller gets told why rather than "unknown command".
 
 MIFire = MIFire or {}
 
@@ -263,6 +268,14 @@ subcommands.classes = function(source)
     replyList(source, lines)
 end
 
+--- `/fire perms` -- why you can or cannot use these commands.
+---
+--- Deliberately reachable by anyone: someone who cannot run the commands is exactly who
+--- needs to see this, and it reveals nothing beyond their own access.
+subcommands.perms = function(source)
+    replyList(source, MIFire.Permissions.explain(source))
+end
+
 -- ---------------------------------------------------------------------------
 -- Registration
 -- ---------------------------------------------------------------------------
@@ -274,17 +287,24 @@ local USAGE = {
     'fire agent <agent> [radius] [gpm] [seconds]',
     'fire stop <id> | stopall | list | info <id>',
     'fire classes | wind [heading] [speed]',
+    'fire perms                           -- why you can or cannot use these',
 }
 
 ---@param source integer
 ---@param args string[]
 function Admin.handle(source, args)
-    local allowed, why = Permissions.requireAdmin(source)
-    if not allowed then
-        return reply(source, why or 'not allowed', 'error')
+    local sub = args[1] and args[1]:lower()
+
+    -- `perms` is the one subcommand anyone may run: it only reports the caller's own access,
+    -- and refusing to explain a refusal is how a permissions problem becomes a support ticket.
+    if sub ~= 'perms' then
+        local allowed, why = Permissions.requireAdmin(source, sub)
+        if not allowed then
+            reply(source, why or 'not allowed', 'error')
+            return reply(source, 'run "/fire perms" to see exactly why')
+        end
     end
 
-    local sub = args[1] and args[1]:lower()
     if not sub or sub == 'help' then
         return replyList(source, USAGE)
     end
@@ -307,9 +327,21 @@ CreateThread(function()
 
     local name = Config.commands.fire or 'fire'
 
-    RegisterCommand(name, function(source, args)
-        Admin.handle(source, args)
-    end, false)
+    lib.addCommand(name, {
+        help = 'Fire administration. Run "/fire perms" if it refuses you.',
+        params = {
+            { name = 'subcommand', type = 'string', help = 'start|here|at|agent|stop|stopall|list|info|classes|wind|perms', optional = true },
+        },
+        -- Intentionally unrestricted; see the note at the top of this file.
+    }, function(source, args, raw)
+        -- ox_lib maps named params into the args table, so rebuild the positional list the
+        -- subcommand handlers expect rather than teaching every one of them two shapes.
+        local positional = {}
+        for word in raw:gmatch('%S+') do positional[#positional + 1] = word end
+        table.remove(positional, 1)   -- drop the command name itself
+
+        Admin.handle(source, positional)
+    end)
 
     Util.debug('admin', 'registered /%s', name)
 end)

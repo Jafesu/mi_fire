@@ -115,21 +115,32 @@ function Util.deepCopy(source)
     return out
 end
 
---- Merge `override` onto a copy of `base`, recursing into tables.
---- Used for config defaults: a district or apparatus entry overrides a base profile.
+--- Merge `override` onto a copy of `base`, recursing into hash tables.
+---
+--- **Arrays are replaced, not merged.** Overriding a list of five with a list of one means
+--- the list of one, which is what anyone writing a config expects. Merging them by index
+--- would keep elements four and five and silently produce a list nobody wrote -- the kind
+--- of bug that looks like a permissions failure rather than a merge failure.
+---
+--- Used for config defaults: a district, apparatus, or fire class overriding a base profile.
 ---@param base table
 ---@param override table|nil
 ---@return table
 function Util.merge(base, override)
     local out = Util.deepCopy(base)
     if type(override) ~= 'table' then return out end
+
     for key, value in pairs(override) do
-        if type(value) == 'table' and type(out[key]) == 'table' then
+        if type(value) == 'table' and type(out[key]) == 'table'
+            and #value == 0 and #out[key] == 0 then
+            -- Both are hashes: merge them.
             out[key] = Util.merge(out[key], value)
         else
-            out[key] = value
+            -- Either side being a sequence means replace outright.
+            out[key] = type(value) == 'table' and Util.deepCopy(value) or value
         end
     end
+
     return out
 end
 

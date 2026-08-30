@@ -478,3 +478,72 @@ started and were not re-run, because nothing touched them.
 the next real work, and Phase 4 is blocked on the phases in front of it plus screenshots.
 
 **Next:** the user's in-game test of the fire engine. Then `EXPO-001`.
+
+---
+
+## 2026-08-30 · session 008
+
+**Scope:** `ADMIN-002` — permissions. Reported from the first attempt to run the commands
+in game: `/fire` refused with a missing ACE permission.
+
+**Changed:** `config/config.lua`, `server/core/permissions.lua`,
+`server/modules/admin/init.lua`, `shared/util.lua`, `shared/validate.lua`,
+`tools/tests/permissions_spec.lua`, `tools/tests/boot_spec.lua`,
+`docs/getting-started/permissions.md`, `docs/getting-started/installation.md`,
+`docs/configuration/README.md`.
+
+**The problem:** `Config.adminAce = 'mi_fire.admin'` required a `server.cfg` grant nobody
+had made. Technically correct and practically useless — a resource that does not work
+until you read the docs has chosen the wrong default.
+
+**Decisions:**
+
+- **Two independent routes to admin access**, because they answer different questions. ACE
+  answers "is this a server administrator"; job and grade answers "is this the fire chief".
+  A server admin should not have to clock on as a firefighter to test a scene, and a chief
+  should not need server admin to run a drill.
+- **Principals are granted at boot.** `Config.permissions.principals` defaults to
+  `group.admin` and `group.god`, and `lib.addAce` grants them `mi_fire.admin` on startup.
+  Those groups already exist on any Qbox server — `qbx_core/server/commands.lua` gates its
+  own admin commands on `group.admin` — so the commands now work with no cfg edit.
+- `command.*` aces are deliberately skipped when granting principals. ox_lib owns those,
+  and granting one would let a principal run a command this resource never registered.
+- **Commands are registered unrestricted on purpose.** `lib.addCommand`'s `restricted` maps
+  to an ACE and FiveM refuses before the handler runs, which would make job-grade access
+  impossible — a grade is runtime state an ACE cannot express. So the gate moved into the
+  service, which also means a refused player is told why instead of getting "unknown
+  command". This also fixes a deviation from the plan: the previous code used raw
+  `RegisterCommand`.
+- **`/fire perms` is available to everyone.** The person who cannot run the commands is
+  exactly who needs to see why. It reports every ACE tested, the job and grade actually
+  held, the verdict, and the literal `add_ace` line to fix it. "Missing ACE permission" is
+  a dead end; this is not.
+- Refusals distinguish *no access* from *your rank cannot use this subcommand*, because
+  those need different fixes.
+- `jobCommands` defaults to everything except `wind`, which changes weather server-wide
+  rather than affecting one incident.
+
+**Bug found and fixed in `Util.merge`.** It deep-merged **arrays by index**, so overriding a
+five-entry list with a one-entry list kept entries two through five. That surfaced as a
+permissions test failure that looked like a permissions bug and was not. Arrays are now
+replaced wholesale, which is what anyone writing a config expects. Nothing currently
+shipping depended on the old behaviour — checked `fireclass.lua` and `bridge/dispatch` —
+but it was a trap waiting for the first config containing a list.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **315 passed, 0 failed** (was 273).
+- 41 new permission assertions covering the boundaries that actually matter: the grade one
+  below the threshold, an unlisted job, a high rank in the wrong job, on-duty and off-duty,
+  each route working without the other, subcommand limiting, and that refusals name the
+  right cause.
+- Validation rejects a permissions block granting nothing, a non-numeric grade, and a
+  `jobCommands` entry naming no real subcommand.
+- All 32 Lua files parse.
+- **Not** re-tested in game. The original report — `/fire` refused — has not been confirmed
+  fixed on a running server.
+
+**Open:** unchanged. The fire engine still has not been seen running; this session fixed the
+gate in front of it, not anything behind it.
+
+**Next:** the in-game test, now that the commands should actually be reachable.

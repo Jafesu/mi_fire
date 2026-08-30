@@ -1,0 +1,24 @@
+# Tooling entry point — the substance lives in docs/internal/CONTRIBUTING.md
+CLAUDE.md
+.claude/
+
+# NUI build output and dependencies
+web/node_modules/
+web/build/
+web/dist/
+web/.vite/
+node_modules/
+
+# Editor and OS noise
+.vscode/
+.idea/
+*.code-workspace
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Local overrides and scratch
+config/*.local.lua
+*.local.json
+*.log
+scratch/

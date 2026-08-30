@@ -35,9 +35,9 @@ Set a task to `in-progress` before you start it, not after.
 | `FIRE-008` | Smoke volumes, separate from flame | todo | `FIRE-002` |
 | `FIRE-009` | Interior probing so indoor fires land inside rooms | todo | `FIRE-002` |
 | `FIRE-010` | Vehicle fire, including the EV reflash variant | todo | `FIRE-002` |
-| `EXPO-001` | Exposure model: the three damage channels | todo | `FIRE-002` |
-| `EXPO-002` | Gear resistance, integrity degradation, ignition threshold | todo | `EXPO-001` |
-| `EXPO-003` | Catching fire, self-extinguish, partner extinguish | todo | `EXPO-002` |
+| `EXPO-001` | Exposure model: the three damage channels | done | `FIRE-002` |
+| `EXPO-002` | Gear resistance, integrity degradation, ignition threshold | done | `EXPO-001` |
+| `EXPO-003` | Catching fire, self-extinguish, partner extinguish | done | `EXPO-002` |
 | `ZONE-001` | District resolution: which district is a point in | todo | `SETUP-003` |
 | `ZONE-002` | AOP: manual mode, `/aop` commands | todo | `ZONE-001` |
 | `ZONE-003` | AOP: auto mode following population, with hold timer | todo | `ZONE-002` |

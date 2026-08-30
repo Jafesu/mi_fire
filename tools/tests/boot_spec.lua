@@ -100,6 +100,7 @@ return function(t)
         'shared/fireclass.lua',
         'shared/suppression.lua',
         'shared/pass.lua',
+        'shared/exposure.lua',
         'config/config.lua',
         'config/dispatch.lua',
         'config/zones.lua',
@@ -124,6 +125,7 @@ return function(t)
         'server/modules/turnout/appearance.lua',
         'server/modules/turnout/init.lua',
         'server/modules/scba/pass.lua',
+        'server/modules/exposure/init.lua',
         'server/modules/admin/init.lua',
         'server/api/exports.lua',
     }
@@ -184,6 +186,7 @@ return function(t)
             'client/modules/fire/init.lua',
             'client/modules/turnout/init.lua',
             'client/modules/scba/pass.lua',
+            'client/modules/exposure/init.lua',
         }) do known[path] = true end
 
         for path in pairs(declared) do
@@ -200,7 +203,7 @@ return function(t)
         'Enums', 'Util', 'Hydraulics', 'Validate', 'FireClass', 'Suppression',
         'Framework', 'Dispatch', 'Inventory', 'DB', 'State', 'Permissions',
         'Fire', 'Spread', 'Admin', 'Turnout', 'Appearance', 'GearAppearance',
-        'Pass', 'PassServer',
+        'Pass', 'PassServer', 'Exposure', 'ExposureServer',
     }
     for _, name in ipairs(expected) do
         t.ok(type(MIFire) == 'table' and MIFire[name] ~= nil,

@@ -125,3 +125,41 @@ breathe fine while you burn. Both are legal, and both are mistakes.
 **No combination makes you fireproof.** Turnout reduces flame damage and degrades while it
 does it. Stand in fire long enough and you burn through the gear and catch light, whatever
 you are wearing.
+
+### Roughly how long you have
+
+Standing still in a fully developed fire:
+
+| What you are wearing | Before you go down |
+|---|---|
+| Station uniform | About 11 seconds |
+| Wildland brush gear | About 17 seconds |
+| Structural turnout | About 35 seconds |
+| Proximity gear | About 58 seconds |
+
+Those are worst cases — a fire you are standing *in*, at full intensity, without moving.
+Working near one rather than in it, or in a fire that is not fully developed, gives you a
+great deal longer.
+
+Smoke without a mask takes about a minute to put you down at full density. Slower than
+fire, and it does not stop.
+
+### Catching fire
+
+Your gear wears down while you are in flame, and worn gear protects less. Once it is far
+enough gone, you can catch light.
+
+If you do: **hold X** to stop, drop and roll. It takes a few seconds and longer in a hazmat
+suit, because you cannot roll properly in one.
+
+Faster: a partner with a charged line. They target you and put you out in about a second
+and a half. That is the point of having a partner.
+
+### Heat, before it gets that far
+
+You do not need to be in the fire to be in trouble. Radiant heat builds up as you work near
+one, and the screen distorts and washes out as it climbs. Past a point your stamina goes and
+you stop being able to sprint.
+
+Back off and it fades. That is the system telling you to rotate out, and it is the same
+thing a real crew is watching for.

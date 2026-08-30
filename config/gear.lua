@@ -173,8 +173,11 @@ MIFireGear.exposure = {
     --- Direct flame, applied per tick to a player standing in a node.
     flame = {
         tickMs = 500,
-        baseDamagePerTick = 4.0,      -- against an unprotected player at full intensity
+        baseDamagePerTick = 9.0,      -- against an unprotected player at full intensity
         intensityScaling = true,      -- scale by node intensity 0-100
+
+        --- How close counts as standing in it. Everything beyond this is radiant heat.
+        contactRadius = 1.8,
     },
 
     --- Radiant heat, applied by proximity rather than contact.
@@ -190,11 +193,23 @@ MIFireGear.exposure = {
     },
 
     --- Smoke. SCBA is the only defence; no gear tier reduces this.
+    ---
+    --- Density is currently derived from nearby fire nodes, weighted by each class's
+    --- `smokeVolume`. A real smoke system (`FIRE-008`) replaces the source without
+    --- changing anything else here.
     smoke = {
         tickMs = 1000,
-        damagePerTick = 1.0,          -- slower than fire, but it does not stop
+        damagePerTick = 3.0,          -- slower than fire, but it does not stop
         visionOnset = 4.0,            -- seconds of exposure before vision degrades
         coughOnset = 6.0,
+
+        --- How far smoke carries from a node before it is too thin to matter.
+        radius = 9.0,
+        --- Smoke does not disperse indoors, which is why interior fires kill people.
+        indoorMultiplier = 2.0,
+        --- Density below this is ignored entirely, so a distant fire does not produce a
+        --- permanent faint cough.
+        minimumDensity = 0.08,
     },
 
     --- Catching fire.
@@ -205,6 +220,9 @@ MIFireGear.exposure = {
         burnDamagePerTick = 6.0,
         --- A partner with a charged line can put someone out faster than rolling.
         hoselineExtinguishSeconds = 1.5,
+        --- Burning stops on its own eventually, so a disconnect mid-burn does not leave
+        --- someone alight forever.
+        maximumBurnSeconds = 45.0,
     },
 
     --- Gear damage persists on the item, so a rough call costs something afterwards.

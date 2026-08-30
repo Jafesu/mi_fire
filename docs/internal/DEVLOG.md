@@ -834,3 +834,83 @@ would have fallen back to the native beep and looked like the NUI path was broke
 
 **Next:** `EXPO-001`, which is now overdue -- three sessions of protective equipment
 against damage that does not exist.
+
+---
+
+## 2026-08-30 · session 013
+
+**Scope:** `EXPO-001`, `EXPO-002`, `EXPO-003` — the exposure model. Overdue by three
+sessions.
+
+**Changed:** `shared/exposure.lua` (new), `server/modules/exposure/init.lua` (new),
+`client/modules/exposure/init.lua` (new), `config/gear.lua`,
+`tools/tests/exposure_spec.lua` (new), `docs/configuration/README.md`,
+`docs/guides/scba-and-air.md`.
+
+**Fire can now hurt people.** Until this, turnout gear was a costume, SCBA was a countdown,
+and a PASS device alarmed for a firefighter nothing could put down.
+
+**Decisions:**
+
+- Three channels ticked separately, because they run at different rates: flame twice a
+  second, heat and smoke once. Damage is decided server-side and applied by the client,
+  since a player's ped is owned by their own client. The trust boundary is real and
+  unavoidable in FiveM; what the server keeps is the decision, the gear tier, and the air.
+- **Worn gear protects less.** `effectiveFireResist` scales with remaining integrity, so a
+  burned coat is genuinely worse than a fresh one. Without that, integrity would be a
+  number that ticked down and changed nothing until it crossed a threshold.
+- Flame takes the *hottest* node you are standing in rather than summing, because standing
+  where two fires overlap should not be twice as lethal as one fire twice the size. Heat
+  sums across sources, because standing between two fires really is hotter. Smoke takes the
+  worst source, so a row of small fires cannot produce impossible density.
+- **Smoke density is derived from fire nodes** weighted by each class's `smokeVolume`,
+  because `FIRE-008` does not exist. It is a number rather than a boolean specifically so a
+  real smoke system replaces the source later without touching the exposure model.
+- Health floors at 1 rather than 0. mi_fire injures; whatever medical resource the server
+  runs decides what dying means.
+- Burning stops on its own after a maximum, so a disconnect mid-burn does not leave someone
+  permanently alight.
+
+**Balance, measured rather than guessed.** The first pass was wrong in two places and the
+figures showed it: a station uniform survived 25 seconds standing in a fully developed
+fire, and smoke took 200 seconds to put someone down. Neither is frightening. After tuning
+`baseDamagePerTick` 4 to 9, smoke `damagePerTick` 1 to 3, and softening the degradation
+floor from 50% to 70% of rated resist:
+
+| Gear | Before | After |
+|---|---|---|
+| Station uniform | 25.0s | **11.5s** |
+| Wildland | 32.5s | 16.5s |
+| Structural turnout | 55.5s | **34.5s** |
+| Proximity | 83.0s | 57.5s |
+| Smoke, no SCBA, indoors | 200s | **67s** |
+
+The degradation floor had to move up as damage moved up. Steep degradation plus a damage
+rate high enough to make fire frightening collapses the gap between turnout and a shirt,
+and that gap is the entire reason to wear the gear.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **493 passed, 0 failed** (was 434).
+- ADR 0001 is now checked from both directions. `validate.lua` proves no tier is
+  *configured* with immunity; the exposure tests prove the maths never *produces* it —
+  including feeding it a `fireResist` of 5.0 and of −3.0 and confirming damage still lands.
+- Three balance invariants are assertions, not intentions: a station uniform gives under
+  twenty seconds, turnout gives over twenty, and turnout is at least 2.5× a shirt. A tuning
+  change that breaks one fails the suite.
+- All 44 Lua files parse.
+- **Not** tested in game.
+
+**Open:**
+
+- Smoke has no visual. The damage and the screen effect are there, but there is no smoke to
+  see — `FIRE-008`.
+- Heat and smoke screen effects use stock GTA timecycle modifiers picked by name and have
+  never been looked at. They may be wrong, ugly, or both.
+- No accountability board: who is inside, on what air, at what heat.
+- `mobility` is configured per tier and not applied anywhere. Heavy gear does not yet slow
+  anyone down.
+
+**Next:** in-game test of the whole loop, which is now worth doing — `/fire here`, walk in
+without gear and die, then in turnout and survive, then watch a PASS alarm when it kills
+you.

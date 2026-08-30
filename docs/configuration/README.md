@@ -201,6 +201,42 @@ being a skill.
 To make air more forgiving, raise `capacitySeconds`. Lowering the exertion multipliers
 works too, but it removes the reason to pace yourself.
 
+### How dangerous fire is
+
+The single most important table in the resource. Seconds spent **standing still in a fully
+developed fire**, at the shipped defaults:
+
+| Gear | Survives |
+|---|---|
+| Station uniform | ~11s |
+| Hazmat Level A | ~13s |
+| Wildland brush gear | ~17s |
+| Structural turnout | ~35s |
+| Proximity gear | ~58s |
+
+Smoke without SCBA, at full density indoors: about **67 seconds**.
+
+Those numbers come from `MIFireGear.exposure`:
+
+```lua
+flame = { baseDamagePerTick = 9.0, tickMs = 500, contactRadius = 1.8 },
+smoke = { damagePerTick = 3.0, radius = 9.0, indoorMultiplier = 2.0 },
+heat  = { buildPerTick = 6.0, damageAt = 85.0, maxLoad = 100.0 },
+```
+
+`baseDamagePerTick` is the master dial for flame. Halve it and everything in the table
+doubles.
+
+**Three things worth preserving when you tune.** A station uniform should give seconds, not
+half a minute — fire has to be frightening. Turnout should be several times better than
+none, because that gap is the reason to wear it. And nothing should let a crew camp inside
+a room that is fully alight. Tests assert all three, so a tuning change that breaks one
+fails the suite rather than surprising you later.
+
+Note that hazmat suits are *worse in fire than turnout*. That is correct, not a typo — a
+Level A vapour-tight suit is plastic, and walking a hazmat crew into flame should be
+punished.
+
 ### PASS audio
 
 ```lua

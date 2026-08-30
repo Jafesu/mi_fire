@@ -61,6 +61,7 @@ local specs = {
     'tools/tests/permissions_spec.lua',
     'tools/tests/scba_spec.lua',
     'tools/tests/pass_spec.lua',
+    'tools/tests/exposure_spec.lua',
     'tools/tests/hydraulics_spec.lua',
     'tools/tests/sprinklers_spec.lua',
 }

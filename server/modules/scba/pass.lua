@@ -55,8 +55,16 @@ local function sampleMotion(source, ped)
 
     -- Downed overrides everything the position says: a ragdolled ped slides, and that
     -- movement must not keep the alarm quiet.
-    local downed = MIFireScba.pass.alarmWhenDowned
-        and (IsPedDeadOrDying(ped, true) or IsPedRagdoll(ped) or GetEntityHealth(ped) <= 105)
+    --
+    -- Asked of the medical bridge rather than guessed from health, so last stand counts --
+    -- a firefighter crawling in last stand is exactly who the device exists to find, and a
+    -- raw health check would miss them the moment their medical resource stabilised them
+    -- above the threshold.
+    local downed = false
+
+    if MIFireScba.pass.alarmWhenDowned then
+        downed = MIFire.Medical.isDown(source) or IsPedRagdoll(ped)
+    end
 
     return moved, downed == true
 end

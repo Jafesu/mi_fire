@@ -208,11 +208,10 @@ developed fire**, at the shipped defaults:
 
 | Gear | Gear fails at | You go down |
 |---|---|---|
-| Station uniform | — nothing to fail | ~13s |
-| Hazmat Level A | ~9s | ~15s |
-| Wildland brush gear | ~21s | ~30s |
-| Structural turnout | ~60s | ~93s |
-| Proximity gear | ~97s | ~117s |
+| Station uniform | immediately | ~9s |
+| Wildland brush gear | ~13s | ~20s |
+| Structural turnout | ~46s | ~64s |
+| Proximity gear | ~60s | ~76s |
 
 "Gear fails at" is when integrity drops far enough that you can **catch fire**. Between that
 moment and going down you are alive and flammable, which is the part of the fireground
@@ -223,13 +222,16 @@ Smoke without SCBA, at full density indoors: about **67 seconds**.
 Those numbers come from `MIFireGear.exposure`:
 
 ```lua
-flame = { baseDamagePerTick = 8.0, tickMs = 500, contactRadius = 1.8 },
+flame = { baseDamagePerTick = 6.0, tickMs = 500, contactRadius = 1.8 },
 smoke = { damagePerTick = 3.0, radius = 9.0, indoorMultiplier = 2.0 },
 heat  = { buildPerTick = 6.0, damageAt = 85.0, maxLoad = 100.0 },
 ```
 
 `baseDamagePerTick` is the master dial for flame. Halve it and everything in the table
 doubles.
+
+A GTA player ped reads 200 health at full and is **dead at 100**, so there are only 100
+points to lose. Any survival estimate that assumes 200 is double the truth.
 
 These are for standing **in** the flames. Working near a fire rather than in it runs on the
 heat channel instead and lasts far longer.

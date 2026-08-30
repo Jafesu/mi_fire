@@ -43,10 +43,10 @@ RegisterNetEvent('mi_fire:client:exposure', function(payload)
     end
 
     if payload.damage and payload.damage > 0 then
-        local health = GetEntityHealth(cache.ped)
-        -- Floor at 1 rather than 0: mi_fire injures, and whatever medical system the
-        -- server runs decides what dying means.
-        SetEntityHealth(cache.ped, math.max(1, math.floor(health - payload.damage)))
+        -- Through the medical bridge, which raises a real damage event so qbx_medical can
+        -- see it, banks sub-point damage rather than rounding it away, and refuses to keep
+        -- hurting someone who is already down.
+        MIFire.Medical.damage(payload.damage)
     end
 
     if payload.heat then

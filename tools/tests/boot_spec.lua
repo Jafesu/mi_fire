@@ -116,6 +116,7 @@ return function(t)
         'bridge/framework/init.lua',
         'bridge/dispatch/init.lua',
         'bridge/inventory/ox_inventory.lua',
+        'bridge/medical/init.lua',
         'server/core/db.lua',
         'server/core/state.lua',
         'server/core/permissions.lua',
@@ -203,7 +204,7 @@ return function(t)
         'Enums', 'Util', 'Hydraulics', 'Validate', 'FireClass', 'Suppression',
         'Framework', 'Dispatch', 'Inventory', 'DB', 'State', 'Permissions',
         'Fire', 'Spread', 'Admin', 'Turnout', 'Appearance', 'GearAppearance',
-        'Pass', 'PassServer', 'Exposure', 'ExposureServer',
+        'Pass', 'PassServer', 'Exposure', 'ExposureServer', 'Medical',
     }
     for _, name in ipairs(expected) do
         t.ok(type(MIFire) == 'table' and MIFire[name] ~= nil,

@@ -122,6 +122,17 @@ local function tickPlayer(source, dt)
     local ped = GetPlayerPed(source)
     if not ped or ped == 0 then return end
 
+    -- Someone already down is not exposed to anything that matters. Continuing to damage
+    -- them produces a stream of events their medical resource cannot act on, and would
+    -- stop a downed firefighter being rescued because the fire keeps killing them.
+    if MIFire.Medical.isDown(source) then
+        if tracked[source] then
+            push(source, { clear = true })
+            tracked[source] = nil
+        end
+        return
+    end
+
     local tier, gearEntry = State.getGearTier(source)
     local coords = GetEntityCoords(ped)
     local sample = ExposureServer.sample(coords, tier)

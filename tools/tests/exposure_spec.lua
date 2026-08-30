@@ -175,11 +175,15 @@ return function(t)
         'while a hazmat suit is worse in fire than turnout -- a Level A suit is plastic, '
         .. 'and walking a hazmat crew into flame should be punished')
 
-    -- The bounds that make it a fireground rather than a cutscene. Measured at full
-    -- intensity: station uniform ~13s, wildland ~30s, turnout ~93s, proximity ~127s.
+    -- The bounds that make it a fireground rather than a cutscene.
+    --
+    -- These are against the **usable** health pool of 100, not 200. A GTA player ped reads
+    -- 200 at full and is dead at 100, so modelling 200 doubled every figure -- which it was
+    -- doing, and which meant the numbers reported for two sessions were twice the truth.
+    -- Measured at full intensity: station uniform ~9s, wildland ~21s, turnout ~69s, proximity ~89s.
     t.ok(bare < 20,
         'a station uniform gives seconds, not half a minute -- fire has to be frightening')
-    t.ok(turnout > 60,
+    t.ok(turnout > 50,
         'turnout gives a real working window, not a dash in and out')
     t.ok(turnout < 240,
         'but nothing lets a crew camp indefinitely in a room that is fully alight')
@@ -196,7 +200,7 @@ return function(t)
     -- nearly shipped that way -- the survival numbers looked fine and the mechanic was
     -- simply never entering.
     local function failureProfile(tier)
-        local health, integrity, elapsed = 200.0, tier.integrity, 0.0
+        local health, integrity, elapsed = 100.0, tier.integrity, 0.0
         local ignitableAt
         while health > 0 and elapsed < 3600 do
             local resist = Exposure.effectiveFireResist(integrity, tier)

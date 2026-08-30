@@ -59,7 +59,7 @@ MIFireGear.tiers = {
         heatResist = 0.40,
         chemResist = 0.05,
         integrity = 110,
-        degradeRate = 4.0,
+        degradeRate = 6.5,
         ignitionThreshold = 0.25,
         selfExtinguish = 5.0,
         mobility = 0.97,
@@ -74,7 +74,7 @@ MIFireGear.tiers = {
         heatResist = 0.70,
         chemResist = 0.15,
         integrity = 240,
-        degradeRate = 3.2,
+        degradeRate = 4.2,
         ignitionThreshold = 0.20,
         selfExtinguish = 4.0,
         mobility = 0.92,
@@ -104,7 +104,7 @@ MIFireGear.tiers = {
         heatResist = 0.90,
         chemResist = 0.20,
         integrity = 320,
-        degradeRate = 2.8,
+        degradeRate = 4.5,
         ignitionThreshold = 0.15,
         selfExtinguish = 3.5,
         mobility = 0.84,
@@ -173,7 +173,7 @@ MIFireGear.exposure = {
     --- Direct flame, applied per tick to a player standing in a node.
     flame = {
         tickMs = 500,
-        baseDamagePerTick = 8.0,      -- against an unprotected player at full intensity
+        baseDamagePerTick = 6.0,      -- against an unprotected player at full intensity
         intensityScaling = true,      -- scale by node intensity 0-100
 
         --- How close counts as standing in it. Everything beyond this is radiant heat.

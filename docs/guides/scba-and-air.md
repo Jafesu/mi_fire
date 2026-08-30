@@ -132,18 +132,22 @@ Standing still in a fully developed fire:
 
 | What you are wearing | Gear gives out | You go down |
 |---|---|---|
-| Station uniform | — | ~13 seconds |
-| Wildland brush gear | ~21s | ~30 seconds |
-| Structural turnout | ~60s | ~93 seconds |
-| Proximity gear | ~97s | ~117 seconds |
+| Station uniform | immediately | ~9 seconds |
+| Wildland brush gear | ~13s | ~20 seconds |
+| Structural turnout | ~46s | ~64 seconds |
+| Proximity gear | ~60s | ~76 seconds |
 
 Those are worst cases — a fire you are standing *in*, at full intensity, without moving.
 Working near one rather than in it, or in a fire that is not fully developed, gives you a
 great deal longer.
 
 **The middle column is the one to watch.** Once your gear gives out you are still alive, and
-now you can catch fire. In turnout that leaves about half a minute of being flammable before
-it kills you: plenty of time to get out, and plenty of time not to.
+now you can catch fire. In turnout that leaves about eighteen seconds of being flammable before
+it kills you: enough to get out, and enough not to.
+
+**The middle column is the one to watch.** Once your gear gives out you are still alive, and
+now you can catch fire. In turnout that leaves about eighteen seconds of being flammable before
+it kills you: enough to get out, and enough not to.
 
 Smoke without a mask takes about a minute to put you down at full density. Slower than
 fire, and it does not stop.

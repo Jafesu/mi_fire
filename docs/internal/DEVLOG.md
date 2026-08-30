@@ -969,3 +969,76 @@ with a three-second window and needed its `degradeRate` raised to 2.8.
 `mobility` is configured but applied nowhere.
 
 **Next:** in-game test of the full loop.
+
+---
+
+## 2026-08-30 · session 015
+
+**Scope:** medical integration, and a correction to every survival figure published so far.
+
+**Changed:** `bridge/medical/init.lua` (new), `client/modules/exposure/init.lua`,
+`server/modules/exposure/init.lua`, `server/modules/scba/pass.lua`, `shared/exposure.lua`,
+`config/gear.lua`, `tools/tests/exposure_spec.lua`, `fxmanifest.lua`,
+`docs/internal/INTEGRATIONS.md`, `docs/configuration/README.md`,
+`docs/guides/scba-and-air.md`.
+
+**Two real bugs, both found by a pre-flight check rather than by testing.**
+
+**One: every survival figure was double the truth.** A GTA player ped reads 200 health at
+full and is **dead at 100**, so the usable pool is 100 points and not 200.
+`Exposure.survivalSeconds` modelled 200. The figures reported in sessions 013 and 014 --
+including the 34.5 seconds that prompted the complaint about turnout, and the 92.5 seconds
+offered as its fix -- were all twice the real number. Actual turnout survival at the time
+of the complaint was about **17 seconds**, not 35.
+
+Corrected, then retuned against the real pool. `baseDamagePerTick` 8 to 6:
+
+| Gear | Gear fails at | You go down |
+|---|---|---|
+| Station uniform | immediately | ~9s |
+| Wildland brush | ~13s | ~20s |
+| Structural turnout | ~46s | ~64s |
+| Proximity | ~60s | ~76s |
+
+**Two: `SetEntityHealth` does not raise a damage event.** qbx_medical decides last stand
+from `CEventNetworkEntityDamage` (`client/dead.lua:118`), so health set directly is
+invisible to it -- a firefighter would have slid to zero and died outright with no last
+stand, no bleeding and no injury record. `ApplyDamageToPed` raises the event properly, and
+is what qbx_medical uses on itself for bleed damage (`client/wounding.lua:61`).
+
+**Decisions:**
+
+- Added `bridge/medical/init.lua`, targeting **qbx_medical** as instructed. It answers two
+  questions: is this player down, and how do I hurt them in a way the medical resource will
+  notice. Server-side death state is read from `metadata.isdead` / `metadata.inlaststand`
+  rather than asked of the client, because the client being asked may be the unconscious
+  one.
+- qbx_medical is in `[disabled]` and `osp_ambulance` is running, so the bridge prefers
+  qbx_medical, falls back to osp_ambulance, then to raw health. The fallback is the path
+  that runs today and it had to work.
+- Exposure stops damaging anyone already down. Otherwise a downed firefighter could not be
+  rescued, because the fire would keep killing them faster than a crew could reach them.
+- PASS now asks the medical bridge whether someone is down instead of guessing from health.
+  That makes **last stand** count, which is exactly who the device exists to find, and a raw
+  health check would miss them the moment a medic stabilised them above the threshold.
+- Sub-point damage is banked rather than floored away. `ApplyDamageToPed` takes whole
+  numbers, and smoke at low density is well under one point per tick -- flooring each call
+  would have rounded it to nothing forever and made smoke harmless.
+
+**The failure-window assertion earned itself twice.** With the corrected pool it caught that
+wildland and proximity gear never burned through before death at all, and structural only
+had a nine-second window. All three degradation rates were raised.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **502 passed, 0 failed** (was 499).
+- All 45 Lua files parse; load order and every file-scope global capture checked against
+  the manifest.
+- Published figures in the configuration reference and the player guide corrected to the
+  real numbers.
+- **Still not tested in game.**
+
+**Open:** no smoke visual, no accountability board, `mobility` applied nowhere. Screen
+effects still unviewed.
+
+**Next:** in-game test.

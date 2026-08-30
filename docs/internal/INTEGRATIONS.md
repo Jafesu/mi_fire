@@ -113,6 +113,32 @@ reasoning behind them is written up in its README.
 
 ---
 
+## qbx_medical — injury and death
+
+**Role:** decides what happens when a firefighter runs out of health. mi_fire injures; it
+never decides that someone is dead.
+
+**Verified** in `[disabled]/qbx_medical`:
+
+| Fact | Where |
+|---|---|
+| Last stand is decided from `CEventNetworkEntityDamage` | `client/dead.lua:118` |
+| It uses `ApplyDamageToPed` on itself for bleed damage | `client/wounding.lua:61` |
+| Client exports `IsDead`, `IsLaststand`, `StartLastStand` | `client/main.lua:59`, `client/laststand.lua:94` |
+| Death state is on the Qbox player as `metadata.isdead` / `metadata.inlaststand` | `server/main.lua:37` |
+
+**The finding that matters:** `SetEntityHealth` does **not** raise a damage event. A
+resource that sets health directly is invisible to qbx_medical -- a firefighter would slide
+to zero and die outright with no last stand, no bleeding, and no injury record. `bridge/medical/init.lua`
+uses `ApplyDamageToPed` instead, which is what qbx_medical does to itself.
+
+The server reads death state from framework metadata rather than asking the client, because
+the client being asked may be the unconscious one.
+
+**Note:** qbx_medical is currently in `[disabled]` and `osp_ambulance` is running. The
+bridge prefers qbx_medical, falls back to osp_ambulance, and falls back again to raw health
+checks -- so it works either way, and the fallback path is the one running today.
+
 ## ox_target, ox_lib, ox_inventory
 
 Standard. `ox_lib` and `ox_target` are hard dependencies in the manifest; `ox_inventory`

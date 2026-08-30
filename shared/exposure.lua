@@ -220,10 +220,13 @@ end
 ---@param intensity number
 ---@param tier table
 ---@param config table `MIFireGear.exposure`
----@param health number|nil Starting health, defaults to 200.
+--- `health` is the **usable pool**, not the raw value. A GTA player ped reads 200 at full
+--- and is dead at 100, so there are only 100 points to lose -- modelling 200 doubles every
+--- figure and was doing exactly that until it was checked against the medical resource.
+---@param health number|nil Usable health, defaults to 100.
 ---@return number seconds
 function Exposure.survivalSeconds(intensity, tier, config, health)
-    health = health or 200.0
+    health = health or 100.0
 
     local integrity = tonumber(tier.integrity) or 0
     local elapsed, step = 0.0, 0.5

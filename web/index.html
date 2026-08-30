@@ -16,16 +16,18 @@
     }
 
     /*
-     * The fireground HUD. Bottom-centre-left, above the minimap's usual footprint and out
-     * of the way of ox_lib's notifications on the right. Rows appear only when they have
-     * something to say, so a firefighter with a full bottle and a good coat sees nothing.
+     * The fireground HUD. Bottom right: the left is the minimap and whatever status icons
+     * a server stacks beside it, and ox_lib's notifications land top right, so this is the
+     * one corner that stays free. Rows appear only when they have something to say, so a
+     * firefighter with a full bottle and a good coat sees nothing at all.
      */
     #mi-hud {
         position: absolute;
-        left: 2vw;
+        right: 2vw;
         bottom: 22vh;
         display: flex;
         flex-direction: column;
+        align-items: flex-end;
         gap: 0.5vh;
         font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
         font-size: 1.25vh;
@@ -66,6 +68,7 @@
 
     #mi-hud .value {
         min-width: 5vw;
+        text-align: right;
         font-variant-numeric: tabular-nums;
         opacity: 0.9;
     }

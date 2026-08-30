@@ -10,51 +10,13 @@ MIFire.ready = false
 -- Config validation
 -- ---------------------------------------------------------------------------
 
---- Fail loudly at boot rather than quietly at 2am.
----
---- The gear check is the important one: a config that grants immunity to fire would
---- silently break the whole exposure model, and the design rule is that no tier may.
+--- Validation itself lives in `shared/validate.lua` as a pure function, so the real
+--- boot check can be exercised by `tools/run_tests.lua` outside FiveM. Discovering a
+--- broken config on a live server is the expensive way to find out.
 ---@return string[] problems
 local function validateConfig()
-    local problems = {}
-
-    if type(Config.fireJobs) ~= 'table' or next(Config.fireJobs) == nil then
-        problems[#problems + 1] = 'Config.fireJobs is empty; nobody can be a firefighter'
-    end
-
-    for name, tier in pairs(MIFireGear.tiers or {}) do
-        local resist = tonumber(tier.fireResist)
-        if resist == nil then
-            problems[#problems + 1] = ('gear tier "%s" has no fireResist'):format(name)
-        elseif resist >= 1.0 then
-            problems[#problems + 1] = ('gear tier "%s" has fireResist %.2f; nothing may grant immunity to fire')
-                :format(name, resist)
-        elseif resist < 0.0 then
-            problems[#problems + 1] = ('gear tier "%s" has a negative fireResist'):format(name)
-        end
-    end
-
-    if not MIFireGear.tiers[MIFireGear.defaultTier] then
-        problems[#problems + 1] = ('MIFireGear.defaultTier "%s" is not a real tier')
-            :format(tostring(MIFireGear.defaultTier))
-    end
-
-    for name, district in pairs(MIFireZones.districts or {}) do
-        if type(district.shape) ~= 'table' then
-            problems[#problems + 1] = ('district "%s" has no shape'):format(name)
-        end
-        if type(district.fireClasses) ~= 'table' or next(district.fireClasses) == nil then
-            problems[#problems + 1] = ('district "%s" can generate no fire classes'):format(name)
-        end
-    end
-
-    for _, districtName in ipairs(MIFireZones.aop.default or {}) do
-        if not MIFireZones.districts[districtName] then
-            problems[#problems + 1] = ('AOP default names unknown district "%s"'):format(districtName)
-        end
-    end
-
-    return problems
+    return MIFire.Validate.configuration(
+        Config, MIFireGear, MIFireZones, MIFireClasses, MIFireAgents)
 end
 
 -- ---------------------------------------------------------------------------

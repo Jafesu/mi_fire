@@ -42,21 +42,56 @@
 
 ## Check it worked
 
-In game, as an admin:
+> **This resource is still in development.** The fire engine is not built yet, so there
+> is nothing to *see* on a first boot — no commands, no fires. What a clean start proves
+> is that the resource loads, the configuration is valid, and the database schema applied.
+> That is worth confirming before the rest is built on top of it.
+
+Watch the server console as it starts. A healthy boot is **silent** — mi_fire only prints
+when something is wrong or when `Config.debug` is on.
+
+Turn on `Config.debug = true` in `config/config.lua` for the first boot and you should see
+one line naming the framework, dispatch, and database it found:
 
 ```
-/fire here
+[mi_fire:boot] framework=qbx dispatch=lb-tablet is started database=ready
 ```
 
-A fire should start at your feet. Then:
+Then confirm the schema applied. mi_fire creates its tables on first boot and records
+what it ran:
+
+```sql
+SELECT * FROM mi_fire_migrations;
+```
+
+Two rows, `0001_stations` and `0002_sprinklers`. If the table does not exist, the database
+was unreachable — see the warning in the console for which.
+
+Finally, `restart mi_fire` **twice**. The second restart is where leaked handles show up,
+and catching that now is far cheaper than catching it once there is a fireground to leak.
+
+### If something is wrong
+
+mi_fire validates its configuration at boot and **refuses to start** on a bad one, listing
+every problem rather than failing at the first:
 
 ```
-/fire list
+[mi_fire] configuration problems found:
+  - gear tier "structural" has fireResist 1.00; nothing may grant immunity to fire
+  - AOP default names unknown district "downtown"
+[mi_fire] refusing to start with an invalid configuration
 ```
 
-It should be listed with an ID. Put it out with `/fire stop <id>`, or `/fire stopall`.
+Those messages name the file and key to fix. A resource that boots into a half-working
+state is harder to debug than one that says why it will not.
 
-If `/fire` does nothing at all, you are missing the ACE grant from step 3.
+Warnings are different from errors — these are informational, and mi_fire keeps running:
+
+| Warning | Meaning |
+|---|---|
+| `dispatch unavailable` | Fires will still start; nobody gets toned out. |
+| `oxmysql is not started` / `database is unreachable` | Station and sprinkler features are off. Everything else is fine. |
+| `ox_target is not started` | No interactions will be available. Fix this one. |
 
 ## Configure it
 

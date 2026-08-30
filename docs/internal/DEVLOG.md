@@ -223,3 +223,68 @@ toward a playable fire.
 
 **Next:** `FIRE-002`, the node lifecycle. Foundation is well ahead of the engine now, and
 the gap should close before more configuration is written.
+
+---
+
+## 2026-08-30 · session 004
+
+**Scope:** `SETUP-011` — boot simulation and testable config validation
+
+**Changed:** `shared/validate.lua` (new), `tools/tests/boot_spec.lua` (new),
+`server/main.lua`, `fxmanifest.lua`, `tools/run_tests.lua`,
+`docs/getting-started/installation.md`.
+
+**Decisions:**
+
+- Config validation moved out of `server/main.lua` into `shared/validate.lua` as a pure
+  function taking the config tables as arguments rather than reading globals. That is what
+  makes the real boot check runnable outside FiveM, and it lets a test feed it a
+  deliberately broken config without mutating the shipped one.
+- Added a boot simulation that stubs the natives and loads every server-side file in
+  manifest order, then runs validation. It does not prove anything works — only a real
+  boot does that. What it removes is the class of failure that costs a server restart
+  each to find: a file referencing something not loaded yet, a global that never gets set,
+  a typo that only executes at boot.
+- The stubs report every optional resource as missing, so the simulated boot exercises the
+  path where ox_target, lb-tablet, oxmysql, and the framework are all absent. That is the
+  case most likely to be broken and least likely to be tested by hand.
+- The boot test cross-checks its own file list against `fxmanifest.lua`. Without that, a
+  file added to the manifest would silently stop being boot-checked, which is how a test
+  like this rots into decoration.
+- Validation gained checks it did not have: AOP mode, district shape well-formedness,
+  districts naming unknown fire classes, agents missing a fire class, and hazards named by
+  the matrix but never defined. Each is tested by feeding it the broken config, because a
+  validation rule that never fires is not a rule.
+
+**Correction to session 001:** `docs/getting-started/installation.md` told readers to
+verify the install with `/fire here` and `/fire list`. Those commands do not exist —
+`ADMIN-001` has not been written. Shipping a verification step that cannot work was worse
+than shipping none. Replaced with what a first boot can actually demonstrate: a clean load,
+the debug line naming the detected integrations, two rows in `mi_fire_migrations`, and a
+double restart. The section now opens by saying the fire engine is not built yet.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **208 passed, 0 failed** (72 boot, 94 hydraulics, 42
+  sprinkler). Up from 136.
+- The full server-side load order executes cleanly with every optional resource absent,
+  and `server/main.lua`'s boot thread runs to completion, emitting the two expected
+  warnings for missing dispatch and missing database.
+- All 26 Lua files parse.
+- **Still not verified on a real server.** No FiveM server on this machine can run it: the
+  two FXServer installs under `c:/fivem` are NexusCore templates whose resource folders
+  hold no `ox_lib`, `ox_target`, or `qbx_core`, and neither points at this resource tree.
+  The migrations remain unproven — the boot simulation stubs `LoadResourceFile` to return
+  nil, so it never reads the SQL, let alone executes it.
+
+**Open:**
+
+- Phase 1 still untouched. Four sessions in, no fire has burned.
+- The migration SQL is the single largest unverified thing in the repo and can only be
+  proven by a real boot.
+- Client-side files are excluded from the boot simulation. They need natives and ox_lib's
+  `cache` in ways the stubs do not honestly reproduce, and a fake pass there would be
+  worse than no test.
+
+**Next:** a real boot on the Qbox server, checking `mi_fire_migrations` has two rows. Then
+`FIRE-002`, the node lifecycle.

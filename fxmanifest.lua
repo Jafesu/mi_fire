@@ -12,6 +12,7 @@ shared_scripts {
     'shared/enums.lua',
     'shared/util.lua',
     'shared/hydraulics.lua',
+    'shared/validate.lua',
     'config/config.lua',
     'config/dispatch.lua',
     'config/zones.lua',

@@ -19,6 +19,7 @@ Set a task to `in-progress` before you start it, not after.
 | `SETUP-008` | Test harness and docs tree | done |
 | `SETUP-009` | Database core, migration runner, station schema | done |
 | `SETUP-010` | Sprinkler schema and configuration | done |
+| `SETUP-011` | Testable config validation and boot simulation | done |
 
 ## Phase 1 — Fire core
 

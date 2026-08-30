@@ -57,6 +57,7 @@ end
 
 local specs = {
     'tools/tests/boot_spec.lua',
+    'tools/tests/fire_spec.lua',
     'tools/tests/hydraulics_spec.lua',
     'tools/tests/sprinklers_spec.lua',
 }

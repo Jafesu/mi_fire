@@ -13,6 +13,8 @@ shared_scripts {
     'shared/util.lua',
     'shared/hydraulics.lua',
     'shared/validate.lua',
+    'shared/fireclass.lua',
+    'shared/suppression.lua',
     'config/config.lua',
     'config/dispatch.lua',
     'config/zones.lua',
@@ -28,6 +30,8 @@ client_scripts {
     'bridge/target/ox_target.lua',
     'bridge/appearance/illenium.lua',
     'client/main.lua',
+    'client/modules/notify.lua',
+    'client/modules/fire/init.lua',
 }
 
 server_scripts {
@@ -39,6 +43,10 @@ server_scripts {
     'server/core/state.lua',
     'server/core/permissions.lua',
     'server/main.lua',
+    'server/modules/fire/init.lua',
+    'server/modules/fire/spread.lua',
+    'server/modules/admin/init.lua',
+    'server/api/exports.lua',
 }
 
 -- Hard dependencies. The framework, dispatch, inventory, and appearance integrations all

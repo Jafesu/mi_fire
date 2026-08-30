@@ -7,6 +7,19 @@ Versions follow [Semantic Versioning](https://semver.org).
 
 ### Added
 
+- **The fire engine.** Nodes ignite, grow, consume fuel, spread, and go out. Knocking a
+  fire down is not extinguishing it: a node driven to zero keeps its fuel and may reflash
+  unless a crew keeps working it, which is overhaul.
+- Suppression through the agent matrix, with one entry point so no water source can
+  bypass it. The wrong agent adds intensity and fires its hazard rather than being
+  clamped to zero.
+- Propagation with per-class spread rates, caps, and a drifting global wind that wildland
+  fires run with.
+- Client fire rendering, scaled by intensity so a crew can see the water working.
+- `/fire` command family: start, here, at, stop, stopall, list, info, agent, wind, classes.
+- Export surface, both name-compatible with the resource mi_fire replaces and a richer
+  native API.
+
 - Repository scaffold: manifest, module layout, and load order.
 - `shared/hydraulics.lua` — fireground hydraulics with real friction-loss coefficients,
   smooth bore and fog nozzle flow, elevation and appliance loss, pump discharge pressure,

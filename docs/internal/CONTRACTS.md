@@ -17,16 +17,16 @@ These deliberately match the names and return shapes of the resource being repla
 | Export | Signature | Status | Task |
 |---|---|---|---|
 | `CreateFire` | `(x, y, z, fireType, radius, count, interiorId?, suppressDispatch?) -> incidentId \| nil` | planned | `API-001` |
-| `StopFire` | `(incidentId) -> ok: boolean` | planned | `API-001` |
-| `GetAllFires` | `() -> FireRow[]` | planned | `API-001` |
-| `GetFiresForIncident` | `(incidentId) -> FireRow[]` | planned | `API-001` |
+| `StopFire` | `(incidentId) -> ok: boolean` | review | `API-001` |
+| `GetAllFires` | `() -> FireRow[]` | review | `API-001` |
+| `GetFiresForIncident` | `(incidentId) -> FireRow[]` | review | `API-001` |
 | `GetIncidentStatus` | `(incidentId) -> status: string \| nil` | planned | `API-001` |
 | `ProbeInteriorAtCoords` | `(x, y, z) -> interiorId: integer \| nil` | planned | `API-001` |
-| `GetActiveVehicleFires` | `(opts?) -> VehicleFireRow[]` | planned | `API-001` |
+| `GetActiveVehicleFires` | `(opts?) -> VehicleFireRow[]` | review | `API-001` |
 | `StartVehicleFire` | `(vehNet, opts?) -> incidentId \| nil` | planned | `API-001` |
 | `CreateSmoke` | `(x, y, z, smokeType, radius, suppressDispatch?) -> incidentId \| nil` | planned | `API-001` |
-| `StopSmoke` | `(incidentId) -> ok: boolean` | planned | `API-001` |
-| `ApplyFireDamageAtCoords` | `(x, y, z, radius, amount, opts?) -> affected: integer` | planned | `API-001` |
+| `StopSmoke` | `(incidentId) -> ok: boolean` | review | `API-001` |
+| `ApplyFireDamageAtCoords` | `(x, y, z, radius, amount, opts?) -> affected: integer` | review | `API-001` |
 
 ## Server exports — native
 
@@ -36,21 +36,26 @@ Richer API for new integrations. Prefer these over the compatible set above.
 |---|---|---|---|
 | `StartIncident` | `(spec: IncidentSpec) -> incidentId \| nil, err?` | planned | `API-002` |
 | `GetIncident` | `(incidentId) -> Incident \| nil` | planned | `API-002` |
-| `GetIncidents` | `(filter?) -> Incident[]` | planned | `API-002` |
-| `ExtinguishAt` | `(coords, radius, agent, amount) -> knockedDown: number` | planned | `API-002` |
+| `GetIncidents` | `(filter?) -> Incident[]` | review | `API-002` |
+| `ExtinguishAt` | `(coords, radius, agent, amount) -> knockedDown: number` | review | `API-002` |
 | `GetDistrictAt` | `(coords) -> districtName \| nil` | planned | `ZONE-001` |
 | `GetActiveAop` | `() -> districtName[]` | planned | `ZONE-002` |
 | `SetAop` | `(districtNames: string[]) -> ok, err?` | planned | `ZONE-002` |
 | `GetGearTier` | `(source) -> tierName, integrity` | planned | `EXPO-002` |
+| `GetAgentEffect` | `(agent, className) -> { effectiveness, hazard, note, counterproductive }` | review | `API-002` |
+| `GetFireClasses` | `() -> string[]` | review | `API-002` |
+| `GetFiresInRadius` | `(coords, radius) -> FireRow[]` | review | `API-002` |
+| `GetWind` | `() -> { heading, speed }` | review | `FIRE-003` |
+| `StopIncident` / `StopAllIncidents` | `(id) -> ok` / `() -> count` | review | `API-002` |
 
 ## Client exports
 
 | Export | Signature | Status | Task |
 |---|---|---|---|
-| `GetAllFires` | `() -> FireRow[]` | planned | `API-001` |
-| `GetAllSmokes` | `() -> SmokeRow[]` | planned | `API-001` |
-| `IsFireNearby` | `(radius?) -> boolean, nearestDistance?` | planned | `API-001` |
-| `IsFireStillActive` | `(incidentId) -> boolean` | planned | `API-001` |
+| `GetAllFires` | `() -> FireRow[]` | review | `API-001` |
+| `GetAllSmokes` | `() -> SmokeRow[]` | review | `API-001` |
+| `IsFireNearby` | `(radius?) -> boolean, nearestDistance?` | review | `API-001` |
+| `IsFireStillActive` | `(incidentId) -> boolean` | review | `API-001` |
 
 ## Events
 

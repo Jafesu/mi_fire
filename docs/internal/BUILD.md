@@ -79,13 +79,18 @@ the convention every FiveM server owner already expects from a `config/` directo
 | `MIFire.DB` | `server/core/db.lua` |
 | `MIFire.State` | `server/core/state.lua` |
 | `MIFire.Permissions` | `server/core/permissions.lua` |
+| `MIFire.FireClass` | `shared/fireclass.lua` |
+| `MIFire.Suppression` | `shared/suppression.lua` |
+| `MIFire.Fire` | `server/modules/fire/init.lua` |
+| `MIFire.Spread` | `server/modules/fire/spread.lua` |
+| `MIFire.Admin` | `server/modules/admin/init.lua` |
 
 ## Phase status
 
 | Phase | Scope | Status |
 |---|---|---|
 | 0 | Foundation: scaffold, bridges, config, test harness | **done** |
-| 1 | Fire core: nodes, classes, agents, exposure, districts, AOP, generation, admin, exports | in progress |
+| 1 | Fire core: nodes, classes, agents, exposure, districts, AOP, generation, admin, exports | in progress -- engine, suppression, admin and exports done |
 | 2 | Placement gizmo, apparatus, offset finder, turnout | todo |
 | 3 | Hoses: pull, lay, connect, crew slots | todo |
 | 4 | Pump operations and the panel | todo |

@@ -21,6 +21,12 @@ return function(t)
     local eventHandlers = {}
     local printed = {}
 
+    --- Threads in this resource are `while true do Wait(n) ... end`. A no-op `Wait` turns
+    --- every one of them into an infinite loop, so the stub throws a sentinel instead:
+    --- the thread unwinds at its first yield point and the runner treats that as success.
+    --- Reaching a Wait is exactly what "the thread started correctly" means.
+    local YIELD = {}
+
     local stubs = {
         --- Nothing is "started" in a bare interpreter, so every bridge takes its
         --- absent path. That is the interesting case anyway: it proves the resource
@@ -33,9 +39,10 @@ return function(t)
         CreateThread = function(fn) threads[#threads + 1] = fn end,
         AddEventHandler = function(name, fn) eventHandlers[name] = fn end,
         RegisterNetEvent = function(name, fn) eventHandlers[name] = fn end,
+        RegisterCommand = function() end,
         TriggerClientEvent = function() end,
         TriggerEvent = function() end,
-        Wait = function() end,
+        Wait = function() error(YIELD) end,
 
         IsPlayerAceAllowed = function() return false end,
         GetPlayerPed = function() return 0 end,
@@ -85,6 +92,8 @@ return function(t)
         'shared/util.lua',
         'shared/hydraulics.lua',
         'shared/validate.lua',
+        'shared/fireclass.lua',
+        'shared/suppression.lua',
         'config/config.lua',
         'config/dispatch.lua',
         'config/zones.lua',
@@ -103,6 +112,10 @@ return function(t)
         'server/core/state.lua',
         'server/core/permissions.lua',
         'server/main.lua',
+        'server/modules/fire/init.lua',
+        'server/modules/fire/spread.lua',
+        'server/modules/admin/init.lua',
+        'server/api/exports.lua',
     }
 
     local function load(path)
@@ -145,6 +158,8 @@ return function(t)
             'bridge/target/ox_target.lua',
             'bridge/appearance/illenium.lua',
             'client/main.lua',
+            'client/modules/notify.lua',
+            'client/modules/fire/init.lua',
         }) do known[path] = true end
 
         for path in pairs(declared) do
@@ -158,8 +173,9 @@ return function(t)
     t.describe('globals the modules promise')
 
     local expected = {
-        'Enums', 'Util', 'Hydraulics', 'Validate',
+        'Enums', 'Util', 'Hydraulics', 'Validate', 'FireClass', 'Suppression',
         'Framework', 'Dispatch', 'Inventory', 'DB', 'State', 'Permissions',
+        'Fire', 'Spread', 'Admin',
     }
     for _, name in ipairs(expected) do
         t.ok(type(MIFire) == 'table' and MIFire[name] ~= nil,
@@ -253,8 +269,11 @@ return function(t)
 
     for i = 1, #threads do
         local ok, err = pcall(threads[i])
-        t.ok(ok, ('boot thread %d runs without error'):format(i))
-        if not ok then realPrint(('    -> %s'):format(tostring(err))) end
+        -- Unwinding at a Wait is the expected outcome for a looping thread.
+        local yielded = (not ok) and err == YIELD
+        t.ok(ok or yielded,
+            ('boot thread %d runs to completion or to its first yield'):format(i))
+        if not ok and not yielded then realPrint(('    -> %s'):format(tostring(err))) end
     end
 
     t.ok(eventHandlers['onResourceStop'] ~= nil,

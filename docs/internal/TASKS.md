@@ -26,12 +26,12 @@ Set a task to `in-progress` before you start it, not after.
 | ID | Task | Status | Depends on |
 |---|---|---|---|
 | `FIRE-001` | Fire class and agent configuration | done | `SETUP-002` |
-| `FIRE-002` | Node lifecycle: ignite, grow, consume fuel, go out | todo | `FIRE-001` |
-| `FIRE-003` | Propagation: spread rolls, wind, spread caps | todo | `FIRE-002` |
+| `FIRE-002` | Node lifecycle: ignite, grow, consume fuel, go out | done | `FIRE-001` |
+| `FIRE-003` | Propagation: spread rolls, wind, spread caps | done | `FIRE-002` |
 | `FIRE-004` | Incident merge when scenes touch | todo | `FIRE-003` |
-| `FIRE-005` | Suppression: agent matrix, knockdown, reflash, overhaul | todo | `FIRE-002` |
-| `FIRE-006` | Hazards: spread, shock, explosion, flare, reaction | todo | `FIRE-005` |
-| `FIRE-007` | Client rendering: PTFX, sound, intensity scaling, render distance | todo | `FIRE-002` |
+| `FIRE-005` | Suppression: agent matrix, knockdown, reflash, overhaul | done | `FIRE-002` |
+| `FIRE-006` | Hazards: spread, shock, explosion, flare, reaction | done | `FIRE-005` |
+| `FIRE-007` | Client rendering: PTFX, sound, intensity scaling, render distance | done | `FIRE-002` |
 | `FIRE-008` | Smoke volumes, separate from flame | todo | `FIRE-002` |
 | `FIRE-009` | Interior probing so indoor fires land inside rooms | todo | `FIRE-002` |
 | `FIRE-010` | Vehicle fire, including the EV reflash variant | todo | `FIRE-002` |
@@ -47,10 +47,10 @@ Set a task to `in-progress` before you start it, not after.
 | `GEN-003` | Indoor placement via learned interiors | todo | `GEN-002`, `FIRE-009` |
 | `GEN-004` | Retire `mi_fire_origins` once parity is reached | todo | `GEN-003` |
 | `DISP-001` | Raise dispatches from incidents through the bridge | todo | `ZONE-004` |
-| `ADMIN-001` | `/fire` command family | todo | `FIRE-002` |
+| `ADMIN-001` | `/fire` command family | done | `FIRE-002` |
 | `ADMIN-002` | `/aop` and `/district` commands | todo | `ZONE-002` |
-| `API-001` | SmartFires-compatible export surface | todo | `FIRE-002` |
-| `API-002` | Native mi_fire export surface | todo | `API-001` |
+| `API-001` | SmartFires-compatible export surface | done | `FIRE-002` |
+| `API-002` | Native mi_fire export surface | done | `API-001` |
 | `API-003` | Repoint `mi_fire_rescue` and verify victims still work | todo | `API-001` |
 | `DOC-001` | `docs/guides/firefighting-basics.md` | todo | `FIRE-005` |
 | `DOC-002` | `docs/guides/admin-guide.md` | todo | `ADMIN-002` |

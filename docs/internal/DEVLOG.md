@@ -336,3 +336,87 @@ line did not appear, because `Config.debug` defaults to `false` and that line is
 
 **Next:** `FIRE-002`, the node lifecycle. The foundation is now verified rather than
 assumed, and there is no remaining excuse to keep writing configuration.
+
+---
+
+## 2026-08-30 · session 006
+
+**Scope:** `FIRE-002`, `FIRE-003`, `FIRE-005`, `FIRE-006`, `FIRE-007`, `ADMIN-001`,
+`API-001`, `API-002`
+
+**Changed:** `shared/fireclass.lua`, `shared/suppression.lua`,
+`server/modules/fire/{init,spread}.lua`, `server/modules/admin/init.lua`,
+`server/api/exports.lua`, `client/modules/fire/init.lua`, `client/modules/notify.lua`,
+`tools/tests/fire_spec.lua`, `fxmanifest.lua`, `tools/tests/boot_spec.lua`.
+
+**The engine exists.** A fire now ignites, grows, consumes fuel, spreads, can be knocked
+down, reflashes if left, and goes out when the fuel is gone.
+
+**Decisions:**
+
+- Class resolution and the suppression maths went into `shared/` as pure functions, same
+  reasoning as the hydraulics: the numbers that decide whether water works are worth being
+  able to check outside the game. `server/modules/fire/` is then mostly bookkeeping.
+- **One entry point for suppression.** Hose lines, extinguishers, sprinklers, the admin
+  command, and `ApplyFireDamageAtCoords` all route through `Fire.applyAgent`. A future
+  water source cannot bypass the agent matrix by being added somewhere else.
+- Negative knockdown is applied as growth rather than clamped, and fires the configured
+  hazard. Water on a Class B pool genuinely makes the incident worse. Tested directly.
+- Fuel burns proportionally to intensity, so a developed fire eats its fuel faster than a
+  smouldering one and a fire held down by a crew lasts longer. That falls out of one line
+  rather than a special case.
+- Knockdown is not extinguishment. A node driven to zero intensity goes to `KNOCKED_DOWN`
+  with its fuel intact and may schedule a reflash. Sustained application after knockdown
+  is overhaul, which cancels the reflash and makes it permanent. This is the loop that
+  makes putting a fire out an activity rather than a moment.
+- Spread scales with intensity, so a fire being fought spreads more slowly even before it
+  is knocked out. Wind is one slowly drifting global vector, blended by per-class
+  `windInfluence` -- wildland runs with it, everything else ignores it.
+- Spread refuses to place a node within half a spread radius of an existing one. Without
+  that, a scene becomes a pile rather than a fire.
+- Client renders with particles rather than `StartScriptFire`. Script fires are capped,
+  spread on their own schedule, and cannot be sized -- all three fight a
+  server-authoritative model. Particles cost manual cleanup, which is what the handle
+  trackers in `client/main.lua` are for.
+- Sync is one batched event per tick, not one per node. A spreading wildland fire changes
+  dozens of nodes in the same tick.
+- `/fire agent <agent>` exists as the test harness for the matrix, and is the only way to
+  put a fire out until hose lines land in Phase 3.
+- Exports that depend on unbuilt systems return empty rather than erroring, and
+  `CONTRACTS.md` now has a "Not implemented" section naming what each is waiting on. A
+  consumer that iterates the result keeps working; one that expects behaviour finds out
+  from the docs.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` -- **273 passed, 0 failed** (was 208).
+- `fire_spec.lua` drives the real engine with a controllable clock: growth, fuel
+  exhaustion, knockdown, reflash, overhaul, spread, class caps, incident caps, and
+  stopAll leaving no orphaned nodes.
+- The behaviours that justify the whole design are asserted, not assumed: water on Class B
+  adds intensity while foam removes it; ABC dry chemical does literally nothing to a
+  Class D fire while dry powder works; point-blank beats long range; a bigger line beats a
+  smaller one but not proportionally.
+- All 30 Lua files parse.
+- **Not** run in game. No fire has been seen on a screen.
+
+**Fixed in the harness:** the boot simulation hung once the engine added
+`while true do Wait() end` threads, because `Wait` was a no-op stub. It now throws a
+sentinel so a thread unwinds at its first yield, and reaching a yield counts as success.
+Two `fire_spec` assertions also failed initially and were the test's fault, not the
+engine's -- Class A burns 0.075 fuel per tick, so draining 0.5 fuel needs seven ticks and
+the test allowed three.
+
+**Open:**
+
+- `EXPO-001`: fire does not hurt players yet. Hazards damage, ordinary flame does not.
+- `FIRE-004` merge, `FIRE-008` smoke, `FIRE-009` interiors, `FIRE-010` vehicle fires.
+- `ZONE-*` and `GEN-*`: nothing generates on its own; every fire is admin- or export-started.
+- No dispatch is raised yet -- `DISP-001` needs run cards.
+- `API-003`: `mi_fire_rescue` still points at the old resource. The export shape is
+  written to match but has never been tested against it.
+- Particle asset and name are guesses carried over from the old config and may look wrong
+  in game.
+
+**Next:** boot it and light one. `/fire here`, then `/fire agent water`, then
+`/fire start B` and water it to watch the matrix bite. After that, `EXPO-001`.

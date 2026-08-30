@@ -80,8 +80,13 @@ CreateThread(function()
             dispatchDetail)
     end
 
+    -- Stations are the only thing that needs the database. Everything else runs without
+    -- it, so a failure here is a warning rather than a refusal to start.
+    local dbOk = MIFire.DB.init()
+
     MIFire.ready = true
-    MIFire.Util.debug('boot', 'framework=%s dispatch=%s', MIFire.Framework.name, dispatchDetail)
+    MIFire.Util.debug('boot', 'framework=%s dispatch=%s database=%s',
+        MIFire.Framework.name, dispatchDetail, dbOk and 'ready' or 'unavailable')
 end)
 
 -- ---------------------------------------------------------------------------

@@ -25,6 +25,8 @@ These are the claims the rest of the design rests on. Changing one is an ADR, no
 | The server owns all fire and water truth | `server/core/state.lua` |
 | Every interaction is `ox_target` | `bridge/target/ox_target.lua` |
 | Hydraulics are real, and testable outside the game | `shared/hydraulics.lua` |
+| Things you build in game live in MySQL, not a config file | `install/migrations/`, `server/core/db.lua` |
+| Station changes hot-apply without a restart | `server/modules/station/` |
 
 ## Module map
 
@@ -32,12 +34,14 @@ These are the claims the rest of the design rests on. Changing one is an ADR, no
 |---|---|
 | `docs/` | User documentation. `docs/internal/` is the engineering record. |
 | `config/` | All tuning. One file per system. Documented in `docs/configuration/`. |
+| `install/migrations/` | Numbered, append-only SQL. Applied by the runner, never by hand. |
 | `shared/` | Pure Lua used by both sides. Side-effect free and unit-testable. |
 | `bridge/` | Every third-party integration. One adapter per resource. |
 | `server/core/` | State, permissions, sync. No feature logic. |
 | `server/modules/` | Feature services. Each owns its state and exposes functions. |
 | `client/modules/` | Rendering, detection, interaction. No business logic. |
 | `client/modules/targets/` | Every `ox_target` registration, in one readable place. |
+| `client/modules/placement/` | Shared raycast-and-nudge gizmo, used by the offset finder and the station tool. |
 | `web/` | React + Vite + TypeScript pump panel. |
 | `tools/` | Test runner and specs. Runs outside FiveM. |
 
@@ -50,8 +54,8 @@ These are the claims the rest of the design rests on. Changing one is an ADR, no
 3. `shared/hydraulics.lua` — pure math, no dependencies
 4. `config/*.lua` — reads nothing, provides globals
 5. `bridge/*` — needs config, detects what is running
-6. `server/core/*` — needs bridge
-7. `server/main.lua` — validates config, then declares ready
+6. `server/core/*` — needs bridge. `db.lua` before `state.lua`.
+7. `server/main.lua` — validates config, runs migrations, then declares ready
 
 Modules that need a bridge must not run at file scope; wait for `MIFire.ready`.
 
@@ -71,6 +75,7 @@ the convention every FiveM server owner already expects from a `config/` directo
 | `MIFire.Target` | `bridge/target/ox_target.lua` (client) |
 | `MIFire.Appearance` | `bridge/appearance/illenium.lua` (client) |
 | `MIFire.Inventory` | `bridge/inventory/ox_inventory.lua` (server) |
+| `MIFire.DB` | `server/core/db.lua` |
 | `MIFire.State` | `server/core/state.lua` |
 | `MIFire.Permissions` | `server/core/permissions.lua` |
 
@@ -80,12 +85,12 @@ the convention every FiveM server owner already expects from a `config/` directo
 |---|---|---|
 | 0 | Foundation: scaffold, bridges, config, test harness | **done** |
 | 1 | Fire core: nodes, classes, agents, exposure, districts, AOP, generation, admin, exports | in progress |
-| 2 | Apparatus, offset finder, turnout | todo |
+| 2 | Placement gizmo, apparatus, offset finder, turnout | todo |
 | 3 | Hoses: pull, lay, connect, crew slots | todo |
 | 4 | Pump operations and the panel | todo |
 | 5 | Supply and ground ladders | todo |
 | 6 | SCBA, PASS, hazmat | todo |
-| 6b | Station alerting | todo |
+| 6b | Station alerting, MySQL-backed and placed in game | todo |
 | 7 | Water rescue | todo |
 | 8 | Polish | todo |
 

@@ -25,3 +25,6 @@ Versions follow [Semantic Versioning](https://semver.org).
 - Dispatch bridge with lb-tablet, custom, and none providers.
 - Target, inventory, and appearance bridges.
 - Server state, permissions, and boot-time configuration validation.
+- MySQL-backed station configuration with a numbered migration runner. Stations, their
+  placed points (lights, speakers, panels, bay doors, apparatus bays), and their coverage
+  polygons are runtime data built in game rather than hand-edited coordinates.

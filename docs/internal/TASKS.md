@@ -17,6 +17,7 @@ Set a task to `in-progress` before you start it, not after.
 | `SETUP-006` | Target, inventory, and appearance bridges | done |
 | `SETUP-007` | `server/core/` state and permissions | done |
 | `SETUP-008` | Test harness and docs tree | done |
+| `SETUP-009` | Database core, migration runner, station schema | done |
 
 ## Phase 1 — Fire core
 
@@ -52,12 +53,15 @@ Set a task to `in-progress` before you start it, not after.
 | `DOC-001` | `docs/guides/firefighting-basics.md` | todo | `FIRE-005` |
 | `DOC-002` | `docs/guides/admin-guide.md` | todo | `ADMIN-002` |
 
-## Phase 2 — Apparatus, offset finder, turnout
+## Phase 2 — Placement, apparatus, turnout
 
 | ID | Task | Status | Depends on |
 |---|---|---|---|
+| `PLACE-001` | Shared placement gizmo: raycast preview, surface-normal orientation | todo | — |
+| `PLACE-002` | Gizmo: 6-DOF nudge, snap toggles, confirm and cancel | todo | `PLACE-001` |
+| `PLACE-003` | Polygon builder: walk the perimeter, close the loop, set height | todo | `PLACE-001` |
 | `APP-001` | Apparatus profile schema and config | todo | — |
-| `APP-002` | Offset finder: 6-DOF preview, snap to bone | todo | `APP-001` |
+| `APP-002` | Offset finder on the shared gizmo, snapping to vehicle bones | todo | `PLACE-002`, `APP-001` |
 | `APP-003` | Offset finder: export to clipboard and to config | todo | `APP-002` |
 | `APP-004` | Tank state: water and foam, per vehicle | todo | `APP-001` |
 | `APP-005` | Pump engage and disengage | todo | `APP-004` |
@@ -71,6 +75,23 @@ Set a task to `in-progress` before you start it, not after.
 
 Tasks are written when the phase starts. The scope of each is in the plan and summarised
 in [BUILD.md](BUILD.md).
+
+### Station alerting — Phase 6b, movable earlier
+
+Only needs `PLACE-003` and `DISP-001`, so it can run ahead of Phase 6 if you want stations
+alive sooner.
+
+| ID | Task | Status | Depends on |
+|---|---|---|---|
+| `STN-001` | Station CRUD service over the schema | todo | `SETUP-009` |
+| `STN-002` | `/firestation` tool: create, edit, place points | todo | `STN-001`, `PLACE-002` |
+| `STN-003` | Coverage and interior polygons via the polygon builder | todo | `STN-002`, `PLACE-003` |
+| `STN-004` | Hot apply: station changes take effect with no restart | todo | `STN-001` |
+| `STN-005` | Zoned alerting: tones, lights, turnout timer | todo | `STN-003`, `DISP-001` |
+| `STN-006` | Panel: acknowledge, silence, test tones, reset lights | todo | `STN-005` |
+| `DOC-003` | `docs/guides/station-operations.md` | todo | `STN-006` |
+
+### Remaining phases
 
 | Phase | Scope |
 |---|---|

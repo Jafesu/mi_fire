@@ -18,6 +18,7 @@ shared_scripts {
     'config/fire_classes.lua',
     'config/agents.lua',
     'config/gear.lua',
+    'config/stations.lua',
 }
 
 client_scripts {
@@ -28,18 +29,30 @@ client_scripts {
 }
 
 server_scripts {
+    '@oxmysql/lib/MySQL.lua',
     'bridge/framework/init.lua',
     'bridge/dispatch/init.lua',
     'bridge/inventory/ox_inventory.lua',
+    'server/core/db.lua',
     'server/core/state.lua',
     'server/core/permissions.lua',
     'server/main.lua',
 }
 
--- Hard dependencies only. The framework, dispatch, inventory, and appearance
--- integrations all degrade gracefully through bridge/ when their resource is absent,
--- so listing them here would break servers that legitimately do not run them.
+-- Hard dependencies. The framework, dispatch, inventory, and appearance integrations all
+-- degrade gracefully through bridge/ and are deliberately absent from this list, so
+-- servers that do not run them are not blocked.
+--
+-- oxmysql is here because `@oxmysql/lib/MySQL.lua` above is a load-time include: without
+-- it the resource does not start at all, so listing it anywhere else would be a lie.
+-- Qbox and ESX both require it already. server/core/db.lua still handles the database
+-- being unreachable at runtime, which is a different failure from it being absent.
 dependencies {
     'ox_lib',
     'ox_target',
+    'oxmysql',
+}
+
+files {
+    'install/migrations/*.sql',
 }

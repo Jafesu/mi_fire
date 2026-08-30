@@ -88,3 +88,67 @@ one saying so — the record of what we believed at the time is part of the valu
 
 **Next:** `FIRE-002` — the fire node lifecycle in `server/modules/fire/`, then the
 class/agent matrix applied to suppression, then exports.
+
+---
+
+## 2026-08-30 · session 002
+
+**Scope:** `SETUP-009`, plus design for `PLACE-001`…`PLACE-003` and `STN-001`…`STN-006`
+
+**Changed:** `install/migrations/0001_stations.sql`, `server/core/db.lua`,
+`config/stations.lua`, `fxmanifest.lua`, `server/main.lua`,
+`docs/internal/DATAMODEL.md`, `docs/internal/{BUILD,TASKS}.md`.
+
+**Decisions:**
+
+- Station configuration moves to MySQL. The split is not "important things in the
+  database" — it is *things you edit in a text editor* versus *things you build by walking
+  around*. Fire tuning wants to be diffed and copied between servers, so it stays a file.
+  A speaker position wants to be placed by looking at a wall, so it is a row.
+- One `mi_fire_station_points` table for every placed kind rather than one per kind. A
+  light and a speaker differ only in what happens when the tones drop, so a new kind
+  should be a row, not a migration.
+- Placement is a raycast tool: aim at a surface, the preview snaps to the hit point and
+  takes its rotation from the surface normal, so a wall-mounted speaker sits flat without
+  anyone typing a rotation. Fine adjustment reuses the 6-DOF nudge from the offset finder.
+- The offset finder and the station tool therefore share one gizmo in
+  `client/modules/placement/`, rather than two that drift apart. That is why the placement
+  tasks moved to the front of Phase 2 — Phase 6b depends on them.
+- A polygon builder covers areas: walk the perimeter dropping vertices, close the loop,
+  set the height. Station coverage is not a sphere, and pretending it is puts the tones in
+  the car park. A station with no polygon falls back to a radius so it is useful
+  immediately and the polygon is a refinement rather than a prerequisite.
+- Presentation stays in `config/stations.lua` while position goes in the database. The row
+  says *where a speaker is*; the config says *how loud speakers are*. Putting the second
+  in the database would mean editing rows to retune audio.
+- Station changes must hot-apply. Recorded as a verification step, not an aspiration.
+
+**Correction to session 001:** that session removed `@oxmysql` from the manifest and
+described the database integration as gracefully degrading. That was wrong.
+`@oxmysql/lib/MySQL.lua` is a **load-time include** — without oxmysql the resource does
+not start at all, so any claim of degradation would have been false. `oxmysql` is now a
+declared hard dependency, which Qbox and ESX both require anyway. `server/core/db.lua`
+still handles the genuinely different failure of oxmysql running but the database being
+unreachable, and proves the connection with `SELECT 1` rather than trusting the resource
+state — a started oxmysql with bad credentials looks identical to a working one until the
+first real query fails somewhere less convenient.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — 94 passed, 0 failed. Unchanged; nothing this session touched
+  the hydraulics.
+- `luac -p` on all 22 Lua files — all parse.
+- **Not** verified in game. The migration runner has never been executed against a real
+  database, so `0001_stations.sql` is unproven — a syntax error in it would only surface on
+  first boot. That is the first thing to check next session.
+
+**Open:**
+
+- Everything in Phase 1 remains untouched; the node engine still does not exist.
+- `MIGRATIONS` in `db.lua` is a hand-maintained list. Adding a migration file without
+  registering it there is a silent no-op, and nothing currently catches that.
+- The statement splitter is naive: it splits on semicolons after stripping line comments.
+  Any migration needing a stored procedure or trigger would break it.
+
+**Next:** `FIRE-002` — the node lifecycle. The database work is foundation, not progress
+toward a playable fire.

@@ -198,6 +198,36 @@ MIFireSmoke.actions = {
 }
 
 -- ---------------------------------------------------------------------------
+-- Rendering
+-- ---------------------------------------------------------------------------
+
+--- Which particle effect carries which behaviour.
+---
+--- Turbulent and laminar need genuinely different effects, not the same one at a different
+--- rate. Boiling smoke and a lazy column look nothing alike, and telling them apart is the
+--- most important read on the fireground.
+---
+--- These dictionary and effect names are verified working pairs. A name that is not in its
+--- dictionary draws nothing and reports nothing.
+MIFireSmoke.visual = {
+    turbulentDict = 'core',
+    turbulentName = 'ent_amb_smoke_foundry',
+
+    laminarDict = 'scr_agencyheistb',
+    laminarName = 'scr_env_agency3b_smoke',
+
+    --- Height above the node for the plume as it leaves, and for the same smoke after it
+    --- has drifted and cooled. The gap between the two is what makes the colour change
+    --- visible from outside.
+    seatHeight = 1.2,
+    driftHeight = 5.0,
+
+    --- Metres of travel the upper layer is rendered as having done. Raising this makes the
+    --- top of a plume paler and the seat easier to locate.
+    driftTravel = 14.0,
+}
+
+-- ---------------------------------------------------------------------------
 -- Size-up vocabulary
 -- ---------------------------------------------------------------------------
 

@@ -268,6 +268,124 @@ subcommands.classes = function(source)
     replyList(source, lines)
 end
 
+--- `/fire sizeup [id]` -- read the smoke on the nearest incident.
+---
+--- Not gated on admin, because reading smoke is the job rather than an administrative act.
+--- What *is* gated is the interpretation: everyone is told what they can see, and an
+--- officer is told what it means. That teaches the skill instead of replacing it.
+subcommands.sizeup = function(source, args)
+    local coords = callerCoords(source)
+    if not coords then
+        return reply(source, 'the console cannot look at anything', 'error')
+    end
+
+    local incidentId = args[2]
+    if incidentId and tonumber(incidentId) then incidentId = 'incident:' .. incidentId end
+
+    if not incidentId then
+        local nearest, nearestDistance
+        for id, incident in pairs(State.getIncidents()) do
+            local distance = math.sqrt(Util.distance3dSq(
+                coords.x, coords.y, coords.z,
+                incident.coords.x, incident.coords.y, incident.coords.z))
+            if distance <= MIFireSmoke.sizeup.maxDistance
+                and (not nearestDistance or distance < nearestDistance) then
+                nearest, nearestDistance = id, distance
+            end
+        end
+        incidentId = nearest
+    end
+
+    if not incidentId then
+        return reply(source, 'nothing close enough to size up')
+    end
+
+    local reading = MIFire.SmokeServer.sizeUp(incidentId)
+    if not reading then
+        return reply(source, 'no smoke showing', 'error')
+    end
+
+    -- The observation. Everyone gets this.
+    replyList(source, {
+        ('%s volume, %s.'):format(reading.volume, reading.velocity),
+        ('%s and %s.'):format(reading.density, reading.colour),
+        ('Ventilation reads %s.'):format(reading.ventilation),
+    })
+
+    -- The interpretation. Gated on rank.
+    local _, _, grade = MIFire.Framework.getJob(source)
+    if (grade or 0) < MIFireSmoke.sizeup.interpretationGrade
+        and not Permissions.hasAdminAce(source) then
+        return
+    end
+
+    local conclusions = MIFireSmoke.sizeup.conclusions
+
+    if reading.warning == MIFire.Smoke.Warning.FLASHOVER then
+        reply(source, conclusions.flashover, 'error')
+    elseif reading.warning == MIFire.Smoke.Warning.BACKDRAFT then
+        reply(source, conclusions.backdraft, 'error')
+    elseif reading.stage == MIFire.Smoke.Stage.PYROLYSIS then
+        reply(source, conclusions.pyrolysis)
+    elseif reading.density < 0.35 then
+        reply(source, conclusions.clean)
+    end
+end
+
+--- `/fire vent <action> [id]` -- change how a compartment is ventilated.
+---
+--- The tactical decision the whole smoke model exists to make interesting. Forcing a door
+--- on a starved compartment is how a crew gets hurt; cutting the roof first is how they
+--- do not.
+subcommands.vent = function(source, args)
+    local coords = callerCoords(source)
+    if not coords then
+        return reply(source, 'the console cannot ventilate anything', 'error')
+    end
+
+    local actionName = args[2]
+    if not actionName or not MIFireSmoke.actions[actionName] then
+        local names = {}
+        for name, action in pairs(MIFireSmoke.actions) do
+            names[#names + 1] = ('%s (%s)'):format(name, action.label)
+        end
+        table.sort(names)
+        return replyList(source, {
+            'usage: fire vent <action> [id]',
+            table.concat(names, ', '),
+        })
+    end
+
+    local incidentId = args[3]
+    if incidentId and tonumber(incidentId) then incidentId = 'incident:' .. incidentId end
+
+    if not incidentId then
+        local nearest, nearestDistance
+        for id, incident in pairs(State.getIncidents()) do
+            local distance = math.sqrt(Util.distance3dSq(
+                coords.x, coords.y, coords.z,
+                incident.coords.x, incident.coords.y, incident.coords.z))
+            if distance <= 30.0 and (not nearestDistance or distance < nearestDistance) then
+                nearest, nearestDistance = id, distance
+            end
+        end
+        incidentId = nearest
+    end
+
+    if not incidentId then return reply(source, 'nothing close enough to ventilate') end
+
+    local ok, why, backdraft = MIFire.SmokeServer.ventilate(incidentId, actionName, source)
+    if not ok then return reply(source, why or 'that did not work', 'error') end
+
+    if backdraft then
+        reply(source, 'It went up. You opened a starved compartment at ground level.', 'error')
+    else
+        reply(source, ('%s -- ventilation now %s'):format(
+            MIFireSmoke.actions[actionName].label,
+            MIFire.SmokeServer.ventilationOf(incidentId)), 'success')
+    end
+end
+
 --- `/fire render` -- ask your own client what it knows and what it is drawing.
 ---
 --- Exists because "I ran the command and nothing happened" was impossible to diagnose from
@@ -303,6 +421,8 @@ local USAGE = {
     'fire classes | wind [heading] [speed]',
     'fire perms                           -- why you can or cannot use these',
     'fire render                          -- what your client is actually drawing',
+    'fire sizeup [id]                     -- read the smoke',
+    'fire vent <action> [id]              -- force_door | take_window | vertical_vent | close_up',
 }
 
 ---@param source integer
@@ -312,6 +432,20 @@ function Admin.handle(source, args)
 
     -- `perms` is the one subcommand anyone may run: it only reports the caller's own access,
     -- and refusing to explain a refusal is how a permissions problem becomes a support ticket.
+    -- Reading smoke and ventilating are the job rather than administration, so they are
+    -- gated on being a firefighter instead of on admin.
+    if sub == 'sizeup' or sub == 'vent' then
+        local allowed, why = Permissions.requireFirefighter(source)
+        if not allowed then return reply(source, why or 'not allowed', 'error') end
+
+        local ok, err = pcall(subcommands[sub], source, args)
+        if not ok then
+            Util.warn('command "fire %s" failed: %s', sub, tostring(err))
+            reply(source, ('that failed: %s'):format(tostring(err)), 'error')
+        end
+        return
+    end
+
     if sub ~= 'perms' then
         local allowed, why = Permissions.requireAdmin(source, sub)
         if not allowed then

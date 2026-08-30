@@ -1042,3 +1042,68 @@ had a nine-second window. All three degradation rates were raised.
 effects still unviewed.
 
 **Next:** in-game test.
+
+---
+
+## 2026-08-30 · session 016
+
+**Scope:** `FIRE-008` — smoke, rebuilt as something readable rather than a by-product.
+
+**Changed:** `shared/smoke.lua`, `config/smoke.lua`, `server/modules/smoke/init.lua`,
+`client/modules/smoke/init.lua` (all new), `server/modules/admin/init.lua`,
+`tools/tests/smoke_spec.lua` (new), manifest and boot spec.
+
+**The technical enabler**, checked before anything was promised: `SetParticleFxLoopedColour`,
+`SetParticleFxLoopedAlpha` and `SetParticleFxLoopedEvolution` are all in production use on
+this server (`[jim]/jim-mechanic`, `[qbx]/qbx_core`). Colour, opacity and behaviour are
+controllable per particle instance, which is what makes any of this possible.
+
+**Decisions:**
+
+- Four attributes, mapped one-to-one onto rendering: volume to scale, density to alpha,
+  colour to tint, velocity to which effect and how often it is re-emitted.
+- **Velocity is the important one.** Turbulent smoke is heat-pushed and means the
+  compartment has stopped absorbing heat; laminar is volume-pushed and means it still is.
+  Rendered as genuinely different effects rather than the same one faster, because boiling
+  smoke and a lazy column look nothing alike.
+- **Colour reports stage and travel together.** Brown means the fire is into structural
+  timber. Black at one opening with white at another is one fire, and the black is nearer
+  the seat. Two plume layers are drawn per fire -- one at the seat and one higher with
+  travel applied -- so that difference is visible from outside without needing building
+  geometry we do not have.
+- **Flashover builds, backdraft waits.** Flashover has a 25-second warning window, so
+  reading the smoke buys real time. Backdraft has no timer at all: it sits indefinitely and
+  is *triggered* by someone opening the compartment. That asymmetry is the character of the
+  two, and the reason one is announced and the other is not.
+- Backdraft risk is evaluated **before** the ventilation change is applied, since the risk
+  is a property of the compartment as it was when someone opened it.
+- Vertical ventilation is the safe answer and takes three times as long as forcing a door,
+  so the correct choice costs something.
+- Flashover's clock winds back rather than resetting when conditions improve, so a crew
+  that cools a room sees the benefit.
+- `sizeup` and `vent` are gated on being a **firefighter**, not an admin. Reading smoke is
+  the job. The observation is given to everyone and the interpretation is gated on rank, so
+  a probationer is told what they can see and an officer is told what it means.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **557 passed, 0 failed** (was 502).
+- Fifty smoke assertions, none of them snapshots. Each is something true about smoke: an
+  outdoor fire never flashes over, a ventilated fire cannot backdraft, a gas jet never
+  reads as pyrolysing, a starved fire has *lower* velocity than a flashover fire, and an
+  early open fire warns of nothing — because warnings that fire constantly stop being
+  listened to.
+- All 49 Lua files parse.
+- **Not** tested in game. The plume rendering, the two events, and the tint values are all
+  unproven.
+
+**Open:**
+
+- Smoke is rendered per incident at the worst node rather than per node. Simpler and reads
+  well, but a large scene shows one plume rather than several.
+- No neutral plane, no smoke pathing through interiors, no volumetric fill. All three need
+  interior geometry that is not available.
+- Ventilation actions are commands, not `ox_target` interactions on actual doors and
+  windows. That needs the placement work in Phase 2.
+
+**Next:** in-game test.

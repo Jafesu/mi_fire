@@ -82,6 +82,7 @@ function Validate.configuration(cfg, gear, zones, classes, agents)
                 here = true, start = true, at = true, stop = true, stopall = true,
                 list = true, info = true, agent = true, classes = true, wind = true,
                 perms = true, help = true, render = true,
+                sizeup = true, vent = true,
             }
             for _, name in ipairs(perms.jobCommands) do
                 if not known[name] then

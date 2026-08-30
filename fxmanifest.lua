@@ -42,6 +42,7 @@ client_scripts {
     'client/modules/turnout/init.lua',
     'client/modules/scba/pass.lua',
     'client/modules/exposure/init.lua',
+    'client/modules/smoke/init.lua',
 }
 
 server_scripts {
@@ -60,6 +61,7 @@ server_scripts {
     'server/modules/turnout/init.lua',
     'server/modules/scba/pass.lua',
     'server/modules/exposure/init.lua',
+    'server/modules/smoke/init.lua',
     'server/modules/admin/init.lua',
     'server/api/exports.lua',
 }

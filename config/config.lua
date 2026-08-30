@@ -71,7 +71,7 @@ Config.permissions = {
     --- The default withholds nothing destructive so much as nothing surprising: a chief can
     --- run the whole fireground, but `wind` changes weather for the entire server.
     jobCommands = {
-        'here', 'start', 'at', 'stop', 'stopall', 'list', 'info', 'agent', 'classes', 'perms', 'render',
+        'here', 'start', 'at', 'stop', 'stopall', 'list', 'info', 'agent', 'classes', 'perms', 'render', 'sizeup', 'vent',
     },
 }
 

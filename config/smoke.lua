@@ -30,6 +30,11 @@ MIFireSmoke.stageColour = {
     developed = { r = 34,  g = 32,  b = 31  },
 }
 
+--- Pure carbon. What a sooty fuel pulls its colour toward regardless of how hot the fire
+--- is -- a pool of diesel smokes black while it is still small, because sooting is a
+--- property of the fuel and not of the temperature.
+MIFireSmoke.sootColour = { r = 24, g = 22, b = 21 }
+
 --- What smoke fades toward as it travels, cools, and filters through the building.
 MIFireSmoke.travelColour = { r = 216, g = 216, b = 220 }
 

@@ -1263,3 +1263,101 @@ shipped as one.
 - No accountability board, so a condemned set is not visible to a company officer.
 
 **Next:** in-game test — gear, SCBA, exposure, PASS, smoke, and now repair.
+
+---
+
+## 2026-08-30 · session 019
+
+**Scope:** first real in-game test of gear, SCBA, exposure, PASS and smoke, and the seven
+defects it found.
+
+**Changed:** `shared/gearmatch.lua`, `shared/smoke.lua`, `config/{gear,scba,smoke,fire_classes}.lua`,
+`server/modules/{turnout,exposure,scba/pass}/init.lua`, `client/modules/{exposure,turnout}/init.lua`,
+`client/modules/hud.lua` (new), `web/{hud.js,index.html}` (new), `client/modules/turnout/init.lua`
+diagnostics, `tools/tests/{gearmatch,exposure}_spec.lua`, and the docs.
+
+**This is the first entry written against evidence rather than reasoning.** Six of the seven
+were invisible from the code and every one of them was a case of something quietly not
+happening. That is the pattern worth remembering.
+
+**Decisions:**
+
+- **SCBA never got the ADR 0004 treatment the coat did.** Turnout was taught to follow the
+  clothing; SCBA was left requiring the rig. A firefighter wearing a visible harness was told
+  "you are not wearing a set". `GearMatch.matchScba` fixes it on the same rule. Recognising
+  the *masked* drawable does not open the valve -- the server owns the bottle, and air should
+  not drain because someone picked a skin.
+
+- **Air is now banked per character.** Recognition from clothing needs somewhere to resume
+  from, or re-equipping the skin would be a free refill and air management would be optional.
+  Same idea as turnout integrity: the equipment is worn out, not the visit. A set with no item
+  behind it comes back full after a restart, which is stated rather than hidden.
+
+- **A full bottle is 10 minutes, not 30** (user's call). A real 30-minute bottle gives 15-20
+  under work and that gap is worth modelling -- but a GTA fire is over in minutes, so 30
+  minutes of game air meant the bottle was never the constraint it is on a real fireground.
+
+- **`StartEntityFire` was overriding the entire gear model.** It looks exactly right and
+  brings GTA's own ped fire damage with it: fast, unconfigurable, independent of every number
+  in `config/gear.lua`. It killed a firefighter from 37 health in about two seconds against a
+  four second roll, so stop-drop-roll was unperformable by anyone. Our own model had given
+  them eighteen seconds. Flames are now a particle we own -- and there is a new invariant in
+  BUILD.md: **the resource owns its damage; no native applies it for us.**
+
+  The test that should have caught this measured the window between the gear failing and
+  death *without* the burn damage that starts at ignition. It now simulates being alight,
+  and asserts the roll is completable both in and out of the flame.
+
+- **A PASS runs on its own battery.** `armed` was `worn and valve open`, so an empty bottle
+  silently disarmed the device at the exact moment its wearer was most likely to need it --
+  which is why it did not alarm during last stand: the bottle had usually run out by the time
+  they went down. It now latches on at first valve-open and stays armed until the set comes
+  off. It alarming with the valve shut is correct, not a glitch.
+
+- **Smoke colour had no input from the fuel.** Stage alone drove it, so a flammable-liquid
+  fire smoked white while it was still small. Backwards -- sooting is a property of the fuel,
+  not the temperature, which is why a diesel pool is black from the first second. Each class
+  now carries `sootiness`, biasing colour toward carbon and thickening density independent of
+  stage. Class B 0.85, gas and D 0.05.
+
+- **The repair options could not appear.** The exposure module degrades integrity server-side
+  and never pushed the new value, so the client believed the coat was full forever and both
+  repair and replace stayed hidden however hard it was worked. Pushed now, throttled to 2%
+  steps.
+
+- **Screen effects are off, all of them** (user's call). Heat escalated into
+  `DrugsMichaelAliensFightIn` -- the drug-trip overlay -- which reads as being poisoned rather
+  than cooked. But the deeper problem was that none of it said *which* of the three channels
+  was hurting you, which is the only thing that changes what you do. A distorted screen was
+  indistinguishable from the resource malfunctioning, and the user reported it as exactly
+  that. The information moved to a HUD where heat, air and gear condition are three separate
+  readable numbers, and the screen is left alone. The machinery survives behind
+  `visuals`, every flag `false`.
+
+- **`/fire gear`** was added before any of this, because "no option on the truck" is five
+  booleans deep and none of them log.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **642 passed, 0 failed** (was 596 at session start).
+- The burn-window test prints its measurements, so the numbers are in the output rather than
+  implied: structural gets 78s clear of the flame for a 3s roll.
+- A scratch probe confirmed the model matches what was observed in game -- ignition at 45.5s
+  with 37.2 health, death at 63.8s -- which is what established that the tuning was fine and
+  the native was the problem.
+- All 53 Lua files parse; `web/hud.js` passes `node --check`.
+- Sections 1, and most of 3, 5, 6 and 7 of `TESTING.md` **passed in game**. That is the first
+  real confirmation the fire engine, suppression, ventilation, backdraft, flashover and PASS
+  audio all work.
+- **Not** re-tested in game since these fixes.
+
+**Open:**
+
+- `TURN-003` — gear state still does not survive a disconnect while worn.
+- Ambient generation and dispatch remain unproven; nothing in this round touched them.
+- The HUD lives in a plain NUI page. Phase 4's React app becomes the `ui_page`, at which
+  point this becomes a component in it.
+- A second player has still not heard a PASS at range, and nobody has been put out by a
+  partner.
+
+**Next:** re-run `TESTING.md` sections 2-6 against these fixes.

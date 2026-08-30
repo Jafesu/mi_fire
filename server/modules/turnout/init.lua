@@ -165,9 +165,104 @@ end
 --- Integrity is keyed to the character and the tier rather than to this session, so
 --- changing clothes does not repair a burned coat and putting the same gear back on
 --- resumes where it left off.
+-- ---------------------------------------------------------------------------
+-- Air, per character
+-- ---------------------------------------------------------------------------
+
+--- What each character's bottle was left at.
+---
+--- Needed because a set can now be recognised from clothing, and a bottle that refilled
+--- itself every time someone re-equipped the skin would make air management optional. The
+--- bank is the same idea as turnout integrity: the equipment is worn out, not the visit.
+---
+--- Written through to the SCBA item's metadata when the player actually has one, so a
+--- carried bottle survives a restart. A set that exists only as clothing does not have an
+--- item to write to, so it comes back full after a restart -- stated rather than hidden.
+---@type table<string, number>
+local airBank = {}
+
+---@param source integer
+---@return string
+local function airKey(source)
+    return MIFire.Framework.getIdentifier(source) or ('src:' .. source)
+end
+
+--- Air this character should get when a set goes on.
+---@param source integer
+---@return number seconds
+local function recallAir(source)
+    local capacity = MIFireScba.air.capacitySeconds
+
+    if Inventory.has(source, MIFireScba.item) then
+        local stored = Inventory.getMetadata(source, MIFireScba.item,
+            MIFireScba.air.metadataKey, nil)
+        if stored then return Util.clamp(tonumber(stored) or capacity, 0.0, capacity) end
+    end
+
+    local banked = airBank[airKey(source)]
+    if banked then return Util.clamp(banked, 0.0, capacity) end
+
+    -- No record at all: a first bottle, and it is full.
+    return capacity
+end
+
+--- Remember where the bottle got to.
+---@param source integer
+---@param air number
+local function bankAir(source, air)
+    airBank[airKey(source)] = air
+
+    if Inventory.has(source, MIFireScba.item) then
+        Inventory.updateMetadata(source, MIFireScba.item, MIFireScba.air.metadataKey, air)
+    end
+end
+
+Turnout.bankAir = bankAir
+
+--- Recognise an SCBA set from what is on the ped.
+---
+--- Same rule as turnout (ADR 0004): the harness is the harness however it got there. This
+--- only decides whether a set is **worn** -- the valve stays a deliberate act, so nobody
+--- silently burns a bottle because they picked a skin.
+---@param source integer
+---@param worn table
+---@param sex string|nil
+local function reconcileScba(source, worn, sex)
+    local recognised = MIFire.GearMatch.matchScba(worn, MIFireScba.appearance, sex)
+    local scba = State.getScba(source)
+
+    if recognised and not scba.worn then
+        local air = recallAir(source)
+
+        State.setScba(source, { worn = true, active = false, air = air, fromClothing = true })
+        TriggerClientEvent('mi_fire:client:scbaState', source, false, air,
+            MIFireScba.air.capacitySeconds)
+
+        if air <= 0 then
+            notify(source, 'That bottle is empty. Refill it at the rig.', 'error')
+        else
+            notify(source, ('SCBA on. %s of air. Open the valve to breathe it.')
+                :format(Util.clock(air)), 'inform')
+        end
+
+        Util.debug('scba', '%s recognised as wearing SCBA with %.0fs air',
+            tostring(source), air)
+
+    elseif not recognised and scba.worn and scba.fromClothing then
+        -- Only clear what clothing put on. A set donned at the rig is tracked by the rig,
+        -- and taking the visual off should not silently discard it.
+        bankAir(source, scba.air)
+        State.clearScba(source)
+        TriggerClientEvent('mi_fire:client:scbaState', source, false, nil, nil)
+        Util.debug('scba', '%s took the SCBA off', tostring(source))
+    end
+end
+
 RegisterNetEvent('mi_fire:server:reportGear', function(worn, sex)
     local source = source
     if type(worn) ~= 'table' then return end
+
+    reconcileScba(source, worn, sex)
 
     local entry = State.getGear(source)
 
@@ -178,6 +273,13 @@ RegisterNetEvent('mi_fire:server:reportGear', function(worn, sex)
         if entry.tier ~= MIFireGear.defaultTier then
             State.clearGear(source)
             pushGearState(source)
+        end
+
+        local scba = State.getScba(source)
+        if scba.worn and scba.fromClothing then
+            bankAir(source, scba.air)
+            State.clearScba(source)
+            TriggerClientEvent('mi_fire:client:scbaState', source, false, nil, nil)
         end
         return
     end
@@ -469,8 +571,10 @@ function Turnout.doffScba(source, opts)
     if not scba.worn then return false, 'you are not wearing a set' end
 
     -- Racking a bottle refills it, which is the whole reason to go back to the rig.
-    if not opts.toRack then
-        Inventory.updateMetadata(source, MIFireScba.item, MIFireScba.air.metadataKey, scba.air)
+    if opts.toRack then
+        bankAir(source, MIFireScba.air.capacitySeconds)
+    else
+        bankAir(source, scba.air)
     end
 
     State.clearScba(source)
@@ -540,6 +644,7 @@ function Turnout.refillScba(source, seconds)
     if scba.worn then
         if scba.air >= capacity then return false, 'the bottle is already full' end
         scba.air = Util.clamp(scba.air + (seconds or capacity), 0.0, capacity)
+        bankAir(source, scba.air)
         TriggerClientEvent('mi_fire:client:scbaState', source, scba.active, scba.air, capacity)
         notify(source, ('Bottle filled to %s'):format(Util.clock(scba.air)), 'success')
         return true
@@ -600,6 +705,10 @@ local function consumeAir(source, dt, exertion, inSmoke)
         pushAppearance(source, 'apply', MIFireScba.appearance.inactive)
         notify(source, 'Out of air. Smoke is no longer being kept out.', 'error')
     end
+
+    -- Bank as it is spent. A set recognised from clothing has no item behind it, so
+    -- without this the bottle would refill itself every time the skin came back on.
+    bankAir(source, scba.air)
 
     TriggerClientEvent('mi_fire:client:scbaState', source, scba.active, scba.air, capacity)
 end
@@ -747,6 +856,17 @@ AddEventHandler('playerDropped', function()
         Inventory.updateMetadata(source, MIFireScba.item, MIFireScba.air.metadataKey, scba.air)
     end
 end)
+
+--- Re-send gear state to a client.
+---
+--- The exposure module owns the burning-through, so it is the one that knows integrity
+--- moved. Without this the client's copy stayed at whatever it was when the coat went on,
+--- and the repair and replace options -- which are gated on integrity being below full --
+--- never appeared however hard the gear was worked.
+---@param source integer
+function Turnout.pushState(source)
+    pushGearState(source)
+end
 
 MIFire.Turnout = Turnout
 

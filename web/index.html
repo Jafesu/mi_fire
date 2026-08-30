@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>mi_fire</title>
 <style>
-    /* Audio only. Nothing is drawn, and nothing may ever take focus or swallow a click. */
+    /* Nothing here may ever take focus or swallow a click. */
     html, body {
         margin: 0;
         padding: 0;
@@ -14,9 +14,77 @@
         background: transparent;
         pointer-events: none;
     }
+
+    /*
+     * The fireground HUD. Bottom-centre-left, above the minimap's usual footprint and out
+     * of the way of ox_lib's notifications on the right. Rows appear only when they have
+     * something to say, so a firefighter with a full bottle and a good coat sees nothing.
+     */
+    #mi-hud {
+        position: absolute;
+        left: 2vw;
+        bottom: 22vh;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5vh;
+        font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+        font-size: 1.25vh;
+        letter-spacing: 0.08em;
+        color: #e8eaed;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+    }
+
+    #mi-hud .row {
+        display: flex;
+        align-items: center;
+        gap: 0.7vw;
+    }
+
+    #mi-hud .label {
+        width: 3.2vw;
+        font-weight: 700;
+        opacity: 0.75;
+    }
+
+    #mi-hud .bar {
+        position: relative;
+        width: 9vw;
+        height: 0.9vh;
+        background: rgba(0, 0, 0, 0.55);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 1px;
+        overflow: hidden;
+    }
+
+    #mi-hud .bar > i {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: #d8dde3;
+        transition: width 220ms linear, background-color 220ms linear;
+    }
+
+    #mi-hud .value {
+        min-width: 5vw;
+        font-variant-numeric: tabular-nums;
+        opacity: 0.9;
+    }
+
+    /* Amber at the low alarm, red past it -- the same two points the audio uses. */
+    #mi-hud .row[data-state="warn"] .bar > i { background: #f0a92b; }
+    #mi-hud .row[data-state="warn"] .value { color: #f0a92b; }
+
+    #mi-hud .row[data-state="critical"] .bar > i { background: #e5484d; }
+    #mi-hud .row[data-state="critical"] .value { color: #e5484d; }
+    #mi-hud .row[data-state="critical"] { animation: mi-pulse 1s ease-in-out infinite; }
+
+    @keyframes mi-pulse {
+        50% { opacity: 0.45; }
+    }
 </style>
 </head>
 <body>
 <script src="sounds.js"></script>
+<script src="hud.js"></script>
 </body>
 </html>

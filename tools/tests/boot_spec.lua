@@ -188,6 +188,7 @@ return function(t)
             'bridge/target/ox_target.lua',
             'client/main.lua',
             'client/modules/notify.lua',
+            'client/modules/hud.lua',
             'client/modules/fire/render.lua',
             'client/modules/fire/init.lua',
             'client/modules/turnout/init.lua',

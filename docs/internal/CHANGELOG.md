@@ -5,8 +5,31 @@ Versions follow [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
 
+### Fixed
+
+- SCBA worn through a clothing menu is recognised, the same way turnout gear already was.
+  A visible harness previously counted for nothing.
+- Catching fire is survivable if you act at once. The engine's own ped fire was applying
+  damage on top of the resource's, killing a firefighter in about two seconds against a
+  four second roll — so stop, drop and roll could not be performed by anyone.
+- A PASS device keeps alarming when the bottle runs out. It previously switched itself off
+  at the moment its wearer most needed it, which also stopped it alarming during last stand.
+- Turnout gear can now actually be repaired or replaced. Wear was tracked server-side but
+  never sent to the player, so both options stayed hidden however burned the set was.
+- Flammable-liquid fires produce black, heavy smoke from the first second. Smoke colour was
+  driven only by how developed the fire was, with no input from what was burning.
+
+### Changed
+
+- A full air bottle is ten minutes rather than thirty.
+- Heat and smoke no longer distort the screen, and there is no coughing. That information
+  moved to a HUD showing air, gear condition and heat as three separate readable numbers.
+  The screen effects remain available in config, switched off.
+
 ### Added
 
+- A fireground HUD: air remaining, gear condition, and heat load. Each row appears only
+  when it has something to say.
 - `/fire gear` — explains why a truck is showing no turnout or SCBA options. An
   ox_target option that does not appear produces no error and no log line, so it reports
   the whole chain instead: ox_target's state, the job gate, whether the vehicle counts as

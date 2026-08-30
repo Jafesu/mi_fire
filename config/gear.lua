@@ -91,7 +91,7 @@ MIFireGear.tiers = {
         integrity = 240,
         degradeRate = 4.2,
         ignitionThreshold = 0.20,
-        selfExtinguish = 4.0,
+        selfExtinguish = 3.0,
         mobility = 0.92,
         appearance = {
             male = {
@@ -269,6 +269,56 @@ MIFireGear.exposure = {
         contactRadius = 1.8,
     },
 
+    --- What heat and smoke do to the screen.
+    ---
+    --- **Off.** All of it, by default.
+    ---
+    --- This started as heat washing the picture out and escalating into a screen effect,
+    --- and smoke darkening and closing in with a cough animation. In play it was wrong in
+    --- both directions at once: the heat overlay was GTA's drug-trip effect, which reads as
+    --- being poisoned rather than being cooked, and none of it told you *which* of the
+    --- three channels was hurting you -- so a distorted screen was indistinguishable from
+    --- the resource malfunctioning.
+    ---
+    --- The information is real and worth having. The screen is the wrong place to put it,
+    --- because a firefighter cannot act on "something is wrong with your vision". It lives
+    --- on the HUD instead, where heat, air, and gear condition are three separate readable
+    --- numbers, and the screen is left alone so you can see the fire you came to fight.
+    ---
+    --- Turn any of it back on if you want it. Every timecycle named here is one already in
+    --- production use rather than one read off a wiki list, for the same reason particle
+    --- names are pinned: a bad name fails silently and looks like a broken feature.
+    visuals = {
+        --- Heat. `heliGunCam` washes the picture out; `rply_motionblur` makes it swim.
+        heat = {
+            enabled = false,
+            onsetFraction = 0.35,
+            buildingTimecycle = 'heliGunCam',
+            severeFraction = 0.75,
+            severeTimecycle = 'rply_motionblur',
+            maxStrength = 0.55,
+            --- Camera shake at severe load. Physiological stress, not an explosion.
+            shake = 'SKY_DIVING_SHAKE',
+            shakeAmplitude = 0.25,
+        },
+
+        --- Smoke. Only ever applied when you are actually breathing it -- a sealed mask
+        --- means you can see, which is most of why you wear one.
+        smoke = {
+            enabled = false,
+            timecycle = 'spectator5',
+            maxStrength = 1.0,
+            --- The coughing animation. Separate from the screen, because a server can
+            --- reasonably want the audible tell without the visual one.
+            cough = false,
+        },
+
+        --- One notification when heat crosses into the range where it damages you on its
+        --- own. Independent of the screen effects: a warning you can read is useful even
+        --- when nothing is distorting.
+        warnOnSevereHeat = true,
+    },
+
     --- Radiant heat, applied by proximity rather than contact.
     heat = {
         tickMs = 1000,
@@ -306,12 +356,41 @@ MIFireGear.exposure = {
         --- Once integrity is below the tier threshold, each flame tick rolls this.
         chancePerTick = 0.08,
         --- Damage per tick while burning, before gear resistance.
-        burnDamagePerTick = 6.0,
+        ---
+        --- Was 6.0, which made stop-drop-roll unreachable rather than difficult. By the
+        --- time a structural set burns through you are ~46 seconds into the fire with
+        --- roughly 28 of your 100 usable points left; 6 a second of burn on top of the
+        --- flame damage killed you in about 3.7 seconds against a 4-second roll. The
+        --- mechanic could not be performed by anyone, at any skill level, ever.
+        ---
+        --- At 3.0 the same firefighter has around six seconds. Rolling immediately works;
+        --- hesitating does not, and getting clear of the flame first roughly doubles the
+        --- window -- which is the correct lesson rather than an arbitrary one.
+        burnDamagePerTick = 3.0,
         --- A partner with a charged line can put someone out faster than rolling.
         hoselineExtinguishSeconds = 1.5,
         --- Burning stops on its own eventually, so a disconnect mid-burn does not leave
         --- someone alight forever.
         maximumBurnSeconds = 45.0,
+
+        --- The flames on a burning player.
+        ---
+        --- Drawn by us rather than with `StartEntityFire`, which looks right but brings
+        --- GTA's own ped fire damage with it -- fast, unconfigurable, and independent of
+        --- every number above. It killed a firefighter in about two seconds against a
+        --- three second roll, so stop-drop-roll could not be performed at all, while the
+        --- model here had given them eighteen seconds.
+        ---
+        --- `core`/`fire_wrecked_truck_vent` is the same pair the fire nodes use, so it is
+        --- verified rather than taken off a list. Bone 24816 is the spine, so the flames
+        --- sit on the torso and follow a ragdoll rather than pooling at the feet.
+        particle = {
+            dict = 'core',
+            name = 'fire_wrecked_truck_vent',
+            scale = 0.5,
+            bone = 24816,
+            z = 0.0,
+        },
     },
 
     --- Superseded by `MIFireGear.integrity` above, which covers all three models rather

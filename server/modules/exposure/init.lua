@@ -156,6 +156,20 @@ local function tickPlayer(source, dt)
         local worn = Exposure.gearDegradation(sample.flameIntensity, tier) * dt
         if worn > 0 then
             gearEntry.integrity = math.max(0.0, gearEntry.integrity - worn)
+
+            -- Tell the client its coat is worse than it was. It reads this to decide
+            -- whether to offer repair and replace, and without it the options stayed
+            -- hidden no matter how burned the set got.
+            local capacity = tier.integrity or 0
+            if capacity > 0 and MIFire.Turnout then
+                local step = capacity * 0.02
+                if not player.lastPushedIntegrity
+                    or math.abs(player.lastPushedIntegrity - gearEntry.integrity) >= step
+                    or gearEntry.integrity <= 0 then
+                    player.lastPushedIntegrity = gearEntry.integrity
+                    MIFire.Turnout.pushState(source)
+                end
+            end
         end
 
         -- Catch fire, once the gear is gone or there was none to begin with.

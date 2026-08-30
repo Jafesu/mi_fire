@@ -20,8 +20,10 @@ These are the claims the rest of the design rests on. Changing one is an ADR, no
 | Invariant | Where it is enforced |
 |---|---|
 | Nothing grants immunity to fire | `server/main.lua` boot validation, plus a test |
-| Protection comes from server state, never clothing | `server/core/state.lua`, `bridge/appearance/` |
+| Protection follows the clothing, however it got there | `shared/gearmatch.lua`, [ADR 0004](adr/0004-protection-follows-the-clothing.md) |
+| Protective equipment is not job-locked; taking it off a rig is | `Config.gearRequiresJob`, `Permissions.requireFirefighter` |
 | Smoke is stopped by SCBA and nothing else | `config/gear.lua` has no smoke field at all |
+| The resource owns its damage; no native applies it for us | `bridge/medical/`, `ignition.particle` over `StartEntityFire` |
 | The server owns all fire and water truth | `server/core/state.lua` |
 | Every interaction is `ox_target` | `bridge/target/ox_target.lua` |
 | Hydraulics are real, and testable outside the game | `shared/hydraulics.lua` |
@@ -43,7 +45,7 @@ These are the claims the rest of the design rests on. Changing one is an ADR, no
 | `client/modules/` | Rendering, detection, interaction. No business logic. |
 | `client/modules/targets/` | Every `ox_target` registration, in one readable place. |
 | `client/modules/placement/` | Shared raycast-and-nudge gizmo, used by the offset finder and the station tool. |
-| `web/` | React + Vite + TypeScript pump panel. |
+| `web/` | NUI. Positional PASS audio and the fireground HUD today; the React pump panel lands here in Phase 4. |
 | `tools/` | Test runner and specs. Runs outside FiveM. |
 
 ## Load order
@@ -84,21 +86,41 @@ the convention every FiveM server owner already expects from a `config/` directo
 | `MIFire.Fire` | `server/modules/fire/init.lua` |
 | `MIFire.Spread` | `server/modules/fire/spread.lua` |
 | `MIFire.Admin` | `server/modules/admin/init.lua` |
+| `MIFire.Exposure` | `shared/exposure.lua` |
+| `MIFire.GearMatch` | `shared/gearmatch.lua` |
+| `MIFire.Integrity` | `shared/integrity.lua` |
+| `MIFire.Pass` | `shared/pass.lua` |
+| `MIFire.Smoke` | `shared/smoke.lua` |
+| `MIFire.Medical` | `bridge/medical/init.lua` |
+| `MIFire.Turnout` | `server/modules/turnout/init.lua` |
+| `MIFire.ExposureServer` | `server/modules/exposure/init.lua` |
+| `MIFire.SmokeServer` | `server/modules/smoke/init.lua` |
+| `MIFire.Hud` | `client/modules/hud.lua` |
 
 ## Phase status
+
+Phases are not worked strictly in order. Where a later phase's feature was needed to test an
+earlier one -- turnout gear to survive a fire, SCBA to survive smoke -- it was built early
+rather than stubbed, so the table below records what is actually in the tree.
 
 | Phase | Scope | Status |
 |---|---|---|
 | 0 | Foundation: scaffold, bridges, config, test harness | **done** |
-| 1 | Fire core: nodes, classes, agents, exposure, districts, AOP, generation, admin, exports | in progress -- engine, suppression, admin and exports done |
-| 2 | Placement gizmo, apparatus, offset finder, turnout | todo |
+| 1 | Fire core: nodes, classes, agents, exposure, districts, AOP, generation, admin, exports | **mostly done** -- engine, suppression, three-channel exposure, smoke, admin and exports done and tested in game. Ambient generation and dispatch still unproven. |
+| 2 | Placement gizmo, apparatus, offset finder, turnout | **partly done** -- turnout gear is complete and in game: tiers, recognition from clothing, coverage, integrity, condition, repair and replacement. The placement gizmo, `config/apparatus.lua` and `/fireoffset` are untouched, and until they exist any emergency-class vehicle counts as apparatus. |
 | 3 | Hoses: pull, lay, connect, crew slots | todo |
-| 4 | Pump operations and the panel | todo |
+| 4 | Pump operations and the panel | todo -- waiting on panel screenshots |
 | 5 | Supply and ground ladders | todo |
-| 6 | SCBA, PASS, hazmat | todo |
-| 6b | Station alerting, MySQL-backed and placed in game | todo |
-| 6c | Sprinkler systems: install, activate, deplete, reset | todo |
+| 6 | SCBA, PASS, hazmat | **partly done** -- SCBA air, exertion, alarms, refill and racking are in, as is the four-phase PASS device with positional audio. Hazmat, the accountability board, mayday and RIT are not started. |
+| 6b | Station alerting, MySQL-backed and placed in game | **schema only** -- migrations and the runner exist; nothing places or alerts yet. |
+| 6c | Sprinkler systems: install, activate, deplete, reset | **model only** -- config and the pure suppression model exist and are tested; nothing is installable in game. |
 | 7 | Water rescue | todo |
 | 8 | Polish | todo |
+
+**Why 2 and 6 ran early.** Phase 1's exposure model damages players from the first fire, and
+there is no way to test that a coat reduces damage without a coat, or that SCBA stops smoke
+without a bottle. Both were built to the point where Phase 1 could be verified, and no
+further -- which is why turnout is finished while the apparatus config it is nominally part
+of does not exist yet.
 
 See [TASKS.md](TASKS.md) for the task breakdown.

@@ -60,9 +60,17 @@ MIFireScba.appearance = {
 -- ---------------------------------------------------------------------------
 
 MIFireScba.air = {
-    --- A full bottle, in seconds of working air. A real 30-minute bottle gives closer to
-    --- 15-20 under work, and that gap is the point: rated duration is not working duration.
-    capacitySeconds = 1800.0,
+    --- A full bottle, in seconds of working air.
+    ---
+    --- A real 30-minute bottle gives closer to 15-20 under work, and that gap is the point:
+    --- rated duration is not working duration. But a real bottle is also consumed across a
+    --- shift that runs in real time, and a GTA fire is over in minutes -- so 30 minutes of
+    --- game air meant the bottle was never the constraint it is on a real fireground, and
+    --- air management was theoretical.
+    ---
+    --- 10 minutes makes it the constraint again: enough for a working fire, not enough to
+    --- forget about, and it puts you back at the rig often enough that the rack matters.
+    capacitySeconds = 600.0,
 
     --- Metadata key on the item. Reading and writing the same key as `mi_diving` would be
     --- convenient and wrong -- a dive rebreather is not an SCBA bottle.
@@ -144,6 +152,18 @@ MIFireScba.pass = {
 
     --- Arms automatically when the air valve is opened.
     armOnActivate = true,
+
+    --- Does closing the valve disarm the device?
+    ---
+    --- **No**, and this is not a detail. A PASS runs on its own battery, not on cylinder
+    --- pressure -- an empty bottle does not switch it off. Tying `armed` to the valve meant
+    --- running out of air silently disarmed the device at the exact moment its wearer was
+    --- most likely to need it, so a firefighter who went down after their bottle emptied
+    --- alarmed to nobody.
+    ---
+    --- Once armed it stays armed until the set comes off. That is also why it keeps
+    --- sounding with the valve shut, which is correct rather than a glitch.
+    disarmOnValveClose = false,
 
     --- Seconds motionless before the escalating pre-alarm chirp starts.
     preAlarmSeconds = 25.0,

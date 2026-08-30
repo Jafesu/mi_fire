@@ -205,10 +205,17 @@ CreateThread(function()
                 local source = tonumber(playerId)
                 local scba = State.getScba(source)
 
-                -- Armed means the set is on and the valve open. A set on your back with
-                -- the valve shut is not a device that should be alarming.
-                local armed = scba.worn
-                    and (scba.active or not MIFireScba.pass.armOnActivate)
+                -- Armed means the set is on and the device has been switched on. The
+                -- valve turns it on; nothing but taking the set off turns it back off,
+                -- because a PASS runs on its own battery. Tying this to the valve meant an
+                -- empty bottle disarmed the device exactly when it was needed.
+                if scba.worn and scba.active then scba.passArmed = true end
+                if not scba.worn then scba.passArmed = nil end
+
+                local armed = scba.worn and (
+                    not MIFireScba.pass.armOnActivate
+                    or scba.passArmed == true
+                    or (MIFireScba.pass.disarmOnValveClose and scba.active))
 
                 if armed or devices[source] then
                     local ped = GetPlayerPed(source)

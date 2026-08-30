@@ -86,6 +86,9 @@ MIFireClasses.classes = {
         fuel = 240.0,
         spreadChance = 32.0,
         smokeVolume = 1.2,
+        --- Ordinary combustibles. Pale early, darkening as the fire works into the
+        -- structure -- so this stays low and lets stage do the talking.
+        sootiness = 0.15,
     },
 
     --- Class B -- flammable liquid. Spreads fast, burns hot, and a straight stream
@@ -108,6 +111,9 @@ MIFireClasses.classes = {
         reflashChance = 55.0,        -- a Class B knockdown that is not blanketed comes back
         reflashDelaySeconds = 12.0,
         smokeVolume = 2.0,
+        --- Hydrocarbons. Black, thick, and rolling from the first second. This is the
+        -- read that identifies a flammable-liquid fire across a car park.
+        sootiness = 0.85,
         heatMultiplier = 1.6,
         explosionChance = 0.4,
         explosionRadius = 8.0,
@@ -132,6 +138,8 @@ MIFireClasses.classes = {
         spreadRadius = 3.0,
         resistance = 1.4,
         smokeVolume = 1.4,
+        --- Burning insulation and plastics. Acrid and dark out of proportion to size.
+        sootiness = 0.55,
         heatMultiplier = 0.8,
 
         --- Cutting power converts this node to Class A, which is what actually happens
@@ -156,6 +164,8 @@ MIFireClasses.classes = {
         resistance = 3.0,
         reflashChance = 40.0,
         smokeVolume = 1.8,
+        --- Burning metal is brilliant white light and metal-oxide smoke, not carbon.
+        sootiness = 0.05,
         heatMultiplier = 2.4,        -- burns far hotter than anything else here
         explosionChance = 0.2,
         explosionRadius = 6.0,
@@ -181,6 +191,8 @@ MIFireClasses.classes = {
         reflashChance = 70.0,        -- the defining behaviour of a kitchen fire
         reflashDelaySeconds = 15.0,
         smokeVolume = 1.6,
+        --- Cooking oil is a hydrocarbon; it smokes heavily and dark.
+        sootiness = 0.6,
         heatMultiplier = 1.3,
     },
 
@@ -202,6 +214,9 @@ MIFireClasses.classes = {
         reflashChance = 100.0,       -- always comes back while the gas is on
         reflashDelaySeconds = 4.0,
         smokeVolume = 0.6,
+        --- A clean gas flame barely smokes at all, which is its own tell -- a lot of
+        -- fire and no smoke means pressurised fuel.
+        sootiness = 0.05,
         heatMultiplier = 2.0,
         explosionChance = 0.0,
 
@@ -230,6 +245,8 @@ MIFireClasses.classes = {
         resistance = 0.8,            -- easy to knock down, hard to keep down
         reflashChance = 35.0,
         smokeVolume = 2.2,
+        --- Vegetation smoke is pale tan and voluminous rather than black.
+        sootiness = 0.25,
         heatMultiplier = 1.1,
     },
 
@@ -252,6 +269,8 @@ MIFireClasses.classes = {
         resistance = 1.3,
         reflashChance = 30.0,
         smokeVolume = 1.8,
+        --- Tyres, fuel, plastics and upholstery. Close to a Class B read.
+        sootiness = 0.75,
         heatMultiplier = 1.4,
         explosionChance = 0.15,
         explosionRadius = 7.0,

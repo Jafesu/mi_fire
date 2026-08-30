@@ -135,4 +135,50 @@ return function(t)
     t.ok(structural.appearance.female ~= nil, 'the tier has a female set')
     t.equal(GearMatch.identify(fullSet(), tiers, 'female'), 'structural',
         'and the matching drawables are recognised for either')
+
+    -- -----------------------------------------------------------------------
+
+    t.describe('SCBA is recognised the same way the coat is')
+
+    -- The bug this covers: a set put on through a clothing menu was not recognised at all,
+    -- so a firefighter wearing a visible bottle was told they had no air. Same rule as
+    -- turnout -- the harness is the harness however it got there.
+    local scbaAppearance = MIFireScba.appearance
+
+    local inactiveSet = {}
+    for slot, drawable in pairs(scbaAppearance.inactive.male) do
+        inactiveSet[slot] = drawable
+    end
+
+    local activeSet = {}
+    for slot, drawable in pairs(scbaAppearance.active.male) do
+        activeSet[slot] = drawable
+    end
+
+    local wornInactive, maskInactive = GearMatch.matchScba(inactiveSet, scbaAppearance, 'male')
+    t.equal(wornInactive, true, 'the pack on your back is recognised as a set')
+    t.equal(maskInactive, false, 'with the mask up')
+
+    local wornActive, maskActive = GearMatch.matchScba(activeSet, scbaAppearance, 'male')
+    t.equal(wornActive, true, 'so is the masked drawable')
+    t.equal(maskActive, true, 'and it reports the mask as down')
+
+    t.describe('and nothing else is')
+
+    t.equal(GearMatch.matchScba({ ['t-shirt'] = 0 }, scbaAppearance, 'male'), false,
+        'a plain shirt is not an SCBA set')
+    t.equal(GearMatch.matchScba({}, scbaAppearance, 'male'), false,
+        'nor is wearing nothing')
+    t.equal(GearMatch.matchScba(nil, scbaAppearance, 'male'), false,
+        'and a missing report is not a set either')
+
+    t.describe('an empty appearance never matches')
+
+    -- Guards the case where a server blanks the config: every slot being absent must not
+    -- read as "all declared slots matched", which would put a bottle on everyone.
+    t.equal(GearMatch.matchScba({}, { inactive = { male = {} }, active = { male = {} } }, 'male'),
+        false, 'a set that declares no slots is not evidence of anything')
+
+    t.equal(GearMatch.matchScba(inactiveSet, {}, 'male'), false,
+        'and neither is a missing appearance table')
 end

@@ -97,6 +97,7 @@ function Smoke.attributes(opts, config)
 
     local stage = Smoke.stage(intensity, opts.fuelFraction or 1.0, class)
     local dirtiness = class.smokeVolume or 1.0
+    local sootiness = class.sootiness or 0.0
 
     -- Volume: how much is being produced. Fuel character and intensity.
     local volume = (intensity / 100.0) * dirtiness * vent.volumeMultiplier
@@ -106,6 +107,13 @@ function Smoke.attributes(opts, config)
     -- starved fire burns very incompletely indeed.
     local density = (intensity / 100.0) * dirtiness * vent.densityMultiplier
     density = density * (config.stageDensity[stage] or 1.0)
+
+    -- Sooty fuels produce thick smoke immediately rather than working up to it. A quarter
+    -- of the range is handed straight to the fuel so a small pool fire still reads as
+    -- heavy, which is what it looks like.
+    if sootiness > 0 then
+        density = density + (1.0 - density) * sootiness * 0.45
+    end
 
     -- Velocity: pressure. Heat drives it, restriction concentrates it.
     local velocity = (intensity / 100.0) * vent.velocityMultiplier
@@ -124,7 +132,8 @@ function Smoke.attributes(opts, config)
         stage = stage,
         turbulent = turbulent,
         travelled = 0.0,
-        colour = Smoke.colour(stage, 0.0, config),
+        colour = Smoke.colour(stage, 0.0, config, sootiness),
+        sootiness = sootiness,
     }
 end
 
@@ -141,10 +150,25 @@ end
 ---@param stage string
 ---@param travelled number Metres from the seat.
 ---@param config table
+---@param sootiness number|nil 0-1, how sooty this fuel burns. See below.
 ---@return table colour { r, g, b } each 0-255
-function Smoke.colour(stage, travelled, config)
+function Smoke.colour(stage, travelled, config, sootiness)
     local base = config.stageColour[stage] or config.stageColour[Smoke.Stage.GROWTH]
     local pale = config.travelColour
+
+    -- Fuel character, before stage. Stage alone said a flammable-liquid fire smokes white
+    -- while it is still small, which is backwards: a hydrocarbon fire is black from the
+    -- first second because it is the *fuel* that soots, not the temperature. Getting this
+    -- wrong removes the single most recognisable thing about a Class B fire.
+    local soot = math.max(0.0, math.min(1.0, tonumber(sootiness) or 0.0))
+    if soot > 0 then
+        local carbon = config.sootColour or { r = 24, g = 22, b = 21 }
+        base = {
+            r = base.r + (carbon.r - base.r) * soot,
+            g = base.g + (carbon.g - base.g) * soot,
+            b = base.b + (carbon.b - base.b) * soot,
+        }
+    end
 
     local distance = math.max(0.0, tonumber(travelled) or 0.0)
     local t = math.min(1.0, distance / math.max(0.1, config.travelToPale))
@@ -176,13 +200,14 @@ function Smoke.travel(attributes, distance, config)
     return {
         volume = attributes.volume * (0.4 + 0.6 * thinning),
         density = attributes.density * thinning,
+        sootiness = attributes.sootiness,
         velocity = attributes.velocity * slowing,
         stage = attributes.stage,
         -- Turbulence is a local property of pressure. Smoke that has travelled is no
         -- longer being pushed, whatever it was doing at the seat.
         turbulent = attributes.turbulent and slowing > 0.6,
         travelled = distance,
-        colour = Smoke.colour(attributes.stage, distance, config),
+        colour = Smoke.colour(attributes.stage, distance, config, attributes.sootiness),
     }
 end
 

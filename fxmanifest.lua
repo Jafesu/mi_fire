@@ -39,6 +39,7 @@ client_scripts {
     'bridge/medical/init.lua',
     'client/main.lua',
     'client/modules/notify.lua',
+    'client/modules/hud.lua',
     'client/modules/fire/render.lua',
     'client/modules/fire/init.lua',
     'client/modules/turnout/init.lua',
@@ -88,5 +89,6 @@ files {
     'install/migrations/*.sql',
     'web/index.html',
     'web/sounds.js',
+    'web/hud.js',
     'web/sounds/*.ogg',
 }

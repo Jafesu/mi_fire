@@ -108,6 +108,60 @@ function GearMatch.identify(worn, tiers, sex)
     return bestName, bestCoverage, bestMissing
 end
 
+--- Is this person wearing an SCBA set, and is the mask down?
+---
+--- The same rule as turnout, for the same reason. A harness on your back is a harness on
+--- your back however it got there -- a set pulled from a clothing menu, an outfit, or a
+--- job loadout is the set. Requiring it to have come off the rig meant a firefighter
+--- wearing a visible bottle was told they had no air, which reads as broken rather than
+--- as a rule.
+---
+--- Returns `active` separately because the two drawables are genuinely different states:
+--- the pack on your back with the mask up, and the mask down and sealed. Recognising the
+--- masked drawable does **not** open the valve on its own -- the server owns the bottle,
+--- and air is spent by a deliberate act rather than by picking a skin.
+---
+---@param worn table `{ slot = drawable }` as reported by the client.
+---@param appearance table `MIFireScba.appearance`
+---@param sex string|nil 'male' or 'female'; defaults to male.
+---@return boolean worn
+---@return boolean maskDown True when wearing the sealed drawable specifically.
+function GearMatch.matchScba(worn, appearance, sex)
+    if type(worn) ~= 'table' or type(appearance) ~= 'table' then return false, false end
+
+    ---@param set table|nil
+    ---@return boolean
+    local function wearing(set)
+        if type(set) ~= 'table' then return false end
+
+        local any = false
+
+        for slot, expected in pairs(set) do
+            local wanted = type(expected) == 'table' and expected.drawable or expected
+            wanted = tonumber(wanted)
+
+            if wanted and wanted >= 0 then
+                -- Every declared slot must match. An SCBA set is one or two pieces, so
+                -- there is no partial-coverage question the way there is for turnout.
+                if tonumber(worn[slot]) ~= wanted then return false end
+                any = true
+            end
+        end
+
+        return any
+    end
+
+    local inactive = appearance.inactive and
+        (appearance.inactive[sex or 'male'] or appearance.inactive.male)
+    local active = appearance.active and
+        (appearance.active[sex or 'male'] or appearance.active.male)
+
+    if wearing(active) then return true, true end
+    if wearing(inactive) then return true, false end
+
+    return false, false
+end
+
 --- How much of a tier's rated protection partial coverage actually gives.
 ---
 --- Wearing the coat without the helmet is not the same as wearing the set, and it should

@@ -32,6 +32,11 @@ local rolling = false
 -- Receiving
 -- ---------------------------------------------------------------------------
 
+--- Declared here because the exposure event below ignites the player, and the flames it
+--- starts are defined further down. A plain `local function` there would leave this call
+--- site resolving to a nil global instead.
+local startBurning, stopBurning
+
 RegisterNetEvent('mi_fire:client:exposure', function(payload)
     if type(payload) ~= 'table' then return end
 
@@ -72,7 +77,7 @@ RegisterNetEvent('mi_fire:client:exposure', function(payload)
 
     if payload.ignited then
         current.burning = true
-        StartEntityFire(cache.ped)
+        startBurning()
         if lib and lib.notify then
             lib.notify({
                 title = 'You are on fire',
@@ -87,7 +92,7 @@ RegisterNetEvent('mi_fire:client:exposure', function(payload)
 
     if payload.extinguished then
         current.burning = false
-        StopEntityFire(cache.ped)
+        stopBurning()
         if lib and lib.notify then
             lib.notify({ description = 'You are out', type = 'success' })
         end
@@ -98,61 +103,183 @@ end)
 -- Visuals
 -- ---------------------------------------------------------------------------
 
---- Screen effects for heat and smoke.
+--- Screen effects for heat and smoke, and the warnings that replaced them.
 ---
---- Heat distorts and desaturates; smoke darkens and narrows vision. They are deliberately
---- different so a player can tell which one is killing them, which decides whether the
---- answer is to back off or to put a mask on.
+--- The effects are **off by default**, on the user's call after testing. Heat escalated
+--- into GTA's drug-trip overlay, which reads as being poisoned rather than being cooked;
+--- smoke darkened and closed in. Neither said *which* of the three channels was hurting
+--- you, which is the only thing that changes what you do about it -- so a distorted screen
+--- was indistinguishable from the resource malfunctioning.
+---
+--- That information now lives on the HUD as three readable numbers, and the screen is left
+--- alone so you can see the fire. What survives here is the machinery, config-gated, for
+--- anyone who wants it back, plus one heat warning that is worth having either way.
 CreateThread(function()
-    local activeEffect = nil
+    local visuals = MIFireGear.exposure.visuals or {}
+    local heatCfg = visuals.heat or {}
+    local smokeCfg = visuals.smoke or {}
 
-    while true do
-        local busy = current.heatFraction > 0.15 or current.smoke > 0 or current.burning
-        Wait(busy and 0 or 500)
+    local applied = nil
+    local warnedSevere = false
 
+    ---@param name string|nil
+    ---@param strength number
+    local function timecycle(name, strength)
+        if name ~= applied then
+            if name then SetTimecycleModifier(name) else ClearTimecycleModifier() end
+            applied = name
+        end
+        if name then SetTimecycleModifierStrength(strength) end
+    end
+
+    --- One pass. Split out so the early exits are returns rather than labels -- the test
+    --- harness parses this file under 5.1, which has no `goto`.
+    ---@param busy boolean
+    local function step(busy)
         if not busy then
-            if activeEffect then
-                StopScreenEffect(activeEffect)
-                activeEffect = nil
-            end
-            ClearTimecycleModifier()
-        else
-            -- Heat: the screen shimmers and washes out as the load climbs.
-            if current.heatFraction > 0.4 then
-                SetTimecycleModifier('heliGunCam')
-                SetTimecycleModifierStrength(current.heatFraction * 0.6)
+            if applied then timecycle(nil, 0.0) end
+            warnedSevere = false
+            return
+        end
 
-                if current.heatFraction > 0.75 and activeEffect ~= 'DrugsMichaelAliensFightIn' then
-                    if activeEffect then StopScreenEffect(activeEffect) end
-                    activeEffect = 'DrugsMichaelAliensFightIn'
-                    StartScreenEffect(activeEffect, 0, true)
+        local severe = heatCfg.severeFraction or 0.75
+
+        -- The warning is independent of the effects. Heat that damages you through the gear
+        -- is worth being told about whether or not the screen is doing anything.
+        if current.heatFraction >= severe then
+            if visuals.warnOnSevereHeat ~= false and not warnedSevere then
+                warnedSevere = true
+                lib.notify({
+                    title = 'Heat',
+                    description = 'Your gear is soaking up more than it can shed. '
+                        .. 'Back out or get a line on it.',
+                    type = 'error',
+                    duration = 6000,
+                })
+            end
+        elseif current.heatFraction < severe * 0.8 then
+            -- Rearmed with hysteresis, so hovering on the threshold does not spam.
+            warnedSevere = false
+        end
+
+        -- Straining under heat load: stamina goes. Not a screen effect, and it stays.
+        if current.straining then
+            RestorePlayerStamina(PlayerId(), 0.0)
+            SetPlayerSprint(PlayerId(), false)
+        end
+
+        -- Smoke wins the screen when you are actually breathing it, if enabled at all.
+        if smokeCfg.enabled and current.smoke > 0 and not current.smokeProtected then
+            timecycle(smokeCfg.timecycle or 'spectator5',
+                math.min(smokeCfg.maxStrength or 1.0, current.smoke))
+
+            if smokeCfg.cough
+                and current.smokeSeconds > (MIFireGear.exposure.smoke.coughOnset or 6.0)
+                and not IsPedRagdoll(cache.ped) and math.random() < 0.05 then
+                TaskPlayAnim(cache.ped, 'timetable@gardener@smoking_joint',
+                    'idle_cough', 8.0, -8.0, 2000, 49, 0, false, false, false)
+            end
+
+        elseif heatCfg.enabled then
+            local onset = heatCfg.onsetFraction or 0.35
+
+            if current.heatFraction >= severe then
+                local into = (current.heatFraction - severe) / math.max(0.01, 1.0 - severe)
+                timecycle(heatCfg.severeTimecycle or 'rply_motionblur',
+                    math.min(heatCfg.maxStrength or 0.55, 0.25 + into * 0.5))
+
+                if heatCfg.shake then
+                    ShakeGameplayCam(heatCfg.shake, (heatCfg.shakeAmplitude or 0.25) * into)
                 end
+
+            elseif current.heatFraction >= onset then
+                local into = (current.heatFraction - onset) / math.max(0.01, severe - onset)
+                timecycle(heatCfg.buildingTimecycle or 'heliGunCam',
+                    math.min(heatCfg.maxStrength or 0.55, into * 0.4))
+
+            elseif applied then
+                timecycle(nil, 0.0)
             end
 
-            -- Smoke: darkens and closes in. Only if there is no air -- a sealed mask means
-            -- you can see, which is most of why you wear one.
-            if current.smoke > 0 and not current.smokeProtected then
-                local intensity = math.min(1.0, current.smoke)
-                SetTimecycleModifier('spectator5')
-                SetTimecycleModifierStrength(intensity)
-
-                -- Coughing, once exposure has gone on long enough to be worth animating.
-                if current.smokeSeconds > (MIFireGear.exposure.smoke.coughOnset or 6.0) then
-                    if not IsPedRagdoll(cache.ped) and math.random() < 0.01 then
-                        TaskPlayAnim(cache.ped, 'timetable@gardener@smoking_joint',
-                            'idle_cough', 8.0, -8.0, 2000, 49, 0, false, false, false)
-                    end
-                end
-            end
-
-            -- Straining under heat load: stamina goes.
-            if current.straining then
-                RestorePlayerStamina(PlayerId(), 0.0)
-                SetPlayerSprint(PlayerId(), false)
-            end
+        elseif applied then
+            timecycle(nil, 0.0)
         end
     end
+
+    while true do
+        local busy = current.heatFraction > 0 or current.smoke > 0 or current.burning
+        Wait(busy and 200 or 500)
+        step(busy)
+    end
 end)
+
+--- Leave the screen as we found it. Without this, a timecycle set while the resource was
+--- running outlives it and the player looks through it until something else sets one.
+---
+--- `DrugsMichaelAliensFightIn` is named explicitly because earlier builds started it and a
+--- player who stopped the resource mid-effect had no way to clear it.
+AddEventHandler('onResourceStop', function(resource)
+    if resource ~= GetCurrentResourceName() then return end
+    ClearTimecycleModifier()
+    StopScreenEffect('DrugsMichaelAliensFightIn')
+end)
+
+-- ---------------------------------------------------------------------------
+-- Being on fire
+-- ---------------------------------------------------------------------------
+
+--- A burning player, drawn by us rather than by the engine.
+---
+--- `StartEntityFire` looks exactly right and is the obvious call, but it brings GTA's own
+--- ped fire damage with it -- and that is fast, unconfigurable, and completely independent
+--- of the gear model. In play it killed a firefighter from 37 health in about two seconds
+--- against a three second roll, so stop-drop-roll could not be performed. Our own model had
+--- given them eighteen seconds; the native was simply overriding all of it.
+---
+--- So the flames are a particle we own and the damage stays server-side, where every other
+--- damage channel in this resource already lives.
+local burnFx = nil
+
+function startBurning()
+    if burnFx then return end
+
+    local layer = MIFireGear.exposure.ignition.particle
+    if not layer then return end
+
+    RequestNamedPtfxAsset(layer.dict)
+    local waited = 0
+    while not HasNamedPtfxAssetLoaded(layer.dict) do
+        Wait(50)
+        waited = waited + 50
+        if waited > 3000 then
+            MIFire.Util.warn('burn particle "%s" would not load', layer.dict)
+            return
+        end
+    end
+
+    UseParticleFxAssetNextCall(layer.dict)
+
+    -- On the spine rather than the root, so it sits on the torso instead of pooling at the
+    -- feet, and follows a ragdoll.
+    burnFx = StartParticleFxLoopedOnPedBone(layer.name, cache.ped,
+        0.0, 0.0, layer.z or 0.0, 0.0, 0.0, 0.0,
+        layer.bone or 24816, layer.scale or 1.0, false, false, false)
+
+    if burnFx == 0 then
+        burnFx = nil
+        MIFire.Util.warn('burn particle "%s" is not in dictionary "%s"', layer.name, layer.dict)
+    end
+end
+
+function stopBurning()
+    if burnFx then
+        StopParticleFxLooped(burnFx, false)
+        burnFx = nil
+    end
+
+    -- Belt and braces: if anything else in the server set the ped alight, put it out too.
+    StopEntityFire(cache.ped)
+end
 
 -- ---------------------------------------------------------------------------
 -- Stop, drop and roll
@@ -245,7 +372,7 @@ end)
 RegisterNetEvent('mi_fire:client:teardown', function()
     ClearTimecycleModifier()
     AnimpostfxStopAll()
-    if current.burning then StopEntityFire(cache.ped) end
+    if current.burning then stopBurning() end
     current.heat, current.heatFraction, current.smoke = 0.0, 0.0, 0.0
     current.burning, current.straining = false, false
 end)

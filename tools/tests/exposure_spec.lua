@@ -227,6 +227,61 @@ return function(t)
         end
     end
 
+    t.describe('and the roll is actually performable')
+
+    -- The bug this catches, found in play: `death - ignitable > 5` above passed happily
+    -- while stop-drop-roll was still impossible, because that window is measured *without*
+    -- the burn damage that starts the moment you ignite. Once alight you are taking flame
+    -- and burn damage together, and the real question is whether what is left of your
+    -- health outlasts `selfExtinguish`. It did not -- by about a third of a second, for
+    -- every tier -- so the mechanic was unreachable rather than merely hard.
+    ---@param tier table
+    ---@param inFlame boolean Still standing in it, or rolled clear first.
+    ---@return number seconds of life remaining from the moment of ignition
+    local function secondsOnceAlight(tier, inFlame)
+        local health, integrity, elapsed = 100.0, tier.integrity, 0.0
+        local alight = false
+        local dt = 0.25
+
+        while health > 0 and elapsed < 600 do
+            local resist = Exposure.effectiveFireResist(integrity, tier)
+
+            if not alight then
+                health = health - Exposure.flameDamage(100, { fireResist = resist }, cfg.flame) * dt
+                integrity = math.max(0.0, integrity - Exposure.gearDegradation(100, tier) * dt)
+                if Exposure.canIgnite(integrity, tier) then alight = true end
+            else
+                -- Burning, per the server's tick.
+                health = health - cfg.ignition.burnDamagePerTick * (1.0 - resist) * dt
+                if inFlame then
+                    health = health
+                        - Exposure.flameDamage(100, { fireResist = resist }, cfg.flame) * dt
+                    integrity = math.max(0.0,
+                        integrity - Exposure.gearDegradation(100, tier) * dt)
+                end
+                elapsed = elapsed + dt
+            end
+        end
+
+        return elapsed
+    end
+
+    for _, name in ipairs({ 'wildland', 'structural', 'proximity' }) do
+        local tier = MIFireGear.tiers[name]
+        local roll = tier.selfExtinguish
+
+        local clear = secondsOnceAlight(tier, false)
+        t.ok(clear > roll,
+            ('%s: getting out of the flame and rolling is survivable (%.1fs of life for a '
+                .. '%.1fs roll)'):format(name, clear, roll))
+
+        -- Rolling while still stood in it should be markedly worse, or "get out first"
+        -- is advice with no mechanism behind it.
+        local inside = secondsOnceAlight(tier, true)
+        t.ok(inside < clear,
+            ('%s: staying in the fire to roll is worse than backing out of it'):format(name))
+    end
+
     t.describe('every tier eventually dies')
 
     for name, tier in pairs(MIFireGear.tiers) do

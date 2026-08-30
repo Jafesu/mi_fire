@@ -103,6 +103,22 @@ local function spreadTarget(node, class)
     }
 end
 
+--- How much wind accelerates a class.
+---
+--- Wind does not just steer a fire, it drives it: a wind-driven fire spreads **faster**,
+--- checks more often, and each check is more likely to take. Scaled by `windInfluence`, so
+--- a kitchen fire is unaffected by a gale and a brush fire is transformed by a breeze.
+---
+--- Without this, `/fire wind` changed only which direction a fire crept and was almost
+--- impossible to see -- which is exactly how it was first reported.
+---@param class table
+---@return number multiplier 1.0 in still air, up to about 1.85 for a fully wind-driven class
+local function windFactor(class)
+    local influence = tonumber(class.windInfluence) or 0.0
+    if influence <= 0 then return 1.0 end
+    return 1.0 + influence * wind.speed
+end
+
 --- Try to spread one node.
 ---@param node table
 ---@param markDirty function
@@ -118,8 +134,12 @@ local function trySpread(node, markDirty)
     end
     if node.intensity < class.ignitionIntensity then return false end
 
+    local gust = windFactor(class)
+
     local now = os.time()
-    if now - (node.lastSpreadAt or 0) < class.spreadIntervalSeconds then return false end
+    -- Wind shortens the gap between attempts as well as improving each one.
+    local interval = class.spreadIntervalSeconds / gust
+    if now - (node.lastSpreadAt or 0) < interval then return false end
 
     node.lastSpreadAt = now
 
@@ -129,7 +149,7 @@ local function trySpread(node, markDirty)
 
     -- Chance scales with how hard the node is burning, so a fire that is being held down
     -- spreads more slowly even before it is knocked out.
-    local chance = class.spreadChance * (node.intensity / class.maxIntensity)
+    local chance = class.spreadChance * (node.intensity / class.maxIntensity) * gust
     if not Util.chance(chance) then return false end
 
     local target = spreadTarget(node, class)

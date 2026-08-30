@@ -9,7 +9,7 @@ Config = {}
 
 --- Verbose logging on both server and client consoles. Safe to leave on while tuning;
 --- it is read live, so toggling it does not need a restart.
-Config.debug = true
+Config.debug = false
 
 --- Jobs treated as firefighters. Anything gated on being a firefighter -- turnout,
 --- hose lines, the pump panel, admin-exempt targets -- checks against this.

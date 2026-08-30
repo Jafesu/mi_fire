@@ -614,3 +614,68 @@ the server did.
 
 **Next:** re-test. `/fire here`, then `/fire render` if it is still invisible — the
 diagnosis will say which of the three failures it is.
+
+---
+
+## 2026-08-30 · session 010
+
+**Scope:** `FIRE-003` — wind, following the first successful in-game test.
+
+**Changed:** `server/modules/fire/spread.lua`, `tools/tests/fire_spec.lua`,
+`config/config.lua` (debug back off).
+
+**The engine works in game.** First full run-through, and every behaviour the design rests
+on held up:
+
+- `/fire here` starts and renders. `/fire agent water` knocks it down and extinguishes it.
+- **`/fire start B` then `/fire agent water` spread the fire.** The agent matrix does what
+  it claims, in the game, with a player watching. `/fire agent foam` then killed it.
+- `/fire list` and `/fire stopall` reconcile correctly.
+
+The `attempt to index a nil value (upvalue 'Render')` errors from the same session were a
+stale client cache, not a load-order fault — `refresh` had not been run before `restart`.
+Verified separately that `render.lua` loads clean and sets `MIFire.Render`.
+
+**The one real finding: `/fire wind` appeared to do nothing.**
+
+It was not broken. Measured in the harness, wildland spread was working the whole time —
+median first spread at 16 s, reaching about 16 nodes in three minutes. But wind only
+steered **direction** and slightly extended **reach**; it never touched **rate**. The only
+visible effect was a change in node count from fewer placement collisions, which is close
+to imperceptible while standing next to a fire.
+
+The expectation behind the report was the correct one: a wind-driven fire spreads *faster*,
+not merely sideways. So wind now shortens the interval between spread attempts and improves
+each attempt, both scaled by the class's `windInfluence`.
+
+Measured before and after, 3 seed nodes, averaged over 30 runs:
+
+| Wind | Before: nodes @120s | After: nodes @120s | After: median first spread |
+|---|---|---|---|
+| 0.0 | ~10 | 10.2 | 16 s |
+| 0.5 | ~22 | 22.4 | 12 s |
+| 0.9 | ~27 | 29.7 | **5 s** |
+
+A gale now takes a wildland fire to its node cap and starts it spreading in five seconds
+instead of sixteen. Class A, which has `windInfluence = 0`, is unaffected — 6.2 nodes calm
+against 6.0 in a gale — so a gale still does nothing to a sofa fire indoors.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **321 passed, 0 failed** (was 319).
+- Two new assertions, both averaged over 12 runs because one run of a probabilistic system
+  proves nothing: a wildland fire in strong wind grows substantially faster than in still
+  air, and a class with no wind influence does not.
+- In game: the full command sequence above, by hand.
+
+**Open:**
+
+- Unchanged: no exposure model, no ambient generation, no dispatch, no smoke.
+- Spread caps at 30 nodes for wildland. In a strong wind that cap is now reached in about
+  two minutes, so it is the next thing likely to feel wrong — a running brush fire should
+  probably keep going rather than stopping dead at a number.
+- `Config.debug` was left on in a previous session and is now off again. It should not be
+  committed on.
+
+**Next:** `EXPO-001`. Fire is visible, spreads, and can be put out; it still cannot hurt
+anyone.

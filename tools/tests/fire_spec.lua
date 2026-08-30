@@ -265,6 +265,45 @@ return function(t)
 
     reset()
 
+    t.describe('wind drives a wildland fire, not just steers it')
+
+    -- Reported from a live test: /fire wind appeared to do nothing. It was steering
+    -- direction and reach but never rate, which is close to invisible. Wind now shortens
+    -- the interval between spread attempts and improves each one.
+    local function spreadTrial(className, windSpeed, seconds)
+        reset()
+        MIFire.Spread.setWind(math.rad(90), windSpeed)
+        local trialId = Fire.startIncident({
+            coords = { x = 0, y = 0, z = 0 }, class = className, nodeCount = 3, radius = 5.0,
+        })
+        run(seconds)
+        return State.countNodesForIncident(trialId)
+    end
+
+    -- Averaged, because a single run of a probabilistic system proves nothing.
+    local function averageNodes(className, windSpeed, seconds, runs)
+        local total = 0
+        for _ = 1, runs do total = total + spreadTrial(className, windSpeed, seconds) end
+        return total / runs
+    end
+
+    local calm = averageNodes('wildland', 0.0, 120, 12)
+    local gale = averageNodes('wildland', 0.9, 120, 12)
+
+    t.ok(gale > calm * 1.5,
+        'a wildland fire in strong wind grows substantially faster than one in still air')
+
+    t.describe('but only for classes that care about wind')
+
+    -- Class A has windInfluence 0. A gale should do nothing to a sofa fire indoors.
+    local calmA = averageNodes('A', 0.0, 120, 12)
+    local galeA = averageNodes('A', 0.9, 120, 12)
+
+    t.ok(math.abs(galeA - calmA) < calmA * 0.35,
+        'a class with no wind influence spreads the same in a gale as in still air')
+
+    reset()
+
     t.describe('some classes do not spread')
 
     id = Fire.startIncident({ coords = { x = 0, y = 0, z = 0 }, class = 'D', nodeCount = 1 })

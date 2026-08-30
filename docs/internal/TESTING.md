@@ -1,262 +1,196 @@
 # In-game test script
 
-Everything built so far, in dependency order — a failure early would invalidate what comes
-after, so work down rather than picking.
+**Round two.** Everything that passed cleanly in round one has been removed — the record of
+what passed is in [DEVLOG.md](DEVLOG.md) session 019, not here. What is left is the work:
+seven fixes that need confirming, and the checks nobody has ever been able to run.
 
-**Nothing below has been tested in game except section 1.** Sections 2 onward are all
-unproven.
+Ordered by what invalidates what. A failure in section 1 makes sections 2 and 3 meaningless,
+so work down rather than picking.
 
 Set `Config.debug = true` in `config/config.lua` before starting, and watch F8.
+
+> **If a truck shows no gear or SCBA options, run `/fire gear` stood next to it.** It prints
+> ox_target's state, your job, whether the vehicle counts as apparatus, and every option
+> evaluated against that truck with the gate that refused it named. Anyone can run it.
 
 ---
 
 ## 0. Before you start
 
-- [ X ] Restart the server. Migration `0003_gear_appearance` must apply.
-- [ X ] `SELECT * FROM mi_fire_migrations;` — expect **3** rows.
-- [ X ] Repoint your SCBA item: `server = { export = 'mi_fire.useScba' }`
-- [ X ] Check keybind conflicts: **J** SCBA valve, **K** PASS panic, **X** stop-drop-roll.
-- [ X ] `/fire perms` — confirms you have access and shows which route granted it.
+- [ ] Restart the server after updating. No new migrations this round — still **3** rows.
+- [ ] Confirm the HUD appears **bottom right**, clear of the minimap.
+- [ ] Keybinds unchanged: **J** SCBA valve, **K** PASS panic, **X** stop-drop-roll.
 
 ---
 
-## 1. Fire engine — *already passed, re-run as a regression*
+## 1. The HUD
 
-- [ X ] `/fire here` — a fire starts and renders.
-- [ X ] `/fire agent water` — knocks down, then extinguishes.
-- [ X ] `/fire start B` then `/fire agent water` — **it gets worse and spreads**.
-- [ X ] `/fire agent foam` — that one works.
-- [ X ] `/fire start wildland 5 3` then `/fire wind 90 0.9` — should now spread visibly
-      faster than in still air. *This changed since your last test.*
-- [ X ] `/fire list`, `/fire stopall`.
+Everything below depends on this, because the HUD is now the only readout for air, gear
+condition and heat — the screen effects that used to hint at them are gone.
+
+- [ ] With no gear, no bottle and no fire, the HUD shows **nothing at all**. Rows appear only
+      when they have something to say.
+- [ ] Take an SCBA set. An **AIR** row appears reading `10:00 · CLOSED`.
+- [ ] Press **J**. The `CLOSED` disappears and the clock starts running.
+- [ ] Let it pass a third remaining — the row goes **amber** at the same moment the low-air
+      alarm sounds, and **red** at 10%.
+- [ ] Stand in a fire in turnout. A **GEAR** row appears once the coat is below full and
+      falls as you stay in. *This is the one that was broken: wear was tracked server-side
+      and never sent to you, so the row could not have appeared and neither could the repair
+      options.*
+- [ ] Stand *near* a fire. A **HEAT** row climbs and falls back when you retreat.
 
 ---
 
-## 2. Turnout gear
+## 2. Screen effects are gone
 
-The first thing built on top of the engine, and nothing after this works without it.
+Your call, and this is now intended behaviour rather than a gap.
 
-> **If no option appears on the truck, run `/fire gear` while stood next to it.**
->
-> Every one of these interactions is five booleans deep — ox_target running, the client
-> booted, the vehicle counting as apparatus, the job gate, and the option's own condition —
-> and any single false gives the identical symptom of nothing at all. `/fire gear` prints
-> all five, evaluates each option against the truck you are stood at, and names the gate
-> that refused. It is reachable by anyone, because the person who cannot see the option is
-> exactly the person who needs to know why.
->
-> The usual answer is the **job gate**: taking equipment off an apparatus is department
-> business, so `Don turnout gear`, `Take an SCBA set`, and `Draw a fresh set` need a job in
-> `Config.fireJobs` and, by default, being clocked **on duty**. Protection itself is not
-> job-gated — only drawing kit off the rig is.
+- [ ] Stand near a fire until **HEAT** is high. **The screen must not change at all** — no
+      wash-out, no distortion, no colour shift.
+- [ ] Past 75% you get **one** notification about your gear soaking up more than it can shed.
+      Once, not repeatedly, and not again until you have cooled off properly.
+- [ ] Stand in smoke with **no SCBA**. You take damage with **no screen change and no
+      coughing**.
 
-- [ X ] Stand at a fire truck. Third-eye it — **Don turnout gear** appears.
-- [ X ] Don it. Your appearance changes: helmet, coat, boots, gloves.
-- [ X ] **The helmet specifically.** It is a prop rather than a component, and the two go
-      through different natives — if the coat appears and the helmet does not, that is the
-      bug to report.
-- [ X ] `/fire render` still works — confirms nothing else broke.
-- [ X ] **Doff turnout gear** — your original clothes come back, not a default skin.
-- [ X ] Don, disconnect, reconnect. *Known gap: gear state does not survive this yet
-      (`TURN-003`). Confirming it is broken is still useful.*
+If any of that still distorts, something is reading `MIFireGear.exposure.visuals` wrong —
+every flag in it is `false`.
 
-**Then the thing that matters most — note this check has been inverted:**
+---
 
-- [ X ] Put on turnout gear through a **clothing menu** instead of the truck.
-- [ X ] Walk into a fire. You should be **fully protected**, exactly as if you had donned it
-      at the apparatus.
-- [ X ] Do it as a **civilian**, with no fire job. Still protected — the coat is a coat.
-- [ X ] Wear only the **coat**, no helmet or gloves. You should be protected, but noticeably
-      less than in the full set.
+## 3. SCBA from a clothing menu
 
-That is ADR 0004. Protection follows the clothing, however it got there.
+The fix with the widest blast radius: SCBA was never given the treatment turnout gear got in
+ADR 0004, so a visible harness counted for nothing.
 
-- [ X ] Take the coat off mid-fire. Protection should drop within a couple of seconds.
-- [ X ] Burn a set down, take it off, put it back on. Integrity should **resume where it
-      left off**, not reset. Changing clothes does not repair a coat.
+- [ ] Put an SCBA set on through the **clothing menu**, not the truck.
+- [ ] It is recognised: you are told how much air you have, and the **AIR** row appears.
+- [ ] Press **J**. The valve opens and air starts draining.
+- [ ] Stand in smoke. Damage stops **completely** while the valve is open.
+- [ ] Take the set off through the clothing menu. The AIR row disappears.
+- [ ] Put it back on. Air **resumes where it left off** — it must not refill.
+- [ ] Now go to a truck and **Refill air bottle**. *That* refills it.
 
-**Gear condition and repair.** Default mode is `persist`.
+Then confirm the rig route still works:
 
-> **Fixed since your last run.** The options genuinely could not appear: the exposure module
-> degraded integrity server-side but never pushed the new value to the client, so the client
-> still believed the coat was full and both options stayed hidden however hard it was worked.
-> There is now a **GEAR** row on the HUD showing condition in words, so you can see it fall.
+- [ ] **Take an SCBA set** at a truck, and **Rack SCBA set** to return it.
 
-- [ ] Watch the **GEAR** row appear on the HUD once the coat is below full, and fall as you
-      stay in the fire.
-- [ ] Burn a set to roughly half. Third-eye the truck — **Draw a fresh set** appears.
-- [ ] Draw one. Protection back to full.
-- [ ] Burn a set below 15% — it is **condemned**. Repair should be refused, telling you to
-      replace it.
-- [ ] Set `MIFireGear.integrity.persist.repairAtApparatus = true`, restart, and try
+---
+
+## 4. Air is ten minutes now
+
+- [ ] With the valve open, **sprint** around and watch the AIR row. It should drain visibly
+      faster than standing still. *You could not check this before — there was no gauge.*
+- [ ] Warnings still land in order: half a bottle, low air, critical.
+- [ ] Let it run out. The valve shuts itself, you are told, and smoke starts hurting again.
+- [ ] Does ten minutes feel right for a working fire? Say if it is still too long.
+
+---
+
+## 5. Catching fire is survivable now
+
+`StartEntityFire` was applying GTA's own ped fire damage on top of ours — about two seconds
+of life against a four second roll. The flames are a particle this resource owns now.
+
+- [ ] Stand in a fire in turnout until you ignite (~46 seconds).
+- [ ] **The flames should look right.** They are a particle on your spine now, not the engine
+      effect. If nothing is drawn, check F8 for a `burn particle` warning.
+- [ ] **Get clear of the fire first**, then hold **X**. Three seconds, and you should live.
+- [ ] Try it again **without leaving the flame**. Markedly worse — getting out first should
+      roughly double your window.
+- [ ] Second player: target you while you are alight and **Put them out**. Faster than
+      rolling. *Never tested.*
+
+---
+
+## 6. Turnout repair and replacement
+
+Both options were unreachable until now, so none of this has ever run.
+
+**Default mode is `persist`.**
+
+- [ ] Burn a set to roughly half — watch the GEAR row to know when.
+- [ ] Third-eye the truck. **Draw a fresh set** appears.
+- [ ] Draw one. GEAR goes back to full.
+- [ ] Burn a set below 15%. It is **condemned** — repair must be refused, telling you to
+      replace it instead.
+- [ ] Set `MIFireGear.integrity.persist.repairAtApparatus = true`, restart, and use
       **Service turnout gear**. It should take longer the worse the set is.
-- [ ] Repair the same set three times. Each repair should restore slightly less than the
-      last, so patching forever is not viable.
+- [ ] Repair the same set three times. Each repair restores slightly less than the last, so
+      patching forever is not viable.
 
-**Then switch models and confirm they behave differently.**
+**Then prove the other two models actually differ.**
 
-- [ ] Set `MIFireGear.integrity.mode = 'regenerate'`, restart.
-- [ ] Burn a set, then step out of the fire. Nothing for the first minute.
-- [ ] Keep waiting — integrity should climb back on its own.
-- [ ] Duck out for five seconds and back in. It should **not** have recovered. The delay is
+- [ ] `MIFireGear.integrity.mode = 'regenerate'`, restart. Burn a set, then step out.
+- [ ] Nothing for the first minute. Then it climbs back on its own.
+- [ ] Duck out for five seconds and back in — it must **not** have recovered. The delay is
       the whole mechanic.
+- [ ] `mode = 'session'`, restart. Damage lasts the shift and resets when gear next goes on.
 
 ---
 
-## 3. SCBA
+## 7. PASS runs on its own battery
 
-- [ X ] At a truck, third-eye — **Take an SCBA set**. You get one, full.
-- [ ] **Put an SCBA set on through a clothing menu instead.** It should be recognised, the
-      HUD should show air, and the valve keybind should work. *This was broken — SCBA was
-      never given the ADR 0004 treatment the coat got, so a visible bottle counted for
-      nothing.*
-- [ ] Take that set off and put it back on. Air should **resume where it left off**, not
-      refill. Only a rack refills.
-- [ X ] Your appearance changes (harness on your back, mask off).
-- [ X ] Press **J**. Appearance changes again — mask on.
-- [ X ] **Use the SCBA item from inventory** instead. Should do the same thing.
-      *If nothing happens, the item export is not repointed.*
-- [ ] With the valve open, sprint around. Watch the **AIR** row on the HUD — it should drain
-      noticeably faster than standing still.
-- [ X ] Wait for the warnings: half a bottle, then low air, then critical.
-- [ ] Let it run out entirely — the valve shuts itself and you are told. *A full bottle is
-      now **10 minutes**, not 30.*
-- [ X ] Third-eye the truck — **Refill air bottle**.
-- [ X ] **Rack SCBA set** — it comes off and is refilled.
+Your observation was right and the behaviour changed to match: a PASS is not powered by
+cylinder pressure, so an empty bottle must not switch it off.
+
+- [ ] Open the valve, then **close it**. Stand still. It should **still** alarm — that is
+      correct, not a glitch.
+- [ ] Take the set off entirely. Now it should not alarm.
+- [ ] **Get downed while wearing an armed set.** It must alarm on its own **during last
+      stand**, not only after you die. *This is the fix — your bottle had usually emptied by
+      the time you went down, which silently disarmed the device.*
+- [ ] Let a bottle run empty, then stand still. Still alarms.
+
+**Never tested, needs a second player.**
+
+- [ ] Second player tries to reset your PASS while you are still down — **it must refuse**.
+- [ ] Can they hear yours from ~45 m, and does it pan as they turn?
+- [ ] Does a full alarm notify every on-duty firefighter with a blip?
 
 ---
 
-## 4. Exposure — the part that makes all of the above matter
+## 8. Class B smoke reads like Class B
 
-**Wear nothing.**
+Colour was driven only by how developed the fire was, with no input from the fuel — so a
+flammable-liquid fire smoked white while it was still small.
 
-- [ X ] `/fire here`, walk into it. You should go down in about **9 seconds**.
-- [ x ] Confirm your medical resource sees it properly — last stand or death, *not* a silent
-      slide to zero. If you just drop dead with no last stand, the damage is not raising
-      events correctly.
+- [ ] `/fire start B` — **black and thick from the first second**, obviously unlike A.
+- [ ] `/fire here` alongside it for comparison. A should be visibly paler.
+- [ ] `/fire start gas` and `/fire start D` — the palest of the set.
+- [ ] `/fire start vehicle` — close to B.
+- [ ] `/fire sizeup` on the B fire should describe it as dark and thick in words, matching
+      what you are looking at.
 
-**In turnout gear.**
+**Never tested.**
 
-- [ X ] Same fire. You should last about **64 seconds**.
-- [ X ] At roughly **46 seconds** your gear gives out and you can catch fire.
-- [ X ] Stay in it until you ignite.
-> **Fixed.** `StartEntityFire` was setting you alight with GTA's own ped fire, which applies
-> its own fast damage on top of ours and ignored the whole gear model — about two seconds of
-> life against a four second roll. Flames are now a particle this resource owns, and the
-> damage stays in our model, which had always been giving you around eighteen seconds.
-
-- [ ] Hold **X** to stop, drop and roll. It should take about **3 seconds** and you should
-      live, provided you start immediately.
-- [ ] Try it **while still stood in the fire**. Markedly worse — getting clear first should
-      roughly double the window.
-- [ ] Get a second player to target you and **Put them out** — should be much faster.
-
-**Heat, without touching the fire.**
-
-> **Removed on your call.** No screen distortion for heat or smoke, and no cough. The
-> machinery survives behind `MIFireGear.exposure.visuals`, all flags `false`, for anyone who
-> wants it back. What replaced it is the HUD plus one notification.
-
-- [ ] Stand *near* a fire without entering it. **The screen should not change at all.**
-- [ ] A **HEAT** row should appear on the HUD and climb.
-- [ ] Past 75% you should get one notification telling you your gear is soaking up more than
-      it can shed. Once, not repeatedly.
-- [ X ] Your stamina should go and sprinting should stop working.
-- [ X ] Back away — it should fade.
-
-**Smoke.**
-
-- [ ] Stand in smoke with **no SCBA**. You take damage, with **no screen change and no
-      cough**.
-- [ X ] Open your SCBA valve. Damage should stop **completely** and vision should clear.
-- [ X ] Let the bottle empty while still in smoke — damage resumes.
-
-> The screen effects are off by default and this is now the intended behaviour, not a gap.
-> The reasoning is in `config/gear.lua` under `visuals`.
+- [ ] As a grade 0/1 firefighter, `/fire sizeup` gives only the observation. At grade 2+ you
+      also get the interpretation.
 
 ---
 
-## 5. PASS device
+## 9. Teardown, with the new particle
 
-> **Your observation was right, and the behaviour is now deliberate.** A PASS runs on its
-> own battery, not on cylinder pressure. Tying `armed` to the valve meant an empty bottle
-> silently switched the device off at the exact moment its wearer needed it — which is also
-> why it did not alarm during last stand. It now latches on when the valve is first opened
-> and stays armed until the set comes off.
+Only worth re-running because burning is now a particle we start rather than an engine
+effect, and an orphaned one would survive the restart.
 
-- [ X ] Wearing SCBA with the valve **open**, stand completely still for ~25 seconds.
-- [ ] Close the valve and stand still again. It should **still** alarm. That is correct.
-- [ ] Take the set off entirely. Now it should not.
-- [ X ] A chirp starts and speeds up.
-- [ X ] Move — it stops. *This is the phase you are meant to escape.*
-- [ X ] Stand still again and ignore it for ~12 more seconds. Full alarm.
-- [ X ] **Move around.** The full alarm should **not** stop. That asymmetry is deliberate.
-- [ X ] Press **K** with a set on — straight to full alarm, no waiting.
-- [ X ] `/passreset` — clears it.
-- [ ] Get downed while wearing an armed set. It should alarm **on its own**, during last
-      stand and not only after it. *Same root cause as above: the bottle had usually emptied
-      by the time you went down, which disarmed the device.*
-- [ ] Have a second player try to reset it while you are still down — **it should refuse**.
-
-**Audio — the least proven thing in the resource.**
-
-- [ X ] Do you hear anything at all?
-- [ X ] Does it get louder as you approach and pan left/right as you turn?
-- [ ] Second player: can they hear yours from ~45 m?
-
-> If it is silent, check F8 for a `could not load` line from `sounds.js` **before**
-> suspecting the phase machine — the phase logic is tested, the audio is not. The most
-> likely failure is the NUI `AudioContext` never resuming.
-
-- [ ] A full alarm should notify every on-duty firefighter with a flashing blip.
+- [ ] `restart mi_fire` **twice** while a fire is burning, **you are alight**, gear is on and
+      SCBA is active.
+- [ ] No flames left on your ped, no orphaned particles, no stuck timecycle, no lingering
+      sound, no leftover blips, no frozen HUD row.
+- [ ] `/fire list` after restart — empty.
 
 ---
 
-## 6. Smoke and reading it
+## What is still unproven after all this
 
-- [ X ] `/fire here` — is there a visible plume, distinct from the flame?
-- [ X ] Is it **darker at the base and paler higher up**? That is the travel model.
-> **Fixed.** Smoke colour was driven only by fire *stage*, with no input from the fuel — so
-> a flammable-liquid fire smoked white while it was still small. Backwards: sooting is a
-> property of the fuel, not the temperature, which is why a diesel pool is black from the
-> first second. Each class now carries a `sootiness`.
+Not a checklist — a list of what nobody has been able to test yet, so it does not get
+mistaken for working.
 
-- [ ] `/fire start B` — should now be **black and thick from the start**, visibly unlike A.
-- [ ] `/fire start D` and `/fire start gas` — should be the palest of the set.
-- [ X ] `/fire start gas` — should barely smoke at all. 
-- [ X ] `/fire sizeup` — reports volume, velocity, density, colour, ventilation.
-- [ ] As a low-grade firefighter you get only the observation; at grade 2+ you also get the
-      interpretation.
-
-**Ventilation and the two events.**
-
-- [ X ] `/fire vent close_up` on an indoor fire — sealed.
-- [ X ] Wait, then `/fire sizeup`. Smoke should be dense, dark, and **low velocity**, and you
-      should be warned about backdraft.
-- [ X ] Is the plume visibly **pulsing**?
-- [ X ] `/fire vent force_door` — should have a real chance of setting off a backdraft.
-- [ X ] Try again on another fire with `/fire vent vertical_vent` **first** — should be safe.
-- [ X ] On a `limited` indoor fire, let it develop and size it up. Expect a flashover warning,
-      then flashover roughly 25 seconds later.
-- [ X ] `/fire vent vertical_vent` during the warning should buy time.
-
----
-
-## 7. Teardown
-
-- [ X ] `restart mi_fire` **twice** while a fire is burning with gear on and SCBA active.
-- [ X ] No orphaned particles, no stuck screen effects, no lingering sound, no leftover blips.
-- [ X ] `/fire list` after restart — empty.
-
----
-
-## Known gaps — do not report these
-
-- Gear state does not survive a disconnect (`TURN-003`).
-- Only `structural` turnout has an appearance. Other tiers change protection, not looks.
-- `isApparatus` accepts **any emergency vehicle**, so police cars offer turnout gear. Fixed
-  in Phase 2 when `config/apparatus.lua` lands.
-- No accountability board.
-- `mobility` is configured per tier and applied nowhere — heavy gear does not slow you.
-- Smoke renders one plume per incident, not per node.
-- Ventilation is commands, not `ox_target` on real doors and windows.
+| Area | Why |
+|---|---|
+| Ambient fire generation | Never observed running on its own clock |
+| Dispatch to lb-tablet | Never seen land on a board |
+| Districts and AOP | Needs a soak test, not an observation |
+| Anything needing two players | Backup slots, RIT, hearing a PASS at range |
+| Gear surviving a disconnect | Known gap, `TURN-003` |

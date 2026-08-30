@@ -54,14 +54,38 @@ end
 -- Turnout
 -- ---------------------------------------------------------------------------
 
+--- What integrity this character's set was left at.
+---
+--- Keyed to the character and tier rather than the session, so changing clothes never
+--- repairs a burned coat -- the gear is worn out, not the visit.
+---@param source integer
+---@param tierName string
+---@return number
+function Turnout.recallIntegrity(source, tierName)
+    local tier = MIFireGear.tiers[tierName]
+    if not tier then return 0.0 end
+
+    local integrity = tier.integrity or 0.0
+
+    if MIFireGear.exposure.persistence.enabled and integrity > 0 then
+        local stored = Inventory.getMetadata(source, 'turnout_' .. tierName,
+            MIFireGear.exposure.persistence.metadataKey, nil)
+        if stored then integrity = tonumber(stored) or integrity end
+    end
+
+    return integrity
+end
+
 --- Put a gear tier on.
 ---@param source integer
 ---@param tierName string
 ---@return boolean ok
 ---@return string|nil reason
 function Turnout.don(source, tierName)
-    local allowed, why = Permissions.requireFirefighter(source)
-    if not allowed then return false, why end
+    if Config.gearRequiresJob then
+        local allowed, why = Permissions.requireFirefighter(source)
+        if not allowed then return false, why end
+    end
 
     local tier = MIFireGear.tiers[tierName]
     if not tier then return false, ('unknown gear tier "%s"'):format(tostring(tierName)) end
@@ -69,16 +93,7 @@ function Turnout.don(source, tierName)
     local entry = State.getGear(source)
     if entry.tier == tierName then return false, 'you are already wearing that' end
 
-    -- Integrity carries over from the item when one is present, so a battered set stays
-    -- battered. Without ox_inventory it starts fresh each time, which is a graceful loss
-    -- rather than a broken feature.
-    local integrity = tier.integrity
-    if MIFireGear.exposure.persistence.enabled and tier.integrity and tier.integrity > 0 then
-        local stored = Inventory.getMetadata(source, 'turnout_' .. tierName,
-            MIFireGear.exposure.persistence.metadataKey, nil)
-        if stored then integrity = tonumber(stored) or integrity end
-    end
-
+    local integrity = Turnout.recallIntegrity(source, tierName)
     State.setGear(source, tierName, integrity)
 
     -- Per-character markings -- name tape, rank -- merged over the department set.
@@ -128,6 +143,69 @@ function Turnout.doff(source)
     return true
 end
 
+
+-- ---------------------------------------------------------------------------
+-- Recognising gear from what is worn
+-- ---------------------------------------------------------------------------
+
+--- The client reports its clothing; this decides what that amounts to.
+---
+--- **Not gated on job by default.** Turnout gear is a coat. If a civilian gets hold of a
+--- set it protects them, because that is what the coat does -- and a system that decided
+--- otherwise would be telling a player the gear on their back is not really gear.
+--- `Config.gearRequiresJob` restores the restriction for servers that want it.
+---
+--- The client is trusted about what it is wearing. That is a small surface: the worst a
+--- forged report achieves is a civilian who is harder to set on fire, and obtaining the
+--- clothing is the real gate.
+---
+--- Integrity is keyed to the character and the tier rather than to this session, so
+--- changing clothes does not repair a burned coat and putting the same gear back on
+--- resumes where it left off.
+RegisterNetEvent('mi_fire:server:reportGear', function(worn, sex)
+    local source = source
+    if type(worn) ~= 'table' then return end
+
+    local entry = State.getGear(source)
+
+    if Config.gearRequiresJob
+        and not MIFire.Framework.isFirefighter(source)
+        and not Permissions.isAdmin(source) then
+        -- Only reachable when a server has opted back into gear being a job perk.
+        if entry.tier ~= MIFireGear.defaultTier then
+            State.clearGear(source)
+            pushGearState(source)
+        end
+        return
+    end
+
+    local tierName, coverage = MIFire.GearMatch.identify(worn, MIFireGear.tiers, sex)
+
+    if not tierName then
+        if entry.tier ~= MIFireGear.defaultTier then
+            State.clearGear(source)
+            pushGearState(source)
+            Util.debug('turnout', '%s is no longer wearing gear', tostring(source))
+        end
+        return
+    end
+
+    if entry.tier == tierName and math.abs((entry.coverage or 0) - coverage) < 0.01 then
+        return
+    end
+
+    -- Integrity comes from what this character's set was left at, not from a fresh pool
+    -- every time they get dressed.
+    local integrity = Turnout.recallIntegrity(source, tierName)
+
+    State.setGear(source, tierName, integrity)
+    State.getGear(source).coverage = coverage
+
+    pushGearState(source)
+    Util.debug('turnout', '%s recognised as wearing %s (%.0f%% coverage, integrity %.0f)',
+        tostring(source), tierName, coverage * 100, integrity)
+end)
+
 -- ---------------------------------------------------------------------------
 -- SCBA
 -- ---------------------------------------------------------------------------
@@ -140,8 +218,12 @@ end
 function Turnout.donScba(source, opts)
     opts = opts or {}
 
-    local allowed, why = Permissions.requireFirefighter(source)
-    if not allowed then return false, why end
+    -- Taking a set off department property is department business; wearing one you already
+    -- have is not. So the job check lives on the rack rather than here.
+    if opts.fromRack or Config.gearRequiresJob then
+        local allowed, why = Permissions.requireFirefighter(source)
+        if not allowed then return false, why end
+    end
 
     local scba = State.getScba(source)
     if scba.worn then return false, 'you are already wearing a set' end

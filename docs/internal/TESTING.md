@@ -46,13 +46,20 @@ The first thing built on top of the engine, and nothing after this works without
 - [ ] Don, disconnect, reconnect. *Known gap: gear state does not survive this yet
       (`TURN-003`). Confirming it is broken is still useful.*
 
-**Then the thing that matters most:**
+**Then the thing that matters most — note this check has been inverted:**
 
 - [ ] Put on turnout gear through a **clothing menu** instead of the truck.
-- [ ] Walk into a fire. You should take **full damage** — no protection whatsoever.
+- [ ] Walk into a fire. You should be **fully protected**, exactly as if you had donned it
+      at the apparatus.
+- [ ] Do it as a **civilian**, with no fire job. Still protected — the coat is a coat.
+- [ ] Wear only the **coat**, no helmet or gloves. You should be protected, but noticeably
+      less than in the full set.
 
-That last check is the whole of ADR 0001. Protection comes from server state, never from
-what you are wearing.
+That is ADR 0004. Protection follows the clothing, however it got there.
+
+- [ ] Take the coat off mid-fire. Protection should drop within a couple of seconds.
+- [ ] Burn a set down, take it off, put it back on. Integrity should **resume where it
+      left off**, not reset. Changing clothes does not repair a coat.
 
 ---
 

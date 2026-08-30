@@ -1107,3 +1107,71 @@ controllable per particle instance, which is what makes any of this possible.
   windows. That needs the placement work in Phase 2.
 
 **Next:** in-game test.
+
+---
+
+## 2026-08-30 · session 017
+
+**Scope:** ADR 0004 — protection follows the clothing. Reverses part of ADR 0001 on the
+user's correction.
+
+**Changed:** `shared/gearmatch.lua` (new), `config/gear.lua`, `config/config.lua`,
+`server/modules/turnout/init.lua`, `client/modules/turnout/init.lua`,
+`server/modules/exposure/init.lua`, `tools/tests/gearmatch_spec.lua` (new),
+`tools/tests/scba_spec.lua`, `docs/internal/adr/0004-*` (new), `adr/0001-*`,
+`docs/internal/TESTING.md`, `docs/getting-started/permissions.md`.
+
+**ADR 0001 was solving the wrong problem.** It said protection is read from server state and
+never from clothing, so donning at an apparatus was the only route. The reasoning was that
+otherwise anyone with a clothing menu could grant themselves fire resistance.
+
+The cost of that was severe and the exploit was trivial. Firefighters get dressed at station
+lockers, through outfit menus, from job clock-ins — and every one of those produced a
+firefighter in full turnout taking full fire damage. That does not read as a design
+decision; it reads as the resource being broken. Meanwhile the thing being prevented was a
+civilian surviving a few seconds longer in a fire.
+
+**Then the same argument taken further, also on the user's call:** gear is not job-gated at
+all. A coat is a coat. If a civilian gets hold of a set it protects them, and a bottle of air
+works for whoever is breathing it. `Config.gearRequiresJob` restores the restriction for
+anyone who disagrees.
+
+The line moved somewhere more defensible: **taking equipment off an apparatus or a station
+rack is department business** and stays job-gated. Obtaining the gear is the gate; using it
+is not.
+
+**Decisions:**
+
+- Recognition matches on **drawable and never texture**. Texture carries the per-character
+  name tape and rank, so matching on it would mean the officers are the ones who lose
+  protection.
+- **A signature slot must match** — the coat. `pants = 11` means "no separate trousers" and
+  half the outfits on a server use it, so matching on that alone would identify most of the
+  population as firefighters.
+- Coverage scales protection between a floor and full, so wearing the coat without the
+  helmet protects less than the full set. A missing hood becomes a real decision.
+- The client reports what it is wearing, because `GetPedDrawableVariation` is client-only.
+  Small trust surface: the worst a forged report achieves is a player who is harder to set
+  on fire.
+- **Integrity is keyed to character and tier, not to the session.** Changing clothes does
+  not repair a burned coat, and putting the same gear back on resumes where it left off.
+  The gear is worn out, not the visit.
+
+**What ADR 0001 keeps:** everything about immunity. No tier may reach `fireResist` 1.0,
+gear degrades while it protects, and staying in long enough still sets you alight. Only the
+*source of the tier* changed, and the test asserting the bound now sits alongside the one
+asserting the new behaviour.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **592 passed, 0 failed** (was 557).
+- The `scba_spec` block that asserted the old rule was rewritten rather than deleted, so the
+  suite now states the new behaviour and the surviving half of the old one side by side.
+- `TESTING.md` section 2 inverted. That check previously read "you should take full damage"
+  and now reads the opposite, with the civilian and partial-coverage cases added.
+- All 51 Lua files parse.
+- **Not** tested in game.
+
+**Open:** unchanged, minus the job-gating note.
+
+**Next:** in-game test.

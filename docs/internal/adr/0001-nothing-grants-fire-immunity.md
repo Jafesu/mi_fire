@@ -1,7 +1,15 @@
 # 0001 — Nothing grants immunity to fire
 
-**Status:** accepted
+**Status:** accepted, partially superseded by [0004](0004-protection-follows-the-clothing.md)
 **Date:** 2026-08-30
+
+> **Superseded in one respect.** This ADR originally said protection is read from server
+> state and never from clothing. That was wrong and 0004 reverses it — protection now
+> follows what is actually being worn, however it was put on.
+>
+> **Everything about immunity still holds.** Nothing grants immunity to fire, no tier may
+> reach `fireResist` 1.0, gear degrades while it protects, and a firefighter who stays in
+> long enough catches light. Only the *source of the tier* changed.
 
 ## Context
 
@@ -41,7 +49,8 @@ that gets edited out:
 
 - A server owner who wants a more forgiving fireground raises `integrity`, which gives
   crews longer inside without ever making them invulnerable. That is the intended knob.
-- Turnout gear has a running cost: integrity persists on the item and needs repair.
+- Turnout gear has a running cost: integrity persists per character and tier, and needs
+  repair. Changing clothes does not repair it.
 - Hazmat suits have *worse* fire resistance than turnout, which surprises people. It is
   correct — a Level A vapour-tight suit is plastic.
 

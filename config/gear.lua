@@ -17,10 +17,24 @@ MIFireGear = {}
 
 --- How resistance is read at runtime.
 ---
---- The active tier is held in server state, keyed to the player, and set only by donning
---- at an apparatus. It is never inferred from what the player is wearing -- putting on a
---- turnout skin through a clothing menu grants nothing, which is the whole point.
+--- **Protection follows the clothing.** A firefighter who got dressed at a station locker,
+--- through an outfit menu, or from a job clock-in is wearing turnout gear, and it protects
+--- them exactly as much as if they had taken it off the truck. Donning at an apparatus is a
+--- convenience, not the source of truth.
+---
+--- Recognition matches on **drawable and never texture**, because texture carries the name
+--- tape and rank and is per-character. See `shared/gearmatch.lua`.
 MIFireGear.defaultTier = 'none'
+
+--- What partial coverage is worth.
+---
+--- Wearing the coat without the helmet is not the same as wearing the set. Protection
+--- scales from `minimum` at signature-only up to full at a complete set, so a missing hood
+--- is a real decision rather than a cosmetic one.
+MIFireGear.coverage = {
+    partialCounts = true,
+    minimum = 0.55,
+}
 
 --- Damage channels each tier answers, and the field that answers it:
 ---
@@ -64,6 +78,7 @@ MIFireGear.tiers = {
         selfExtinguish = 5.0,
         mobility = 0.97,
         appearance = nil,   -- not authored for this server yet
+        signature = { 'torso2' },
     },
 
     --- Full structural turnout. The default fireground tier.
@@ -94,6 +109,13 @@ MIFireGear.tiers = {
                 arms   = 179,
             },
         },
+
+        --- Slots that must match for this to count as turnout at all.
+        ---
+        --- The coat, and only the coat. `pants = 11` is "no separate trousers" and half the
+        --- outfits on a server use it; matching on that would identify half the population
+        --- as firefighters. The rest of the set adds coverage once the coat is there.
+        signature = { 'torso2' },
     },
 
     --- Aluminized proximity gear. Built for radiant heat off a fuel fire -- aircraft,

@@ -30,6 +30,19 @@ Config.emsJobs = {
 --- Require the player to be clocked on duty, not merely to hold the job.
 Config.requireOnDuty = true
 
+--- Does protective equipment only work for firefighters?
+---
+--- **No, by default.** Turnout gear is a coat, not a permission. If a civilian gets hold of
+--- a set, it protects them exactly as much as it protects anyone else, because that is what
+--- the coat does. The same goes for SCBA: a bottle of air works for whoever is breathing it.
+---
+--- The line is drawn somewhere more sensible instead -- **taking equipment off an
+--- apparatus or a station rack** is still department business and stays job-gated. Getting
+--- hold of the gear is the gate; using it is not.
+---
+--- Set true if you would rather protection was a job perk.
+Config.gearRequiresJob = false
+
 --- Who can use the admin commands in `server/modules/admin/`.
 ---
 --- Two independent routes in, because they answer different questions. ACE answers "is this

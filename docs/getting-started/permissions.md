@@ -99,10 +99,31 @@ fixes:
 
 All of them are followed by a nudge to run `/fire perms`.
 
+## Protective equipment is not job-gated
+
+Turnout gear and SCBA work for **whoever is wearing them**. A civilian who gets hold of a
+set is protected by it exactly as much as a firefighter is, because a coat is a coat and a
+bottle of air works for whoever is breathing it.
+
+The gate is on **obtaining** it, not using it. Taking a set off an apparatus or a station
+rack is department business and still requires the fire job; what you do with gear you
+already have is your own affair.
+
+```lua
+Config.gearRequiresJob = false
+```
+
+Set it true if you would rather protection was a job perk.
+
+Note that protection follows the **clothing**, so however a firefighter got dressed -- the
+truck, a station locker, an outfit menu, a job clock-in -- the gear works. See
+[Reading smoke](../guides/reading-smoke.md) and the gear section of the
+[configuration reference](../configuration/README.md).
+
 ## Firefighters and EMS
 
-Separate from admin access, and not ACE-based. These gate ordinary gameplay — turnout gear,
-hose lines, the pump panel — rather than commands.
+Separate from admin access, and not ACE-based. These gate hose lines, the pump panel, and
+taking equipment off department property — **not** protection, which follows the clothing.
 
 ```lua
 Config.fireJobs = { fireman = true, fire = true, firefighter = true, lsfd = true }

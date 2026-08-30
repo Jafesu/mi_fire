@@ -18,6 +18,7 @@ shared_scripts {
     'shared/pass.lua',
     'shared/exposure.lua',
     'shared/smoke.lua',
+    'shared/gearmatch.lua',
     'config/config.lua',
     'config/dispatch.lua',
     'config/zones.lua',

@@ -137,20 +137,34 @@ return function(t)
 
     -- -----------------------------------------------------------------------
 
-    t.describe('protection is server state, never clothing')
+    t.describe('protection follows the clothing')
 
     reset()
     t.equal(State.getGearTier(PLAYER).fireResist, MIFireGear.tiers.none.fireResist,
-        'a player who has not donned has no resistance')
+        'someone wearing nothing has no resistance')
 
-    -- The whole point of ADR 0001: putting on the appearance does not grant the tier.
-    Appearance.apply(MIFireGear.tiers.structural.appearance.male)
-    t.equal(State.getGearTier(PLAYER).fireResist, MIFireGear.tiers.none.fireResist,
-        'and wearing the turnout skin through a clothing menu still grants nothing')
+    -- ADR 0004. The route does not matter: what is on the ped decides the tier, so a
+    -- firefighter who got dressed at a station locker is protected exactly as much as one
+    -- who took the gear off a truck.
+    local worn = {}
+    for slot, value in pairs(MIFireGear.tiers.structural.appearance.male) do
+        worn[slot] = type(value) == 'table' and value.drawable or value
+    end
+
+    t.equal(MIFire.GearMatch.identify(worn, MIFireGear.tiers, 'male'), 'structural',
+        'a full set of turnout is recognised whatever put it there')
 
     Turnout.don(PLAYER, 'structural')
     t.equal(State.getGearTier(PLAYER).fireResist, MIFireGear.tiers.structural.fireResist,
-        'only donning at a rack does')
+        'and the tier carries its rated protection')
+
+    t.describe('but immunity is still impossible')
+
+    -- The half of ADR 0001 that 0004 did not touch.
+    for name, tier in pairs(MIFireGear.tiers) do
+        t.ok(tier.fireResist < 1.0,
+            ('the %s tier still grants resistance rather than immunity'):format(name))
+    end
 
     -- -----------------------------------------------------------------------
 

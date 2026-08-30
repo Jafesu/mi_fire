@@ -144,9 +144,11 @@ local function tickPlayer(source, dt)
     -- --- Flame -----------------------------------------------------------
 
     if sample.flameIntensity > 0 then
-        -- Gear that has been burned through protects less. Without this, integrity would
-        -- tick down and change nothing until it crossed a threshold.
+        -- Gear that has been burned through protects less, and a partial set protects
+        -- less than a complete one. Working without your helmet is a real decision.
         local resist = Exposure.effectiveFireResist(gearEntry.integrity, tier)
+            * MIFire.GearMatch.protectionMultiplier(
+                gearEntry.coverage or 1.0, MIFireGear.coverage)
         damage = damage + Exposure.flameDamage(sample.flameIntensity,
             { fireResist = resist }, cfg.flame) * dt
 

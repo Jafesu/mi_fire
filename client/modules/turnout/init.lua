@@ -32,6 +32,12 @@ RegisterNetEvent('mi_fire:client:gearAppearance', function(action, set)
     elseif action == 'restore' then
         Appearance.restore()
     end
+
+    -- Our own change counts too, and the server should hear about it immediately rather
+    -- than on the next poll.
+    SetTimeout(250, function()
+        if MIFire.reportWornGear then MIFire.reportWornGear(true) end
+    end)
 end)
 
 --- What the server says we are wearing. Used to decide which target options to offer;
@@ -50,6 +56,84 @@ RegisterNetEvent('mi_fire:client:scbaState', function(active, air, capacity)
     scba.active = active == true
     scba.air = tonumber(air) or 0.0
     scba.capacity = tonumber(capacity) or 0.0
+end)
+
+
+-- ---------------------------------------------------------------------------
+-- What we are actually wearing
+-- ---------------------------------------------------------------------------
+
+--- Protection follows the clothing, so the client reports what is on the ped and the
+--- server decides what that amounts to.
+---
+--- The server cannot read this itself -- `GetPedDrawableVariation` is client-only -- so it
+--- is reported. That is safe because the server still gates on **job**: a civilian
+--- reporting a full set of turnout gets nothing, because they are not a firefighter.
+---
+--- Drawables only. Texture carries the per-character name tape and rank, and matching on it
+--- would mean a firefighter with their own markings is not recognised as wearing the gear.
+local WATCHED_SLOTS = {
+    hat = { kind = 'prop', id = 0 },
+    torso2 = { kind = 'component', id = 11 },
+    arms = { kind = 'component', id = 3 },
+    pants = { kind = 'component', id = 4 },
+    shoes = { kind = 'component', id = 6 },
+    ['t-shirt'] = { kind = 'component', id = 8 },
+    vest = { kind = 'component', id = 9 },
+    mask = { kind = 'component', id = 1 },
+    bag = { kind = 'component', id = 5 },
+}
+
+---@return table worn `{ slot = drawable }`
+local function readWornGear()
+    local ped = cache.ped
+    local worn = {}
+
+    for slot, def in pairs(WATCHED_SLOTS) do
+        if def.kind == 'prop' then
+            worn[slot] = GetPedPropIndex(ped, def.id)
+        else
+            worn[slot] = GetPedDrawableVariation(ped, def.id)
+        end
+    end
+
+    return worn
+end
+
+--- Report only when something changed. A clothing set is nine numbers; sending it every
+--- two seconds for every player forever would be pure noise on the wire.
+local lastReported
+
+local function reportWornGear(force)
+    local worn = readWornGear()
+
+    local fingerprint = ('%s|%s|%s|%s|%s|%s'):format(
+        worn.hat or -1, worn.torso2 or -1, worn.arms or -1,
+        worn.pants or -1, worn.shoes or -1, worn['t-shirt'] or -1)
+
+    if not force and fingerprint == lastReported then return end
+    lastReported = fingerprint
+
+    TriggerServerEvent('mi_fire:server:reportGear', worn, IsPedMale(cache.ped) and 'male' or 'female')
+end
+
+MIFire.reportWornGear = reportWornGear
+
+CreateThread(function()
+    while not MIFire.ready do Wait(250) end
+
+    -- Once on spawn, then on change. Getting dressed is not a frequent event.
+    reportWornGear(true)
+
+    while true do
+        Wait(2000)
+        reportWornGear(false)
+    end
+end)
+
+--- Anything that changes clothes should say so rather than waiting for the poll.
+RegisterNetEvent('illenium-appearance:client:setPedAppearance', function()
+    SetTimeout(250, function() reportWornGear(true) end)
 end)
 
 -- ---------------------------------------------------------------------------

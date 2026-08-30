@@ -102,6 +102,7 @@ return function(t)
         'shared/pass.lua',
         'shared/exposure.lua',
         'shared/smoke.lua',
+        'shared/gearmatch.lua',
         'config/config.lua',
         'config/dispatch.lua',
         'config/zones.lua',
@@ -208,7 +209,7 @@ return function(t)
         'Enums', 'Util', 'Hydraulics', 'Validate', 'FireClass', 'Suppression',
         'Framework', 'Dispatch', 'Inventory', 'DB', 'State', 'Permissions',
         'Fire', 'Spread', 'Admin', 'Turnout', 'Appearance', 'GearAppearance',
-        'Pass', 'PassServer', 'Exposure', 'ExposureServer', 'Medical', 'Smoke', 'SmokeServer',
+        'Pass', 'PassServer', 'Exposure', 'ExposureServer', 'Medical', 'Smoke', 'SmokeServer', 'GearMatch',
     }
     for _, name in ipairs(expected) do
         t.ok(type(MIFire) == 'table' and MIFire[name] ~= nil,

@@ -276,6 +276,20 @@ function ExposureServer.isBurning(source)
     return player ~= nil and player.burning == true
 end
 
+--- How long since this player was last standing in fire.
+---
+--- The 'regenerate' integrity model needs "clear of the fire" to mean what it says rather
+--- than "not currently taking damage", so it asks here.
+---@param source integer
+---@return number seconds
+function ExposureServer.secondsSinceFlame(source)
+    local player = tracked[source]
+    if not player or not player.lastFlameAt or player.lastFlameAt == 0 then
+        return math.huge
+    end
+    return os.time() - player.lastFlameAt
+end
+
 ---@param source integer
 ---@return number
 function ExposureServer.heatLoad(source)

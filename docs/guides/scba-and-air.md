@@ -163,6 +163,27 @@ suit, because you cannot roll properly in one.
 Faster: a partner with a charged line. They target you and put you out in about a second
 and a half. That is the point of having a partner.
 
+### Looking after your gear
+
+Your coat wears down while it is protecting you, and worn gear protects less. What happens
+to it after that depends on how your server is set up — ask, because it changes how you work.
+
+**If gear recovers on its own,** back out of the fire and wait. After about a minute clear
+it starts coming back. Rotating out is not just about your air.
+
+**If damage sticks,** you have two options at the truck:
+
+| | Time | Notes |
+|---|---|---|
+| **Service turnout gear** | Longer the worse it is | Keeps your own set |
+| **Draw a fresh set** | Quick | Department property, so it needs the job |
+
+A set that has been serviced several times does not come back quite as good each time, so
+eventually it is worth drawing a new one rather than patching the old one again.
+
+And a set that is **condemned** cannot be repaired at all. Past a point you replace it,
+which is exactly what happens to real turnout.
+
 ### Heat, before it gets that far
 
 You do not need to be in the fire to be in trouble. Radiant heat builds up as you work near

@@ -1175,3 +1175,91 @@ asserting the new behaviour.
 **Open:** unchanged, minus the job-gating note.
 
 **Next:** in-game test.
+
+---
+
+## 2026-08-30 · session 018
+
+**Scope:** `GEAR-004` gear condition, repair, and the three integrity models
+
+**Changed:** `shared/integrity.lua` (new), `config/gear.lua`,
+`server/modules/turnout/init.lua`, `server/modules/exposure/init.lua`,
+`client/modules/turnout/init.lua`, `tools/tests/integrity_spec.lua` (new),
+`fxmanifest.lua`, `tools/tests/boot_spec.lua`, `docs/configuration/README.md`,
+`docs/guides/scba-and-air.md`, `docs/internal/TESTING.md`.
+
+**The gap this closes.** Session 017 made gear integrity persist across sessions and keyed
+it to the character rather than the visit — a coat you burned stayed burned. What it did not
+build was any way to *un*-burn it. Integrity fell, protection fell with it, and there was no
+repair path, no replacement path, and nothing that put a set back in service. Persistence
+without a repair path is not realism, it is a one-way ratchet: play long enough and every
+firefighter on the server is in condemned gear with no recourse. That was a dead end and it
+shipped as one.
+
+**Decisions:**
+
+- **Three models, chosen in config, because both positions are defensible.** A server that
+  wants gear to be a logistics system and a server that wants it to be a damage modifier are
+  both asking for something reasonable, and the argument between them is not one this
+  resource should settle:
+
+  | Mode | Behaviour |
+  |---|---|
+  | `regenerate` | Recovers on its own once the wearer is clear of the fire |
+  | `persist` | Stays damaged until repaired or replaced (default) |
+  | `session` | Lasts the shift, resets when gear next goes on |
+
+  Nothing outside `shared/integrity.lua` knows which is active. The exposure model, the
+  target options, and the protection multiplier are all identical across the three.
+
+- **On `regenerate`, the delay is the mechanic, not the rate.** `delaySeconds` before
+  recovery starts is what makes rotating out mean something; without it, backing out of a
+  doorway for two seconds would reset a coat and the whole model would be decorative. The
+  rate can be set arbitrarily high and the model stays coherent as long as the delay holds.
+
+- **"Clear of the fire" means clear of the fire.** Recovery reads
+  `ExposureServer.secondsSinceFlame`, not "not currently taking damage" — those differ, and
+  the cheap version would let someone recover while standing in a node that happened not to
+  have ticked yet.
+
+- **Repaired gear does not come back as new.** `ceilingLossPerRepair` takes a slice off the
+  ceiling each service, so a set that has been through several fires is eventually replaced
+  rather than patched forever. Without it, one set of turnout lasts the life of the server
+  and the replacement path is dead code. The ceiling has a floor so gear never repairs to
+  nothing, and the loss can be set to `0.0` by anyone who wants indefinite patching.
+
+- **Condemned gear cannot be repaired.** Below `condemnedBelow` the only option is a fresh
+  set. Past a point real turnout is taken out of service rather than serviced, and modelling
+  that is what gives replacement a purpose distinct from repair.
+
+- **Replacing is faster than repairing, and that is the trade.** A fresh set is quick but it
+  is department property and stays job-gated; servicing the set you have is slow but
+  available to anyone, consistent with session 017's line — obtaining gear is the gate,
+  using it is not.
+
+- **Repair time scales with damage.** A scorched coat is quick and a nearly-condemned one is
+  a job, so the progress bar carries information rather than being a fixed toll.
+
+- **Racks hand out, stations service.** `repairAtApparatus` defaults off: an engine can give
+  you a fresh set at 3am but it is not a gear room. Both are config, so a server that does
+  not run a station can turn servicing on at the truck.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **626 passed, 0 failed** (was 596).
+- `integrity_spec` asserts each model on its own terms: `regenerate` does not recover inside
+  the delay and does past it; `persist` never recovers however long you wait; condemned gear
+  refuses repair and says to replace; repair restores less each time but never to nothing;
+  and the shipped config is coherent — the mode exists, the threshold is a fraction, and
+  replacing is faster than repairing.
+- All 52 Lua files parse.
+- **Not** tested in game. Sections 2–7 of `TESTING.md` remain unrun, now including the
+  repair and mode-switch checks added this session.
+
+**Open:**
+
+- `TURN-003` — gear state still does not survive a disconnect while worn.
+- Only the `structural` tier has an authored appearance.
+- No accountability board, so a condemned set is not visible to a company officer.
+
+**Next:** in-game test — gear, SCBA, exposure, PASS, smoke, and now repair.

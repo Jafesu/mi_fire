@@ -61,6 +61,25 @@ That is ADR 0004. Protection follows the clothing, however it got there.
 - [ ] Burn a set down, take it off, put it back on. Integrity should **resume where it
       left off**, not reset. Changing clothes does not repair a coat.
 
+**Gear condition and repair.** Default mode is `persist`.
+
+- [ ] Burn a set to roughly half. Third-eye the truck — **Draw a fresh set** appears.
+- [ ] Draw one. Protection back to full.
+- [ ] Burn a set below 15% — it is **condemned**. Repair should be refused, telling you to
+      replace it.
+- [ ] Set `MIFireGear.integrity.persist.repairAtApparatus = true`, restart, and try
+      **Service turnout gear**. It should take longer the worse the set is.
+- [ ] Repair the same set three times. Each repair should restore slightly less than the
+      last, so patching forever is not viable.
+
+**Then switch models and confirm they behave differently.**
+
+- [ ] Set `MIFireGear.integrity.mode = 'regenerate'`, restart.
+- [ ] Burn a set, then step out of the fire. Nothing for the first minute.
+- [ ] Keep waiting — integrity should climb back on its own.
+- [ ] Duck out for five seconds and back in. It should **not** have recovered. The delay is
+      the whole mechanic.
+
 ---
 
 ## 3. SCBA

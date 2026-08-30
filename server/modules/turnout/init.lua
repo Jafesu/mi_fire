@@ -46,8 +46,11 @@ end
 ---@param source integer
 local function pushGearState(source)
     local entry = State.getGear(source)
+    local tier = MIFireGear.tiers[entry.tier]
+
     TriggerClientEvent('mi_fire:client:gearState', source,
-        entry.tier, entry.tier ~= MIFireGear.defaultTier, entry.integrity)
+        entry.tier, entry.tier ~= MIFireGear.defaultTier, entry.integrity,
+        tier and tier.integrity or 0)
 end
 
 -- ---------------------------------------------------------------------------
@@ -66,14 +69,17 @@ function Turnout.recallIntegrity(source, tierName)
     if not tier then return 0.0 end
 
     local integrity = tier.integrity or 0.0
+    local rules = MIFireGear.integrity
 
-    if MIFireGear.exposure.persistence.enabled and integrity > 0 then
-        local stored = Inventory.getMetadata(source, 'turnout_' .. tierName,
-            MIFireGear.exposure.persistence.metadataKey, nil)
-        if stored then integrity = tonumber(stored) or integrity end
-    end
+    -- On the session model, gear is fresh every time it goes on. On the others, it
+    -- resumes where it was left.
+    if rules.mode == MIFire.Integrity.Mode.SESSION then return integrity end
+    if not rules.saveBetweenSessions or integrity <= 0 then return integrity end
 
-    return integrity
+    local stored = Inventory.getMetadata(source, 'turnout_' .. tierName,
+        rules.metadataKey, nil)
+
+    return tonumber(stored) or integrity
 end
 
 --- Put a gear tier on.
@@ -120,11 +126,8 @@ function Turnout.doff(source)
         return false, 'you are not wearing any gear'
     end
 
-    -- Write the wear back to the item so a rough call costs something afterwards.
-    if MIFireGear.exposure.persistence.enabled then
-        Inventory.updateMetadata(source, 'turnout_' .. entry.tier,
-            MIFireGear.exposure.persistence.metadataKey, entry.integrity)
-    end
+    -- Write the wear back so a rough call costs something afterwards.
+    Turnout.storeIntegrity(source, entry.tier, entry.integrity)
 
     State.clearGear(source)
 
@@ -205,6 +208,201 @@ RegisterNetEvent('mi_fire:server:reportGear', function(worn, sex)
     Util.debug('turnout', '%s recognised as wearing %s (%.0f%% coverage, integrity %.0f)',
         tostring(source), tierName, coverage * 100, integrity)
 end)
+
+
+-- ---------------------------------------------------------------------------
+-- Gear condition
+-- ---------------------------------------------------------------------------
+
+--- Repairs performed on this character's set, so repaired gear can lose a little ceiling
+--- each time and eventually need replacing rather than being patched forever.
+---@type table<string, integer>
+local repairCounts = {}
+
+---@param source integer
+---@param tierName string
+---@return string
+local function repairKey(source, tierName)
+    local identifier = MIFire.Framework.getIdentifier(source) or ('src:' .. source)
+    return identifier .. ':' .. tierName
+end
+
+--- What condition someone's gear is in, in words.
+---@param source integer
+---@return table|nil { tier, condition, fraction, integrity, capacity, condemned }
+function Turnout.condition(source)
+    local entry = State.getGear(source)
+    if entry.tier == MIFireGear.defaultTier then return nil end
+
+    local tier = MIFireGear.tiers[entry.tier]
+    local capacity = tier and tier.integrity or 0
+
+    local condition, fraction = MIFire.Integrity.condition(
+        entry.integrity, capacity, MIFireGear.integrity)
+
+    return {
+        tier = entry.tier,
+        label = tier and tier.label or entry.tier,
+        condition = condition,
+        fraction = fraction,
+        integrity = entry.integrity,
+        capacity = capacity,
+        condemned = MIFire.Integrity.isCondemned(entry.integrity, capacity, MIFireGear.integrity),
+    }
+end
+
+--- Repair the set someone is wearing.
+---
+--- Repaired gear does not come back as new -- each repair costs a little of the ceiling, so
+--- a set that has been through several fires is eventually replaced rather than patched
+--- indefinitely. That is what happens to real turnout.
+---@param source integer
+---@return boolean ok
+---@return string|nil reason
+---@return number|nil seconds How long it should take.
+function Turnout.repair(source)
+    local entry = State.getGear(source)
+    if entry.tier == MIFireGear.defaultTier then
+        return false, 'you are not wearing any gear'
+    end
+
+    local tier = MIFireGear.tiers[entry.tier]
+    local capacity = tier and tier.integrity or 0
+
+    local ok, why = MIFire.Integrity.canRepair(entry.integrity, capacity, MIFireGear.integrity)
+    if not ok then return false, why end
+
+    local key = repairKey(source, entry.tier)
+    repairCounts[key] = (repairCounts[key] or 0) + 1
+
+    local restored = MIFire.Integrity.afterRepair(capacity, repairCounts[key], MIFireGear.integrity)
+
+    entry.integrity = restored
+    Turnout.storeIntegrity(source, entry.tier, restored)
+    pushGearState(source)
+
+    local condition = MIFire.Integrity.condition(restored, capacity, MIFireGear.integrity)
+    notify(source, ('Gear serviced -- %s'):format(condition), 'success')
+
+    Util.debug('turnout', '%s repaired %s to %.0f (repair #%d)',
+        tostring(source), entry.tier, restored, repairCounts[key])
+
+    return true
+end
+
+--- Draw a fresh set. Fast, and the only option once a set is condemned.
+---@param source integer
+---@param tierName string|nil Defaults to what they are wearing.
+---@return boolean ok
+---@return string|nil reason
+function Turnout.replace(source, tierName)
+    tierName = tierName or State.getGear(source).tier
+    local tier = MIFireGear.tiers[tierName]
+
+    if not tier or tierName == MIFireGear.defaultTier then
+        return false, 'no gear to replace'
+    end
+
+    local key = repairKey(source, tierName)
+    repairCounts[key] = 0
+
+    local capacity = tier.integrity or 0
+    State.setGear(source, tierName, capacity)
+    Turnout.storeIntegrity(source, tierName, capacity)
+    pushGearState(source)
+
+    notify(source, 'Fresh set drawn', 'success')
+    return true
+end
+
+--- Write integrity somewhere it survives, per the configured model.
+---@param source integer
+---@param tierName string
+---@param integrity number
+function Turnout.storeIntegrity(source, tierName, integrity)
+    if not MIFireGear.integrity.saveBetweenSessions then return end
+    if MIFireGear.integrity.mode == MIFire.Integrity.Mode.SESSION then return end
+
+    Inventory.updateMetadata(source, 'turnout_' .. tierName,
+        MIFireGear.integrity.metadataKey, integrity)
+end
+
+-- ---------------------------------------------------------------------------
+-- Recovery
+-- ---------------------------------------------------------------------------
+
+--- On the 'regenerate' model, gear recovers once its wearer is clear of the fire.
+---
+--- Driven off the exposure module's record of when this player was last in flame, so
+--- "clear of the fire" means what it says rather than "not currently taking damage".
+CreateThread(function()
+    while not MIFire.ready do Wait(250) end
+
+    if MIFireGear.integrity.mode ~= MIFire.Integrity.Mode.REGENERATE then return end
+
+    local interval = 2000
+    local dt = interval / 1000.0
+
+    while true do
+        Wait(interval)
+
+        for _, playerId in ipairs(GetPlayers()) do
+            local source = tonumber(playerId)
+            local entry = source and State.getGear(source)
+
+            if entry and entry.tier ~= MIFireGear.defaultTier then
+                local tier = MIFireGear.tiers[entry.tier]
+                local capacity = tier and tier.integrity or 0
+
+                if capacity > 0 and entry.integrity < capacity then
+                    local clearFor = MIFire.ExposureServer
+                        and MIFire.ExposureServer.secondsSinceFlame(source) or math.huge
+
+                    local recovered = MIFire.Integrity.recover(
+                        entry.integrity, capacity, clearFor, dt, MIFireGear.integrity)
+
+                    if recovered > entry.integrity then
+                        entry.integrity = recovered
+                        pushGearState(source)
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- ---------------------------------------------------------------------------
+-- Transports
+-- ---------------------------------------------------------------------------
+
+RegisterNetEvent('mi_fire:server:repairGear', function(coords)
+    local source = source
+    if coords and not Permissions.isNear(source, coords, 6.0) then
+        return notify(source, 'you are not at the gear room', 'error')
+    end
+
+    local ok, why = Turnout.repair(source)
+    if not ok and why then notify(source, why, 'error') end
+end)
+
+RegisterNetEvent('mi_fire:server:replaceGear', function(coords)
+    local source = source
+    if coords and not Permissions.isNear(source, coords, 6.0) then
+        return notify(source, 'you are not at a rack', 'error')
+    end
+
+    -- Drawing a fresh set is department property, so this one is job-gated even though
+    -- wearing gear is not.
+    local allowed, why = Permissions.requireFirefighter(source)
+    if not allowed then return notify(source, why or 'not allowed', 'error') end
+
+    local ok, reason = Turnout.replace(source)
+    if not ok and reason then notify(source, reason, 'error') end
+end)
+
+exports('GetGearCondition', function(source) return Turnout.condition(source) end)
+exports('RepairGear', function(source) return Turnout.repair(source) end)
+exports('ReplaceGear', function(source, tier) return Turnout.replace(source, tier) end)
 
 -- ---------------------------------------------------------------------------
 -- SCBA

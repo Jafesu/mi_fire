@@ -250,6 +250,54 @@ Note that hazmat suits are *worse in fire than turnout*. That is correct, not a 
 Level A vapour-tight suit is plastic, and walking a hazmat crew into flame should be
 punished.
 
+### What happens to damaged gear
+
+Three models. Pick one; nothing else in the system cares which.
+
+```lua
+MIFireGear.integrity.mode = 'persist'
+```
+
+| Mode | Behaviour |
+|---|---|
+| `regenerate` | Gear recovers on its own once the wearer is clear of the fire. Forgiving, no logistics, nobody is ever stuck without a coat. |
+| `persist` | Damage stays until someone repairs or replaces the set. Realistic, and gives a station gear room a purpose. |
+| `session` | Damage lasts the shift and resets when gear next goes on. Middle ground, needs no repair points. |
+
+**On `regenerate`, the delay matters more than the rate.**
+
+```lua
+regenerate = { delaySeconds = 60.0, ratePerSecond = 3.0, recoverTo = 1.0 }
+```
+
+Ducking out for two seconds should not reset a coat; rotating out properly should. Set
+`ratePerSecond` very high for "clear of the fire for a minute and it is as good as new".
+Drop `recoverTo` below 1.0 and gear still accumulates damage across a shift even on this
+mode.
+
+**On `persist`, gear has a service life.**
+
+```lua
+persist = {
+    repairSeconds = 45.0,
+    condemnedBelow = 0.15,
+    replaceSeconds = 10.0,
+    ceilingLossPerRepair = 0.08,
+}
+```
+
+Repair time scales with how bad the set is, so a scorched coat is quick and a
+nearly-condemned one is a job. Below `condemnedBelow` a set cannot be repaired at all and
+has to be replaced — past a point real gear is taken out of service rather than patched.
+
+`ceilingLossPerRepair` is what stops gear being patched forever: each repair costs a little
+of the ceiling, so a set that has been through several fires eventually gets replaced. Set
+it to `0.0` to repair to full every time.
+
+Replacing is deliberately **faster** than repairing. That is the whole trade — the fresh set
+is quick but it is department property and job-gated, and repairing the one you have is
+slower but yours.
+
 ### PASS audio
 
 ```lua

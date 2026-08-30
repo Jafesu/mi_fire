@@ -42,6 +42,11 @@ Richer API for new integrations. Prefer these over the compatible set above.
 | `GetActiveAop` | `() -> districtName[]` | planned | `ZONE-002` |
 | `SetAop` | `(districtNames: string[]) -> ok, err?` | planned | `ZONE-002` |
 | `GetGearTier` | `(source) -> tierName, integrity` | planned | `EXPO-002` |
+| `GetGearCondition` | `(source) -> { tier, label, condition, fraction, integrity, capacity, condemned } \| nil` | review | `GEAR-004` |
+| `RepairGear` | `(source) -> ok, reason?` | review | `GEAR-004` |
+| `ReplaceGear` | `(source, tier?) -> ok, reason?` | review | `GEAR-004` |
+| `IsBurning` | `(source) -> boolean` | review | `EXPO-002` |
+| `GetHeatLoad` | `(source) -> number` | review | `EXPO-002` |
 | `GetAgentEffect` | `(agent, className) -> { effectiveness, hazard, note, counterproductive }` | review | `API-002` |
 | `GetFireClasses` | `() -> string[]` | review | `API-002` |
 | `GetFiresInRadius` | `(coords, radius) -> FireRow[]` | review | `API-002` |
@@ -56,12 +61,18 @@ Richer API for new integrations. Prefer these over the compatible set above.
 | `GetAllSmokes` | `() -> SmokeRow[]` | review | `API-001` |
 | `IsFireNearby` | `(radius?) -> boolean, nearestDistance?` | review | `API-001` |
 | `IsFireStillActive` | `(incidentId) -> boolean` | review | `API-001` |
+| `GetGearState` | `() -> tierName, worn, integrity, capacity` | review | `GEAR-004` |
+| `GetGearCondition` | `() -> condition \| nil, fraction` | review | `GEAR-004` |
+| `GetScbaState` | `() -> { worn, active, air, capacity }` | review | `SCBA-001` |
 
 ## Events
 
 | Event | Direction | Payload | Status |
 |---|---|---|---|
 | `mi_fire:client:teardown` | server to client | none | review |
+| `mi_fire:client:gearState` | server to client | `tier, worn, integrity, capacity` | review |
+| `mi_fire:server:repairGear` | client to server | `coords` — proximity validated | review |
+| `mi_fire:server:replaceGear` | client to server | `coords` — proximity validated, job-gated | review |
 
 Nothing else is registered yet. Net events that accept player input must validate at the
 service boundary — see [CONVENTIONS.md](CONVENTIONS.md).

@@ -7,6 +7,13 @@ Versions follow [Semantic Versioning](https://semver.org).
 
 ### Added
 
+- **Gear condition, repair, and replacement.** Damaged turnout can be serviced or swapped
+  for a fresh set, and how damage behaves is a server's choice between three models:
+  gear that recovers on its own once you are clear of the fire, gear that stays damaged
+  until someone deals with it, or gear that resets at the start of each shift. Repair
+  takes longer the worse the set is, restores a little less each time, and is refused
+  outright on a set that is condemned — past a point real turnout gets replaced rather
+  than patched.
 - **The fire engine.** Nodes ignite, grow, consume fuel, spread, and go out. Knocking a
   fire down is not extinguishing it: a node driven to zero keeps its fuel and may reflash
   unless a crew keeps working it, which is overhaul.

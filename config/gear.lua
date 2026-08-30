@@ -190,6 +190,73 @@ MIFireGear.tiers = {
     },
 }
 
+--- What happens to damaged gear.
+---
+--- Three models, because servers disagree about this and both positions are defensible.
+--- Pick one; the rest of the system does not care which.
+---
+---   'regenerate'  Gear recovers on its own once you are clear of the fire. Forgiving, no
+---                 logistics, nobody ever stuck without a coat. Back out for a minute and
+---                 you are good again.
+---
+---   'persist'     Damage stays until someone repairs or replaces the set. Realistic --
+---                 thermal damage to real turnout does not heal, which is why NFPA 1851
+---                 exists. Gives a station gear room a purpose and makes a bad call cost
+---                 something afterwards.
+---
+---   'session'     Damage lasts the shift and resets when you next put gear on. A middle
+---                 ground that needs no repair points and no database.
+MIFireGear.integrity = {
+    mode = 'persist',
+
+    --- Only used by 'regenerate'.
+    regenerate = {
+        --- Seconds clear of any fire before a set starts recovering. This matters more
+        --- than the rate: ducking out for two seconds should not reset a coat, and
+        --- rotating out properly should.
+        delaySeconds = 60.0,
+
+        --- Integrity restored per second once recovery has started. Set this very high for
+        --- "clear of the fire for a minute and it is as good as new".
+        ratePerSecond = 3.0,
+
+        --- Fraction of full integrity recovery reaches. Below 1.0, gear slowly accumulates
+        --- damage across a shift even on this mode.
+        recoverTo = 1.0,
+    },
+
+    --- Only used by 'persist'.
+    persist = {
+        --- Base seconds to repair a set, scaled by how bad it is -- a scorched coat is
+        --- quick and a nearly-condemned one is a job.
+        repairSeconds = 45.0,
+
+        --- Below this fraction a set is **condemned**: it cannot be repaired and has to be
+        --- replaced. Past a point real gear is taken out of service rather than patched,
+        --- and modelling that gives replacement a purpose distinct from repair.
+        condemnedBelow = 0.15,
+
+        --- Seconds to draw a fresh set from a rack. Fast, because the slow option is
+        --- repairing the one you have.
+        replaceSeconds = 10.0,
+
+        --- Ceiling lost each time a set is repaired, as a fraction. Repaired gear does not
+        --- come back as new, so a set that has been through several fires eventually gets
+        --- replaced rather than endlessly patched. Set 0.0 to repair to full every time.
+        ceilingLossPerRepair = 0.08,
+
+        --- Where a set can be repaired. Racks on apparatus can hand out fresh gear but
+        --- cannot service it -- that is a station job.
+        repairAtStation = true,
+        repairAtApparatus = false,
+    },
+
+    --- Store integrity across sessions, on ox_inventory item metadata when present and in
+    --- server state otherwise. Turning this off makes 'persist' behave like 'session'.
+    saveBetweenSessions = true,
+    metadataKey = 'integrity',
+}
+
 --- Exposure tuning. These are the knobs a server owner actually turns.
 MIFireGear.exposure = {
     --- Direct flame, applied per tick to a player standing in a node.
@@ -247,12 +314,12 @@ MIFireGear.exposure = {
         maximumBurnSeconds = 45.0,
     },
 
-    --- Gear damage persists on the item, so a rough call costs something afterwards.
+    --- Superseded by `MIFireGear.integrity` above, which covers all three models rather
+    --- than only the persistent one. Kept as an alias so an older config still loads.
     persistence = {
         enabled = true,
         metadataKey = 'integrity',
-        --- Below this fraction the gear is unserviceable and must be replaced.
-        condemnedBelow = 0.10,
+        condemnedBelow = 0.15,
     },
 }
 

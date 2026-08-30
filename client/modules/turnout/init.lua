@@ -42,12 +42,13 @@ end)
 
 --- What the server says we are wearing. Used to decide which target options to offer;
 --- it is never consulted for protection, which is read server-side.
-local gear = { tier = nil, worn = false, integrity = 0.0 }
+local gear = { tier = nil, worn = false, integrity = 0.0, capacity = 0.0 }
 
-RegisterNetEvent('mi_fire:client:gearState', function(tier, worn, integrity)
+RegisterNetEvent('mi_fire:client:gearState', function(tier, worn, integrity, capacity)
     gear.tier = tier
     gear.worn = worn == true
     gear.integrity = tonumber(integrity) or 0.0
+    gear.capacity = tonumber(capacity) or 0.0
     MIFire.wearingGear = gear.worn
 end)
 
@@ -236,6 +237,56 @@ CreateThread(function()
 
     Target.addGlobalVehicle({
         {
+            name = 'mi_fire:repairGear',
+            icon = 'screwdriver-wrench',
+            label = 'Service turnout gear',
+            distance = 2.5,
+            canInteract = function(entity)
+                if not isApparatus(entity) then return false end
+                if not MIFireGear.integrity.persist.repairAtApparatus then return false end
+                return gear.worn and gear.integrity < (gear.capacity or math.huge)
+            end,
+            onSelect = function(data)
+                local seconds = MIFire.Integrity.repairSeconds(
+                    gear.integrity, gear.capacity or 100, MIFireGear.integrity)
+
+                local finished = lib.progressBar({
+                    duration = math.floor(seconds * 1000),
+                    label = 'Servicing gear',
+                    canCancel = true,
+                    disable = { move = true, car = true, combat = true },
+                })
+
+                if finished then
+                    TriggerServerEvent('mi_fire:server:repairGear', coordsOf(data.entity))
+                end
+            end,
+        },
+        {
+            name = 'mi_fire:replaceGear',
+            icon = 'shirt',
+            label = 'Draw a fresh set',
+            distance = 2.5,
+            requiresFirefighter = true,
+            canInteract = function(entity)
+                if not isApparatus(entity) then return false end
+                return gear.worn and gear.integrity < (gear.capacity or math.huge) * 0.95
+            end,
+            onSelect = function(data)
+                local finished = lib.progressBar({
+                    duration = math.floor(
+                        (MIFireGear.integrity.persist.replaceSeconds or 10.0) * 1000),
+                    label = 'Drawing a fresh set',
+                    canCancel = true,
+                    disable = { move = true, car = true, combat = true },
+                })
+
+                if finished then
+                    TriggerServerEvent('mi_fire:server:replaceGear', coordsOf(data.entity))
+                end
+            end,
+        },
+        {
             name = 'mi_fire:donTurnout',
             icon = 'fire-extinguisher',
             label = 'Don turnout gear',
@@ -349,7 +400,15 @@ end)
 ---@return boolean worn
 ---@return number integrity
 exports('GetGearState', function()
-    return gear.tier, gear.worn, gear.integrity
+    return gear.tier, gear.worn, gear.integrity, gear.capacity
+end)
+
+--- What condition the gear is in, in words rather than a percentage.
+---@return string|nil condition
+---@return number fraction
+exports('GetGearCondition', function()
+    if not gear.worn or gear.capacity <= 0 then return nil, 0.0 end
+    return MIFire.Integrity.condition(gear.integrity, gear.capacity, MIFireGear.integrity)
 end)
 
 MIFire.TurnoutClient = TurnoutClient

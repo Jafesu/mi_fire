@@ -420,3 +420,61 @@ the test allowed three.
 
 **Next:** boot it and light one. `/fire here`, then `/fire agent water`, then
 `/fire start B` and water it to watch the matrix bite. After that, `EXPO-001`.
+
+---
+
+## 2026-08-30 · session 007
+
+**Scope:** pump panel architecture — design and documentation only. No code.
+
+**Changed:** `docs/internal/adr/0003-panels-are-data-not-code.md`,
+`docs/internal/APPARATUS.md`, `docs/internal/TASKS.md`.
+
+**Why no code:** Phase 4 is gated on Phase 1-3, and on reference screenshots of the in-game
+panels that do not exist yet. The session 006 engine also has not been tested in game. Building
+on top of an untested engine, toward an unbuildable phase, would have been motion rather than
+progress.
+
+**Decisions:**
+
+- **A panel is data, not code.** One renderer, a layout file per model. The alternative is seven
+  React frontends that drift apart, where every apparatus added later is a new frontend project.
+  Full reasoning in ADR 0003.
+- Panels vary along four axes — family, theme, modules, per-model overrides — and that is far
+  less variation than it looks. A Pierce side-mount and an E-ONE side-mount are about ninety
+  percent the same panel.
+- **The truck pack settled the family split.** `2026firetrucks` ships four modelled pump panels
+  (`Pump_Panelengine`, `Pump_Panelladdder`, `Pump_Paneltower`, `Pump_PanelPUC`), so families are
+  a fact about the apparatus rather than a taxonomy we invented.
+- PUC gets its own family rather than a theme. Pierce Ultimate Configuration is a real
+  single-pump architecture with no separate pump house, operated differently.
+- **The panel is a mod slot.** `Pump_Panelengine` sits on `VMT_HYDRO` and turns off bone
+  `misc_p`; intake fittings sit on `VMT_WING_L`. Opening the NUI can physically open the panel on
+  the truck. Opt-in per model, because it makes mi_fire partly responsible for the vehicle's
+  appearance and can fight a customs resource.
+- **The auto-generated fallback is built first**, before any authored layout. It makes the
+  feature useful immediately and it is the path that otherwise never gets tested, because the
+  authored panels look better.
+- Panel discharges bind to `portId`s from `config/apparatus.lua`, validated at boot. A panel
+  promising a discharge the truck does not have should fail at startup, not mid-incident.
+
+**Findings, recorded in `APPARATUS.md`:**
+
+- `brushtruck` ships **no mod kit at all** and uses extras rather than mod slots. No panel
+  geometry to deploy, so its panel is pure NUI — which makes it the honest test of the generated
+  fallback, and the reason `brush` is built early despite being last in priority.
+- **`alamolhp` is not a fire rig.** It is a police Alamo from a law-enforcement pack. It was
+  listed as brush apparatus earlier in this session on the strength of its filename; that was
+  wrong and is corrected in `APPARATUS.md`.
+- Both packs ship `RSC7`-compressed models, so **bone names, extra indices, and connection
+  geometry cannot be read from disk** — confirmed by attempting it. Everything positional has to
+  be found in game with `/fireoffset`. Written down so a later session does not repeat the
+  attempt.
+
+**Verified:** nothing to verify — no code changed. Tests were green at 273 when this session
+started and were not re-run, because nothing touched them.
+
+**Open:** unchanged from session 006. The engine is still untested in game, `EXPO-001` is still
+the next real work, and Phase 4 is blocked on the phases in front of it plus screenshots.
+
+**Next:** the user's in-game test of the fire engine. Then `EXPO-001`.

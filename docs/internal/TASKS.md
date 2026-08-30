@@ -111,6 +111,28 @@ suppression model, and the supply work for the fire department connection.
 | `SPK-009` | Impairment: close a valve, report it on dispatch | todo | `SPK-001` |
 | `DOC-004` | `docs/guides/sprinkler-systems.md` | todo | `SPK-008` |
 
+### Pump panel — Phase 4
+
+Designed in full; see [adr/0003](adr/0003-panels-are-data-not-code.md) and
+[APPARATUS.md](APPARATUS.md). **Blocked on reference screenshots** of the in-game panels, which
+the user is capturing. Authoring a layout from guesswork means building it twice.
+
+| ID | Task | Status | Depends on |
+|---|---|---|---|
+| `PANEL-001` | Layout schema: grid, widget types, data bindings | todo | — |
+| `PANEL-002` | React renderer, widget components, theme system | todo | `PANEL-001` |
+| `PANEL-003` | Auto-generated fallback from apparatus ports | todo | `PANEL-002`, `APP-001` |
+| `PANEL-004` | Boot validation: layout `portId`s must exist on the apparatus | todo | `PANEL-001` |
+| `PANEL-005` | `engine` family, authored against `EengineHT` | todo | `PANEL-003`, screenshots |
+| `PANEL-006` | `puc` family — proves families are real, not skins | todo | `PANEL-005`, screenshots |
+| `PANEL-007` | `brush` family against `brushtruck` — no panel geometry at all | todo | `PANEL-003` |
+| `PANEL-008` | Physical panel deployment via the mod slot, opt-in per model | todo | `PANEL-005` |
+| `PANEL-009` | Shared panel state so two operators see each other's valves | todo | `PANEL-002` |
+| `DOC-005` | `docs/guides/pump-operations.md` | todo | `PANEL-005` |
+
+`ladder`, `tower`, and `tanker` families follow in Phase 5 with the aerial and supply work their
+controls depend on.
+
 ### Remaining phases
 
 | Phase | Scope |

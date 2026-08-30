@@ -19,6 +19,8 @@ Versions follow [Semantic Versioning](https://semver.org).
 - `/fire` command family: start, here, at, stop, stopall, list, info, agent, wind, classes.
 - Export surface, both name-compatible with the resource mi_fire replaces and a richer
   native API.
+- Pump panel architecture designed and documented: one renderer driving per-model layout
+  files, with an auto-generated fallback so an unconfigured apparatus still works.
 
 - Repository scaffold: manifest, module layout, and load order.
 - `shared/hydraulics.lua` — fireground hydraulics with real friction-loss coefficients,

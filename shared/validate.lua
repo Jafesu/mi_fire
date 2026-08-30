@@ -81,7 +81,7 @@ function Validate.configuration(cfg, gear, zones, classes, agents)
             local known = {
                 here = true, start = true, at = true, stop = true, stopall = true,
                 list = true, info = true, agent = true, classes = true, wind = true,
-                perms = true, help = true,
+                perms = true, help = true, render = true,
             }
             for _, name in ipairs(perms.jobCommands) do
                 if not known[name] then
@@ -113,6 +113,74 @@ function Validate.configuration(cfg, gear, zones, classes, agents)
 
         if not gear.tiers[gear.defaultTier] then
             fail('MIFireGear.defaultTier "%s" is not a real tier', tostring(gear.defaultTier))
+        end
+    end
+
+    -- --- Fire class visuals -------------------------------------------------
+    --
+    -- The failure this exists to prevent: `StartParticleFxLoopedAtCoord` with an effect
+    -- name that is not in the given dictionary returns 0 and prints nothing. No fire, no
+    -- error, no clue. The first version of this resource shipped with an invented name and
+    -- looked completely broken in game while the server logs said everything worked.
+    --
+    -- The name cannot be checked without the game running, so instead every name used has
+    -- to be one confirmed to work. Adding a new one means confirming it in game and adding
+    -- it here -- which is friction, and is the point.
+
+    local VERIFIED_PTFX = {
+        ['core'] = {
+            fire_wrecked_truck_vent = true, fire_petroltank_truck = true,
+            fire_vehicle = true, ent_ray_meth_fires = true,
+            ent_amb_elec_crackle = true, ent_amb_smoke_foundry = true,
+            ent_amb_smoke_general = true, ent_amb_smoke_factory_white = true,
+            ent_amb_fbi_smoke_fogball = true, ent_amb_generator_smoke = true,
+            ent_amb_stoner_vent_smoke = true, proj_grenade_smoke = true,
+        },
+        ['scr_trevor3'] = { scr_trev3_trailer_plume = true },
+        ['scr_michael2'] = { scr_mich3_heli_fire = true },
+        ['scr_agencyheistb'] = { scr_env_agency3b_smoke = true },
+    }
+
+    if classes and type(classes.classes) == 'table' then
+        local function checkPtfx(owner, layers)
+            if type(layers) ~= 'table' then
+                fail('%s has no ptfx layers; it would be invisible', owner)
+                return
+            end
+
+            if #layers == 0 then
+                fail('%s has an empty ptfx list; it would be invisible', owner)
+                return
+            end
+
+            for i = 1, #layers do
+                local layer = layers[i]
+
+                if type(layer.dict) ~= 'string' or type(layer.name) ~= 'string' then
+                    fail('%s ptfx layer %d is missing a dict or name', owner, i)
+                else
+                    local known = VERIFIED_PTFX[layer.dict]
+                    if not known then
+                        fail('%s ptfx layer %d uses unverified dictionary "%s"; confirm it in '
+                            .. 'game and add it to VERIFIED_PTFX', owner, i, layer.dict)
+                    elseif not known[layer.name] then
+                        fail('%s ptfx layer %d uses unverified effect "%s" in "%s"; a wrong '
+                            .. 'name draws nothing and reports nothing', owner, i,
+                            layer.name, layer.dict)
+                    end
+                end
+            end
+        end
+
+        if type(classes.base) == 'table' then
+            checkPtfx('MIFireClasses.base', classes.base.ptfx)
+        end
+
+        for name, class in pairs(classes.classes) do
+            -- A class without its own ptfx inherits the base, which is already checked.
+            if class.ptfx ~= nil then
+                checkPtfx(('fire class "%s"'):format(name), class.ptfx)
+            end
         end
     end
 

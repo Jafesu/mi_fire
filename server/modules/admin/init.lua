@@ -268,6 +268,20 @@ subcommands.classes = function(source)
     replyList(source, lines)
 end
 
+--- `/fire render` -- ask your own client what it knows and what it is drawing.
+---
+--- Exists because "I ran the command and nothing happened" was impossible to diagnose from
+--- the server: it had started the fire, and said so truthfully. This separates three
+--- different bugs -- the client never got the node, the particle dictionary failed to load,
+--- or the effect name is not in that dictionary and the native returned 0 without saying so.
+subcommands.render = function(source)
+    if source == 0 then
+        return reply(source, 'the console has no client to ask; run this in game', 'error')
+    end
+    TriggerClientEvent('mi_fire:client:diagnose', source)
+    reply(source, 'render diagnosis printed to your chat and F8 console')
+end
+
 --- `/fire perms` -- why you can or cannot use these commands.
 ---
 --- Deliberately reachable by anyone: someone who cannot run the commands is exactly who
@@ -288,6 +302,7 @@ local USAGE = {
     'fire stop <id> | stopall | list | info <id>',
     'fire classes | wind [heading] [speed]',
     'fire perms                           -- why you can or cannot use these',
+    'fire render                          -- what your client is actually drawing',
 }
 
 ---@param source integer

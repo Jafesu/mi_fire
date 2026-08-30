@@ -162,6 +162,7 @@ return function(t)
             'bridge/appearance/illenium.lua',
             'client/main.lua',
             'client/modules/notify.lua',
+            'client/modules/fire/render.lua',
             'client/modules/fire/init.lua',
         }) do known[path] = true end
 
@@ -256,6 +257,23 @@ return function(t)
     holedMatrix.matrix.water.D = nil
     t.ok(#MIFire.Validate.configuration(Config, MIFireGear, MIFireZones, MIFireClasses, holedMatrix) > 0,
         'an agent missing a fire class is rejected, because that silently does nothing')
+
+    -- The bug this whole check exists for: an invented particle name draws nothing and
+    -- reports nothing, so the server logs look perfect while the game looks broken.
+    local madeUpEffect = U.deepCopy(MIFireClasses)
+    madeUpEffect.classes.A.ptfx = { { dict = 'core', name = 'fire_wrecked_plane_cabin' } }
+    t.ok(#MIFire.Validate.configuration(Config, MIFireGear, MIFireZones, madeUpEffect) > 0,
+        'an unverified particle effect name is rejected at boot rather than failing silently')
+
+    local madeUpDict = U.deepCopy(MIFireClasses)
+    madeUpDict.classes.A.ptfx = { { dict = 'not_a_dictionary', name = 'whatever' } }
+    t.ok(#MIFire.Validate.configuration(Config, MIFireGear, MIFireZones, madeUpDict) > 0,
+        'so is an unverified dictionary')
+
+    local noPtfx = U.deepCopy(MIFireClasses)
+    noPtfx.classes.A.ptfx = {}
+    t.ok(#MIFire.Validate.configuration(Config, MIFireGear, MIFireZones, noPtfx) > 0,
+        'and a class with no layers at all, which would be an invisible fire')
 
     local ghostHazard = U.deepCopy(MIFireAgents)
     ghostHazard.matrix.water.B.hazard = 'not_a_real_hazard'

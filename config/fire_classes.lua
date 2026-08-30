@@ -43,10 +43,32 @@ MIFireClasses.base = {
     smokeVolume = 1.0,           -- multiplier on smoke produced
     heatMultiplier = 1.0,        -- multiplier on radiant heat output
 
-    --- Presentation
-    ptfxAsset = 'core',
-    ptfxName = 'fire_wrecked_plane_cabin',
+    --- Presentation.
+    ---
+    --- `ptfx` is a list of layers drawn together, because one particle effect does not read
+    --- as a fire -- a flame layer plus a smoke plume does. Each layer has its own scale
+    --- multiplier and vertical offset so smoke can sit above the flame.
+    ---
+    --- These dictionary and effect names are **verified working** pairs. A name that does
+    --- not exist fails silently: the native returns a handle of 0 and you get no fire and
+    --- no error, which is exactly how the first version of this shipped looking broken.
+    --- Do not invent new ones -- confirm them in game first.
+    ptfx = {
+        { dict = 'core',        name = 'fire_wrecked_truck_vent',  scale = 1.0, z = 0.0 },
+        { dict = 'scr_trevor3', name = 'scr_trev3_trailer_plume',  scale = 0.8, z = 0.6 },
+    },
     scale = 1.0,
+
+    --- Also start a native GTA script fire under the particles.
+    ---
+    --- Worth it: a script fire casts real light and heat haze, which particles do not, and
+    --- without it a night-time fire is a flat orange smudge that lights nothing. The engine
+    --- still owns whether the fire exists -- the script fire is decoration that gets removed
+    --- with the node.
+    ---
+    --- GTA caps concurrent script fires (around 70), so this is skipped once the client is
+    --- already rendering a lot of them; particles carry on regardless.
+    scriptFire = true,
 }
 
 --- Per-class overrides, merged onto `base` at load.
@@ -56,6 +78,10 @@ MIFireClasses.classes = {
     --- everyone expects, which makes it the right thing to learn on.
     A = {
         label = 'Ordinary combustibles',
+        ptfx = {
+            { dict = 'core',        name = 'fire_wrecked_truck_vent', scale = 1.0, z = 0.0 },
+            { dict = 'scr_trevor3', name = 'scr_trev3_trailer_plume', scale = 0.9, z = 0.6 },
+        },
         growthPerSecond = 1.2,
         fuel = 240.0,
         spreadChance = 32.0,
@@ -66,6 +92,11 @@ MIFireClasses.classes = {
     --- pushes the pool around instead of putting it out. Foam is the answer.
     B = {
         label = 'Flammable liquid',
+        -- A pool fire is wide and low with heavy black smoke, not a column.
+        ptfx = {
+            { dict = 'core', name = 'fire_petroltank_truck',        scale = 1.2, z = 0.0 },
+            { dict = 'core', name = 'ent_amb_smoke_foundry',        scale = 1.3, z = 1.0 },
+        },
         ignitionIntensity = 35.0,
         growthPerSecond = 2.6,
         fuel = 160.0,
@@ -86,6 +117,12 @@ MIFireClasses.classes = {
     --- it is what happens to a firefighter who hits it with water.
     C = {
         label = 'Energized electrical',
+        -- Small flame, arcing, and the electrical crackle that tells a crew what it is
+        -- before they put water on it.
+        ptfx = {
+            { dict = 'scr_michael2', name = 'scr_mich3_heli_fire',  scale = 0.7, z = 0.0 },
+            { dict = 'core',         name = 'ent_amb_elec_crackle', scale = 1.0, z = 0.3 },
+        },
         ignitionIntensity = 20.0,
         growthPerSecond = 0.7,
         fuel = 120.0,
@@ -106,6 +143,11 @@ MIFireClasses.classes = {
     --- obvious thing is catastrophic.
     D = {
         label = 'Combustible metal',
+        -- Burning metal is blindingly bright and white rather than orange.
+        ptfx = {
+            { dict = 'core', name = 'ent_ray_meth_fires',           scale = 1.1, z = 0.0 },
+            { dict = 'core', name = 'ent_amb_smoke_factory_white',  scale = 1.4, z = 0.8 },
+        },
         ignitionIntensity = 45.0,
         growthPerSecond = 1.0,
         fuel = 300.0,
@@ -123,6 +165,11 @@ MIFireClasses.classes = {
     --- stays above its autoignition temperature long after the flame is out.
     K = {
         label = 'Cooking oil',
+        -- Confined and greasy. Small flame, dirty smoke.
+        ptfx = {
+            { dict = 'core', name = 'ent_ray_meth_fires',    scale = 0.7, z = 0.0 },
+            { dict = 'core', name = 'ent_amb_smoke_general', scale = 0.9, z = 0.5 },
+        },
         ignitionIntensity = 30.0,
         growthPerSecond = 1.4,
         fuel = 100.0,
@@ -142,6 +189,10 @@ MIFireClasses.classes = {
     --- swapped a fire for an unignited vapour cloud. Cool the exposures, find the valve.
     gas = {
         label = 'Pressurized gas',
+        -- A jet flame, not a pile of burning material. Almost no smoke while it is fed.
+        ptfx = {
+            { dict = 'core', name = 'fire_petroltank_truck', scale = 1.0, z = 0.0 },
+        },
         ignitionIntensity = 50.0,
         growthPerSecond = 0.4,       -- fed, so it does not need to grow
         fuel = 100000.0,             -- effectively unlimited until the valve is shut
@@ -164,6 +215,10 @@ MIFireClasses.classes = {
     --- unattended fire becomes a very large problem.
     wildland = {
         label = 'Vegetation',
+        ptfx = {
+            { dict = 'core',            name = 'fire_wrecked_truck_vent',   scale = 0.9, z = 0.0 },
+            { dict = 'scr_agencyheistb', name = 'scr_env_agency3b_smoke',   scale = 1.4, z = 0.8 },
+        },
         ignitionIntensity = 20.0,
         growthPerSecond = 1.0,
         fuel = 180.0,
@@ -182,6 +237,10 @@ MIFireClasses.classes = {
     --- repeatedly and needs sustained flow rather than a quick knockdown.
     vehicle = {
         label = 'Vehicle',
+        ptfx = {
+            { dict = 'core', name = 'fire_vehicle',        scale = 1.0, z = 0.0 },
+            { dict = 'core', name = 'ent_amb_elec_crackle', scale = 0.8, z = 0.4 },
+        },
         ignitionIntensity = 30.0,
         growthPerSecond = 1.8,
         fuel = 140.0,

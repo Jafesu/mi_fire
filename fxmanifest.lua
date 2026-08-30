@@ -31,6 +31,7 @@ client_scripts {
     'bridge/appearance/illenium.lua',
     'client/main.lua',
     'client/modules/notify.lua',
+    'client/modules/fire/render.lua',
     'client/modules/fire/init.lua',
 }
 

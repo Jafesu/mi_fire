@@ -547,3 +547,70 @@ but it was a trap waiting for the first config containing a list.
 gate in front of it, not anything behind it.
 
 **Next:** the in-game test, now that the commands should actually be reachable.
+
+---
+
+## 2026-08-30 · session 009
+
+**Scope:** `FIRE-007` — fire was invisible in game.
+
+**Changed:** `config/fire_classes.lua`, `client/modules/fire/render.lua` (new),
+`client/modules/fire/init.lua`, `server/modules/admin/init.lua`, `shared/validate.lua`,
+`fxmanifest.lua`, `config/config.lua`, `tools/tests/boot_spec.lua`.
+
+**The bug:** `/fire here` reported success and drew nothing. The server was correct
+throughout — incidents started, nodes were created, sync went out. The particle name
+`core / fire_wrecked_plane_cabin` was invented in session 006 and does not exist.
+
+**Why it was invisible rather than broken:** `StartParticleFxLoopedAtCoord` with an effect
+name that is not in the given dictionary returns a handle of `0` and prints nothing. No
+error, no warning, no clue. The server logs said everything worked, because everything on
+the server did.
+
+**Decisions:**
+
+- Particle dictionary and effect names are now taken from **verified working pairs**, read
+  out of the reference resource's own `cl_utils.lua` rather than guessed. The mechanism was
+  never wrong — the code path is identical to theirs — only the names were.
+- **Layered effects.** One particle does not read as a fire; a flame layer plus a smoke
+  plume does. Each layer carries its own scale multiplier and Z offset so smoke sits above
+  the flame. Every class now has visuals matched to what it should look like: a Class B
+  pool fire is wide and low with black smoke, Class D burns white, Class C arcs and
+  crackles, and a gas fire is a jet with almost no smoke while it is fed.
+- **A native script fire underneath, for light only.** Particles cast none, and the failure
+  screenshot was at night — a fire that lights nothing looks wrong in a way no amount of
+  particle tuning fixes. GTA owns the light and heat haze; mi_fire still owns whether the
+  fire exists. Capped at 40 concurrent, since GTA limits script fires and particles must
+  carry on regardless.
+- **Boot validation now rejects an unverified particle name.** The name cannot be checked
+  without the game running, so instead every name must be one already confirmed to work,
+  listed in `VERIFIED_PTFX`. Adding a new one means confirming it in game first. That is
+  friction, and it is the point: this class of bug is invisible at runtime and cheap to
+  catch at boot.
+- **`/fire render`** asks the caller's own client what it knows and what it is drawing.
+  This existed nowhere and should have from the start: "I ran the command and nothing
+  happened" was impossible to diagnose from the server, which had done its job correctly
+  and said so. The diagnosis separates three unrelated bugs — the client never received the
+  node, the dictionary failed to load, or the effect name is not in it.
+- Rendering moved to its own `render.lua`. It is where the failure was and deserves to be
+  readable without the sync and export code around it.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **319 passed, 0 failed** (was 315).
+- Three new validation cases, including one that feeds it the exact invented name from
+  session 006 and asserts it is now rejected.
+- All 33 Lua files parse.
+- **Not** confirmed fixed in game. The names are taken from a working resource and the
+  code path matches, but nothing has been seen burning yet.
+
+**Open:**
+
+- Everything from session 006 still stands: no exposure model, no generation, no dispatch.
+- Scale ranges and layer offsets are first guesses and will need a look once a fire is
+  actually visible.
+- If a fire now renders but looks wrong rather than absent, that is tuning in
+  `config/fire_classes.lua` rather than a bug.
+
+**Next:** re-test. `/fire here`, then `/fire render` if it is still invisible — the
+diagnosis will say which of the three failures it is.

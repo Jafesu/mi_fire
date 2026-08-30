@@ -62,6 +62,7 @@ local specs = {
     'tools/tests/scba_spec.lua',
     'tools/tests/pass_spec.lua',
     'tools/tests/exposure_spec.lua',
+    'tools/tests/smoke_spec.lua',
     'tools/tests/hydraulics_spec.lua',
     'tools/tests/sprinklers_spec.lua',
 }

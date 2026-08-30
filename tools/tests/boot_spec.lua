@@ -101,6 +101,7 @@ return function(t)
         'shared/suppression.lua',
         'shared/pass.lua',
         'shared/exposure.lua',
+        'shared/smoke.lua',
         'config/config.lua',
         'config/dispatch.lua',
         'config/zones.lua',
@@ -110,6 +111,7 @@ return function(t)
         'config/stations.lua',
         'config/sprinklers.lua',
         'config/scba.lua',
+        'config/smoke.lua',
     }
 
     local serverFiles = {
@@ -204,7 +206,7 @@ return function(t)
         'Enums', 'Util', 'Hydraulics', 'Validate', 'FireClass', 'Suppression',
         'Framework', 'Dispatch', 'Inventory', 'DB', 'State', 'Permissions',
         'Fire', 'Spread', 'Admin', 'Turnout', 'Appearance', 'GearAppearance',
-        'Pass', 'PassServer', 'Exposure', 'ExposureServer', 'Medical',
+        'Pass', 'PassServer', 'Exposure', 'ExposureServer', 'Medical', 'Smoke',
     }
     for _, name in ipairs(expected) do
         t.ok(type(MIFire) == 'table' and MIFire[name] ~= nil,
@@ -213,7 +215,7 @@ return function(t)
 
     local configGlobals = {
         'Config', 'MIFireGear', 'MIFireZones', 'MIFireClasses', 'MIFireAgents',
-        'MIFireStations', 'MIFireSprinklers', 'MIFireScba',
+        'MIFireStations', 'MIFireSprinklers', 'MIFireScba', 'MIFireSmoke',
     }
     for _, name in ipairs(configGlobals) do
         t.ok(rawget(_G, name) ~= nil, ('%s is set after load'):format(name))

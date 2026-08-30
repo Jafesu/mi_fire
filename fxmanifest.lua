@@ -17,6 +17,7 @@ shared_scripts {
     'shared/suppression.lua',
     'shared/pass.lua',
     'shared/exposure.lua',
+    'shared/smoke.lua',
     'config/config.lua',
     'config/dispatch.lua',
     'config/zones.lua',
@@ -26,6 +27,7 @@ shared_scripts {
     'config/stations.lua',
     'config/sprinklers.lua',
     'config/scba.lua',
+    'config/smoke.lua',
 }
 
 client_scripts {

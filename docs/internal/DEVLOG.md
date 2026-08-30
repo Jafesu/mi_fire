@@ -764,3 +764,73 @@ that genuinely need natives at load time stay excluded.
 
 **Next:** `EXPO-001`. Everything built this session is protection against damage that does
 not exist yet.
+
+---
+
+## 2026-08-30 · session 012
+
+**Scope:** `SCBA-005` — the PASS device, including its audio.
+
+**Changed:** `shared/pass.lua` (new), `server/modules/scba/pass.lua` (new),
+`client/modules/scba/pass.lua` (new), `web/index.html` + `web/sounds.js` (new),
+`web/sounds/pass.ogg` (supplied by the user), `config/scba.lua`,
+`tools/tests/pass_spec.lua` (new), `docs/guides/scba-and-air.md`.
+
+**Answering the question that started this:** there were no PASS sounds, and no audio in
+the resource at all. There is now.
+
+**Decisions:**
+
+- **The phase machine is pure**, in `shared/pass.lua`. Same reasoning as the hydraulics,
+  but more acute: verifying that a chirp starts at twenty-five seconds means standing
+  perfectly still for twenty-five seconds, and checking that movement clears a pre-alarm
+  but not a full alarm means doing it twice more. Nobody repeats that by hand, so it would
+  have rotted. Twenty-six assertions now cover it.
+- **Movement clears a pre-alarm but not a full alarm.** That asymmetry is the whole design.
+  A firefighter working a nozzle from one spot sets off a chirp and wiggles it away; one
+  who goes down and is dragged out is still alarming when they arrive, because the alarm is
+  for the people looking rather than for the wearer.
+- **Reset refuses on someone still down.** Otherwise a well-meaning partner silences the
+  device on an unconscious firefighter, which is the exact opposite of what it is for.
+- **Motion is detected server-side** from position deltas the server already has. Cheap,
+  and a modified client cannot silence its own PASS -- a device that can be suppressed by
+  its wearer is worse than none, because a crew would learn not to trust it. Downed
+  overrides the position check, since a ragdolled ped slides and that must not read as
+  movement.
+- **Audio is a swappable backend**, chosen because the right answer needs assets that do
+  not exist. NUI uses Web Audio with a `StereoPannerNode`, and Lua computes volume and pan
+  from the camera -- bearing is most of what makes a sound feel located, and it is the cue
+  actually used when hunting an alarm. `native` is a positioned GTA beep so a fresh install
+  is audible. `auto` picks between them.
+- What NUI **cannot** do is occlusion. A PASS through a wall sounds like one in the open,
+  and muffling is a real search cue. An engine audio pack (`.awc` + compiled `.dat54.rel`)
+  would fix that and is the eventual answer; when one exists it is a third backend and
+  nothing else changes.
+- **One sound file covers both phases.** The user asked whether to split the audio. With no
+  dedicated pre-alarm file, the full-alarm sound is played in short repeating bursts whose
+  gap shortens as it escalates, which reads convincingly as chirping. Splitting improves it
+  and is optional, which is a better answer than requiring more assets.
+
+**Bug caught before shipping:** `backend()` in auto mode required *both* audio files, so a
+setup with only the full-alarm sound -- which is the setup we now ship and recommend --
+would have fallen back to the native beep and looked like the NUI path was broken.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **434 passed, 0 failed** (was 390).
+- All 41 Lua files parse.
+- **Not** tested in game. The audio path in particular is unproven: NUI `AudioContext` can
+  start suspended, and whether it resumes without user interaction inside FiveM is the
+  thing most likely to be wrong.
+
+**Open:**
+
+- `EXPO-001` still not built. A PASS now alarms correctly for a firefighter who goes down,
+  but nothing in the game can put them down yet.
+- Accountability board (who is inside, on what air) is not built; mayday currently notifies
+  and blips.
+- The audio has never been heard. If it is silent in game, check the F8 console for a
+  `could not load` line from `sounds.js` before assuming the phase machine is at fault.
+
+**Next:** `EXPO-001`, which is now overdue -- three sessions of protective equipment
+against damage that does not exist.

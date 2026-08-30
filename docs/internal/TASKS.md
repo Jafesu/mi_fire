@@ -74,7 +74,7 @@ Set a task to `in-progress` before you start it, not after.
 | `SCBA-002` | Three equip routes: item, station rack, apparatus | done | `SCBA-001` |
 | `SCBA-003` | Air consumption driven by exertion | done | `SCBA-001` |
 | `SCBA-004` | Low-air warnings and automatic shutoff | done | `SCBA-003` |
-| `SCBA-005` | PASS device, four phases | todo | `SCBA-001` |
+| `SCBA-005` | PASS device, four phases | done | `SCBA-001` |
 | `DOC-006` | `docs/guides/scba-and-air.md` | done | `SCBA-004` |
 | `TURN-004` | Real gear tiers wired to the Phase 1 exposure hooks | done | `TURN-002`, `EXPO-002` |
 | `HYD-001` | Hydrant registry and prop offsets | todo | `APP-002` |

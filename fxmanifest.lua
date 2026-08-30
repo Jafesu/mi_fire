@@ -15,6 +15,7 @@ shared_scripts {
     'shared/validate.lua',
     'shared/fireclass.lua',
     'shared/suppression.lua',
+    'shared/pass.lua',
     'config/config.lua',
     'config/dispatch.lua',
     'config/zones.lua',
@@ -35,6 +36,7 @@ client_scripts {
     'client/modules/fire/render.lua',
     'client/modules/fire/init.lua',
     'client/modules/turnout/init.lua',
+    'client/modules/scba/pass.lua',
 }
 
 server_scripts {
@@ -50,6 +52,7 @@ server_scripts {
     'server/modules/fire/spread.lua',
     'server/modules/turnout/appearance.lua',
     'server/modules/turnout/init.lua',
+    'server/modules/scba/pass.lua',
     'server/modules/admin/init.lua',
     'server/api/exports.lua',
 }
@@ -68,6 +71,11 @@ dependencies {
     'oxmysql',
 }
 
+ui_page 'web/index.html'
+
 files {
     'install/migrations/*.sql',
+    'web/index.html',
+    'web/sounds.js',
+    'web/sounds/*.ogg',
 }

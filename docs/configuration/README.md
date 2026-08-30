@@ -201,6 +201,30 @@ being a skill.
 To make air more forgiving, raise `capacitySeconds`. Lowering the exertion multipliers
 works too, but it removes the reason to pace yourself.
 
+### PASS audio
+
+```lua
+MIFireScba.audio = {
+    backend = 'auto',                       -- 'nui' | 'native' | 'auto'
+    files = {
+        full     = 'sounds/pass.ogg',
+        preAlarm = nil,                     -- optional
+    },
+}
+```
+
+`auto` uses NUI as soon as a full-alarm file exists, and falls back to a positioned GTA
+beep otherwise — so it is audible on a fresh install and correct once a sound is added.
+
+**One file is enough.** With `preAlarm` left nil, the full-alarm sound is played in short
+repeating bursts whose gap shortens as the alarm escalates, which reads convincingly as
+chirping. Supplying a real pre-alarm sound is better and entirely optional.
+
+What NUI audio cannot do is **occlusion**. A PASS through a wall sounds exactly like one in
+the open, and real muffling is a genuine cue when searching. Fixing that needs a GTA audio
+pack (`.awc` + a compiled `.dat54.rel`) driven by the engine; when one exists it becomes a
+third backend and nothing else changes.
+
 ### Dispatch
 
 In `dispatch.lua`:

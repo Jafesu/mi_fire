@@ -70,6 +70,45 @@ stops you working; it just starts hurting.
 Target an apparatus and choose **Refill air bottle**, or rack the set and take another.
 Racking is faster if there is a spare, which is the reason to carry one.
 
+## The PASS device
+
+Built into the harness. It arms itself when you open the air valve, and it is listening for
+one thing: whether you have stopped moving.
+
+| Phase | When | What you hear |
+|---|---|---|
+| **Sensing** | Armed and moving | Nothing |
+| **Pre-alarm** | About 25 seconds motionless | Chirping, speeding up |
+| **Full alarm** | 12 seconds of chirping ignored | Loud, and it carries |
+
+**The chirp is the one you can escape.** Move, and it stops. That is deliberate — a
+firefighter working a nozzle from one spot will set it off eventually, and a wiggle clears
+it.
+
+**The full alarm is not.** Once it goes off, moving does *not* silence it. It has to be
+reset on the device, and it will not reset on someone who is still down. That is the whole
+point: if you are being dragged out unconscious, your PASS should still be screaming when
+you reach the door, because the alarm is for the people looking for you.
+
+Going down triggers it on its own. You do not have to press anything, which matters because
+the situations it exists for are the ones where you cannot.
+
+### The panic button
+
+Press **K** to go straight to full alarm. No waiting, no chirp. The "I am trapped and I know
+it" button.
+
+### Answering one
+
+A full alarm is a **mayday**. Every on-duty firefighter is told and gets a flashing blip,
+wherever they are on the map.
+
+Finding them is by ear. The alarm carries about 45 metres and pans across your headphones as
+you turn, so sweep your view and walk toward where it gets louder.
+
+To silence it once you have them, target them and choose **Reset PASS alarm**, or use
+`/passreset` on your own. It will refuse while they are still unconscious.
+
 ## Turnout gear is a separate decision
 
 SCBA and turnout are independent. You can wear either, both, or neither, and each protects

@@ -50,6 +50,7 @@ return function(t)
         IsPlayerAceAllowed = function() return false end,
         IsPrincipalAceAllowed = function() return false end,
         GetPlayerPed = function() return 0 end,
+        GetPlayers = function() return {} end,
         GetEntityCoords = function() return { x = 0.0, y = 0.0, z = 0.0 } end,
         DoesEntityExist = function() return false end,
         NetworkGetEntityFromNetworkId = function() return 0 end,
@@ -98,6 +99,7 @@ return function(t)
         'shared/validate.lua',
         'shared/fireclass.lua',
         'shared/suppression.lua',
+        'shared/pass.lua',
         'config/config.lua',
         'config/dispatch.lua',
         'config/zones.lua',
@@ -121,6 +123,7 @@ return function(t)
         'server/modules/fire/spread.lua',
         'server/modules/turnout/appearance.lua',
         'server/modules/turnout/init.lua',
+        'server/modules/scba/pass.lua',
         'server/modules/admin/init.lua',
         'server/api/exports.lua',
     }
@@ -180,6 +183,7 @@ return function(t)
             'client/modules/fire/render.lua',
             'client/modules/fire/init.lua',
             'client/modules/turnout/init.lua',
+            'client/modules/scba/pass.lua',
         }) do known[path] = true end
 
         for path in pairs(declared) do
@@ -196,6 +200,7 @@ return function(t)
         'Enums', 'Util', 'Hydraulics', 'Validate', 'FireClass', 'Suppression',
         'Framework', 'Dispatch', 'Inventory', 'DB', 'State', 'Permissions',
         'Fire', 'Spread', 'Admin', 'Turnout', 'Appearance', 'GearAppearance',
+        'Pass', 'PassServer',
     }
     for _, name in ipairs(expected) do
         t.ok(type(MIFire) == 'table' and MIFire[name] ~= nil,

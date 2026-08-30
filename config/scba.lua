@@ -137,9 +137,8 @@ MIFireScba.sources = {
 
 --- Modelled on NFPA 1982. Part of the harness by default.
 ---
---- Not implemented yet -- these are the numbers `SCBA-005` will use. Written down now
---- because they are the reason the device is worth having, and because a later session
---- guessing them would get the phases wrong.
+--- The phase machine is in `shared/pass.lua` and is pure, so these numbers are testable
+--- without standing still in game for thirty-seven seconds to check a chirp.
 MIFireScba.pass = {
     enabled = true,
 
@@ -163,6 +162,60 @@ MIFireScba.pass = {
     alarmWhenDowned = true,
 
     range = { preAlarm = 15.0, full = 45.0 },
+
+    --- Key to trigger the alarm manually. The "I am trapped and I know it" button.
+    manualKey = 'K',
+}
+
+-- ---------------------------------------------------------------------------
+-- Audio
+-- ---------------------------------------------------------------------------
+
+--- How the PASS is heard.
+---
+---   'nui'     HTML5 audio, positioned by volume and stereo pan computed in Lua. Works
+---             with the files below and needs no tooling. No occlusion: a PASS through a
+---             wall sounds like one in the open.
+---   'native'  A positioned GTA sound. True 3D including muffling through walls, but
+---             nothing in the game sounds like a PASS, so it reads as a generic alarm.
+---   'auto'    NUI when a full-alarm file is configured, native otherwise.
+---
+--- An engine audio pack (.awc + .dat54.rel) would beat both and is the eventual answer.
+--- When one exists it becomes a third backend and nothing else changes.
+MIFireScba.audio = {
+    backend = 'auto',
+
+    --- Master volume for PASS audio, 0 to 1.
+    volume = 1.0,
+
+    files = {
+        --- The continuous alarm. Required for the NUI backend.
+        full = 'sounds/pass.ogg',
+
+        --- The escalating chirp before full alarm.
+        ---
+        --- Optional. Left nil, the full-alarm file is played in **short repeating bursts**
+        --- instead, which reads convincingly as chirping and means one sound file covers
+        --- both phases. Supplying a real pre-alarm sound is better and is the only reason
+        --- to split the audio.
+        preAlarm = nil,
+    },
+
+    --- Burst shape used when `files.preAlarm` is nil. `gapMs` shortens as the pre-alarm
+    --- escalates, so the chirp speeds up on its way to full alarm.
+    burst = {
+        burstMs = 220,
+        gapMsAtStart = 1100,
+        gapMsAtFull = 320,
+    },
+
+    --- Used by the 'native' backend only.
+    native = {
+        preAlarmSet = 'DLC_HEIST_HACKING_SNAKE_SOUNDS',
+        preAlarmName = 'Beep_Red',
+        fullSet = 'DLC_HEIST_HACKING_SNAKE_SOUNDS',
+        fullName = 'Beep_Red',
+    },
 }
 
 return MIFireScba

@@ -28,3 +28,9 @@ Versions follow [Semantic Versioning](https://semver.org).
 - MySQL-backed station configuration with a numbered migration runner. Stations, their
   placed points (lights, speakers, panels, bay doors, apparatus bays), and their coverage
   polygons are runtime data built in game rather than hand-edited coordinates.
+- Sprinkler systems the fire department installs in buildings. Heads fuse individually
+  over the fire using real temperature ratings and the orifice formula Q = K*sqrt(P),
+  flow until the tank runs dry, and then need a five-step reset with replacement heads.
+  Systems discharge through the agent matrix, so installing a water system over a
+  commercial kitchen makes a Class K fire worse. A fire department connection lets a crew
+  supply a drained system from an engine. Waterflow raises its own dispatch.

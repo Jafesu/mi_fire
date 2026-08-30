@@ -18,6 +18,7 @@ Set a task to `in-progress` before you start it, not after.
 | `SETUP-007` | `server/core/` state and permissions | done |
 | `SETUP-008` | Test harness and docs tree | done |
 | `SETUP-009` | Database core, migration runner, station schema | done |
+| `SETUP-010` | Sprinkler schema and configuration | done |
 
 ## Phase 1 — Fire core
 
@@ -91,6 +92,24 @@ alive sooner.
 | `STN-006` | Panel: acknowledge, silence, test tones, reset lights | todo | `STN-005` |
 | `DOC-003` | `docs/guides/station-operations.md` | todo | `STN-006` |
 
+### Sprinkler systems — Phase 6c
+
+Fire protection the department installs in buildings. Needs the placement gizmo, the
+suppression model, and the supply work for the fire department connection.
+
+| ID | Task | Status | Depends on |
+|---|---|---|---|
+| `SPK-001` | System CRUD service over the schema | todo | `SETUP-010` |
+| `SPK-002` | `/sprinkler` tool: install a system, place riser and FDC | todo | `SPK-001`, `PLACE-002` |
+| `SPK-003` | Head placement against ceilings, with type and coverage preview | todo | `SPK-002` |
+| `SPK-004` | Activation: per-head heat triggering, system type delays, deluge | todo | `SPK-003`, `EXPO-001` |
+| `SPK-005` | Flow and suppression through the agent matrix, tank depletion | todo | `SPK-004`, `FIRE-005` |
+| `SPK-006` | Waterflow alarm dispatch, retard timer, depletion escalation | todo | `SPK-005`, `DISP-001` |
+| `SPK-007` | FDC: supply a system from an engine, boosted pressure, tank refill | todo | `SPK-005`, Phase 5 |
+| `SPK-008` | Reset: close, drain, replace fused heads, refill, return to service | todo | `SPK-005` |
+| `SPK-009` | Impairment: close a valve, report it on dispatch | todo | `SPK-001` |
+| `DOC-004` | `docs/guides/sprinkler-systems.md` | todo | `SPK-008` |
+
 ### Remaining phases
 
 | Phase | Scope |
@@ -100,5 +119,6 @@ alive sooner.
 | 5 | Supply, relay, transfer, drafting, ground ladders |
 | 6 | SCBA, PASS, hazmat |
 | 6b | Station alerting |
+| 6c | Sprinkler systems |
 | 7 | Water rescue |
 | 8 | Polish |

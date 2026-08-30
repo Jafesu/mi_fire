@@ -152,3 +152,74 @@ first real query fails somewhere less convenient.
 
 **Next:** `FIRE-002` — the node lifecycle. The database work is foundation, not progress
 toward a playable fire.
+
+---
+
+## 2026-08-30 · session 003
+
+**Scope:** `SETUP-010`, plus design for `SPK-001`…`SPK-009`
+
+**Changed:** `config/sprinklers.lua`, `install/migrations/0002_sprinklers.sql`,
+`shared/enums.lua`, `server/core/db.lua`, `fxmanifest.lua`,
+`tools/tests/sprinklers_spec.lua`, `tools/run_tests.lua`, `docs/internal/DATAMODEL.md`,
+`docs/internal/{BUILD,TASKS,CHANGELOG}.md`.
+
+**Decisions:**
+
+- Sprinklers get their **own tables**, not `mi_fire_station_points`. The request framed
+  them as station config, and they do share the placement tooling and the MySQL-backed
+  pattern — but a station is fire department property whose rows are static presentation,
+  while a sprinkler system is building infrastructure carrying live state. Squeezing state
+  into the points table would have meant a `metadata` blob doing the work of real columns.
+- That live state is the second reason sprinklers belong in the database at all: water
+  remaining, which heads have fused, whether the system is in service. **A server restart
+  is not a reset.**
+- One row per head, because heads operate **individually** — only the ones that get hot
+  enough fuse. This is the detail fiction always gets wrong, and it is what makes an
+  activation readable on scene. Storing a system as a single coverage volume would have
+  lost exactly the behaviour worth having.
+- Head flow uses the real orifice formula `Q = K·√P`, the same relationship as a smooth
+  bore nozzle. K5.6 at 15 psi lands on the published 21.7 gpm.
+- Systems discharge through the **existing agent matrix**, so a water system over a
+  commercial kitchen makes a Class K fire worse. Not special-cased away — it is why real
+  kitchens have wet-chemical hood systems, and it makes installing the right system a
+  decision rather than a formality. Tested directly.
+- The **fire department connection** is the tactical payoff and the reason this is not
+  scenery: when the tank runs dry, a crew that lays a line to the FDC keeps the heads
+  flowing off the engine at 45 psi instead of the tank's 15. That ties sprinklers into the
+  Phase 5 supply work, so `SPK-007` depends on it.
+- The **waterflow alarm is the call**. A protected building generates its own dispatch
+  after a retard timer, which is a genuinely different feel from a passer-by phoning it in.
+  Running dry with fire still burning escalates, because the building just lost its
+  protection.
+- Reset is five ox_target steps with replacement heads as an inventory item, and
+  `autoResetSeconds` is deliberately `nil`. Nothing quietly fixes a system on a timer.
+- Placed at **Phase 6c**, after station alerting. It needs the placement gizmo (Phase 2),
+  the suppression model (Phase 1), and Phase 5 for the FDC.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **136 passed, 0 failed** (94 hydraulics, 42 sprinkler).
+- Sprinkler flow asserted against the published K5.6 figure, and the square-root
+  relationship checked directly rather than assumed.
+- The design invariant is now a test, not a comment: two heads run 17 minutes on the
+  default tank, six drain it in under six, and even the largest configurable tank cannot
+  outlast an hour of serious flow. A tuning change that turned sprinklers into a win
+  button would fail the suite.
+- `luac -p` on all 24 Lua files — all parse.
+- **Not** verified in game. Neither migration has ever run against a real database, so
+  both `0001_stations.sql` and `0002_sprinklers.sql` remain unproven — a syntax error in
+  either would only surface on first boot.
+
+**Open:**
+
+- Phase 1 is still untouched. Three sessions of foundation and configuration; no fire has
+  ever burned.
+- `activationHeat` values are calibrated against a heat scale that `EXPO-001` has not
+  built yet. They are reasonable-looking numbers on an axis with no implementation, and
+  will almost certainly need retuning once heat actually accumulates.
+- Sprinkler suppression assumes `FIRE-005` will expose a way to apply an agent to nodes in
+  a radius. That interface does not exist yet.
+
+**Next:** `FIRE-002`, the node lifecycle. Foundation is well ahead of the engine now, and
+the gap should close before more configuration is written.

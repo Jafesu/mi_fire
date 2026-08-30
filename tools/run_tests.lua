@@ -57,6 +57,7 @@ end
 
 local specs = {
     'tools/tests/hydraulics_spec.lua',
+    'tools/tests/sprinklers_spec.lua',
 }
 
 print(('%smi_fire test suite%s'):format(BOLD, RESET))

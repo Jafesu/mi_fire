@@ -1,8 +1,12 @@
 --- Database access and the migration runner.
 ---
---- Only runtime data that a server owner *builds* lives in MySQL -- stations and the
---- points and zones that make one up. Tuning stays in `config/`, because tuning is
---- something you edit in a text editor and station geometry is not.
+--- Only runtime data that a server owner *builds* lives in MySQL -- stations with their
+--- points and zones, and sprinkler systems with their heads. Tuning stays in `config/`,
+--- because tuning is something you edit in a text editor and a building layout is not.
+---
+--- Sprinkler rows additionally carry live state that must survive a restart: water
+--- remaining, which heads have fused, whether the system is in service. A server restart
+--- is not a reset.
 ---
 --- Migrations are numbered files applied by this runner and recorded in a table. Never
 --- hand-run SQL, and never edit a migration that has shipped -- write a new one.
@@ -141,6 +145,7 @@ end
 --- waiting to change under you.
 local MIGRATIONS = {
     { version = 1, name = '0001_stations' },
+    { version = 2, name = '0002_sprinklers' },
 }
 
 local function ensureMigrationTable()

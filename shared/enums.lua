@@ -115,6 +115,30 @@ Enums.Priority = {
     LOW    = 'low',
 }
 
+--- Fixed fire protection. See `config/sprinklers.lua`.
+Enums.SprinklerType = {
+    WET       = 'wet',
+    DRY       = 'dry',
+    PREACTION = 'preaction',
+    DELUGE    = 'deluge',
+}
+
+--- A system's lifecycle. `EMPTY` and `NEEDS_RESET` both mean it will not flow, but they
+--- are different problems: one needs water, the other needs new heads.
+Enums.SprinklerState = {
+    ARMED       = 'armed',        -- in service, waiting
+    FLOWING     = 'flowing',      -- heads open, water going
+    EMPTY       = 'empty',        -- tank dry, fire resumes
+    NEEDS_RESET = 'needs_reset',  -- fused heads to replace before it works again
+    IMPAIRED    = 'impaired',     -- valve closed, deliberately out of service
+}
+
+--- A head is a one-time device. Once fused, it is scrap until replaced.
+Enums.SprinklerHeadState = {
+    INTACT = 'intact',
+    FUSED  = 'fused',
+}
+
 MIFire.Enums = Enums
 
 return Enums

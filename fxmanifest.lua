@@ -19,6 +19,7 @@ shared_scripts {
     'config/agents.lua',
     'config/gear.lua',
     'config/stations.lua',
+    'config/sprinklers.lua',
 }
 
 client_scripts {

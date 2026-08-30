@@ -27,6 +27,7 @@ These are the claims the rest of the design rests on. Changing one is an ADR, no
 | Hydraulics are real, and testable outside the game | `shared/hydraulics.lua` |
 | Things you build in game live in MySQL, not a config file | `install/migrations/`, `server/core/db.lua` |
 | Station changes hot-apply without a restart | `server/modules/station/` |
+| Sprinklers buy time, they do not win | `config/sprinklers.lua` tank sizing |
 
 ## Module map
 
@@ -91,6 +92,7 @@ the convention every FiveM server owner already expects from a `config/` directo
 | 5 | Supply and ground ladders | todo |
 | 6 | SCBA, PASS, hazmat | todo |
 | 6b | Station alerting, MySQL-backed and placed in game | todo |
+| 6c | Sprinkler systems: install, activate, deplete, reset | todo |
 | 7 | Water rescue | todo |
 | 8 | Polish | todo |
 

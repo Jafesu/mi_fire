@@ -206,20 +206,24 @@ works too, but it removes the reason to pace yourself.
 The single most important table in the resource. Seconds spent **standing still in a fully
 developed fire**, at the shipped defaults:
 
-| Gear | Survives |
-|---|---|
-| Station uniform | ~11s |
-| Hazmat Level A | ~13s |
-| Wildland brush gear | ~17s |
-| Structural turnout | ~35s |
-| Proximity gear | ~58s |
+| Gear | Gear fails at | You go down |
+|---|---|---|
+| Station uniform | — nothing to fail | ~13s |
+| Hazmat Level A | ~9s | ~15s |
+| Wildland brush gear | ~21s | ~30s |
+| Structural turnout | ~60s | ~93s |
+| Proximity gear | ~97s | ~117s |
+
+"Gear fails at" is when integrity drops far enough that you can **catch fire**. Between that
+moment and going down you are alive and flammable, which is the part of the fireground
+worth having.
 
 Smoke without SCBA, at full density indoors: about **67 seconds**.
 
 Those numbers come from `MIFireGear.exposure`:
 
 ```lua
-flame = { baseDamagePerTick = 9.0, tickMs = 500, contactRadius = 1.8 },
+flame = { baseDamagePerTick = 8.0, tickMs = 500, contactRadius = 1.8 },
 smoke = { damagePerTick = 3.0, radius = 9.0, indoorMultiplier = 2.0 },
 heat  = { buildPerTick = 6.0, damageAt = 85.0, maxLoad = 100.0 },
 ```
@@ -227,11 +231,18 @@ heat  = { buildPerTick = 6.0, damageAt = 85.0, maxLoad = 100.0 },
 `baseDamagePerTick` is the master dial for flame. Halve it and everything in the table
 doubles.
 
-**Three things worth preserving when you tune.** A station uniform should give seconds, not
-half a minute — fire has to be frightening. Turnout should be several times better than
-none, because that gap is the reason to wear it. And nothing should let a crew camp inside
-a room that is fully alight. Tests assert all three, so a tuning change that breaks one
-fails the suite rather than surprising you later.
+These are for standing **in** the flames. Working near a fire rather than in it runs on the
+heat channel instead and lasts far longer.
+
+**Four things worth preserving when you tune.** A station uniform should give seconds, not
+half a minute. Turnout should give a real working window, because a dash in and out is not
+an interior attack. Nothing should let a crew camp in a room that is fully alight. And
+**gear must burn through before it kills you**, or catching fire becomes unreachable.
+
+That last one is easy to break by accident: raise `fireResist` without raising `degradeRate`
+and the coat outlasts the wearer, so the ignition mechanic silently stops happening while
+every survival number still looks healthy. All four are assertions, so a tuning change that
+breaks one fails the suite.
 
 Note that hazmat suits are *worse in fire than turnout*. That is correct, not a typo — a
 Level A vapour-tight suit is plastic, and walking a hazmat crew into flame should be

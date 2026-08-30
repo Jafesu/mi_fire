@@ -175,17 +175,53 @@ return function(t)
         'while a hazmat suit is worse in fire than turnout -- a Level A suit is plastic, '
         .. 'and walking a hazmat crew into flame should be punished')
 
-    -- The bounds that make it a fireground rather than a cutscene. Measured figures at
-    -- full intensity: station uniform 11.5s, turnout 34.5s, proximity 57.5s.
+    -- The bounds that make it a fireground rather than a cutscene. Measured at full
+    -- intensity: station uniform ~13s, wildland ~30s, turnout ~93s, proximity ~127s.
     t.ok(bare < 20,
         'a station uniform gives seconds, not half a minute -- fire has to be frightening')
-    t.ok(turnout > 20,
-        'but turnout is not so fragile that walking through a doorway kills you')
-    t.ok(turnout < 180,
-        'and nothing in the config lets a crew camp inside a room that is fully alight')
+    t.ok(turnout > 60,
+        'turnout gives a real working window, not a dash in and out')
+    t.ok(turnout < 240,
+        'but nothing lets a crew camp indefinitely in a room that is fully alight')
 
-    t.ok(turnout / bare > 2.5,
+    t.ok(turnout / bare > 4.0,
         'the gap between gear and no gear is large enough to be the reason to wear it')
+
+    -- -----------------------------------------------------------------------
+
+    t.describe('gear fails before it kills you')
+
+    -- The bug this catches: raise resistance without raising degradation and the gear
+    -- outlasts the wearer, so catching fire becomes unreachable dead code. It was very
+    -- nearly shipped that way -- the survival numbers looked fine and the mechanic was
+    -- simply never entering.
+    local function failureProfile(tier)
+        local health, integrity, elapsed = 200.0, tier.integrity, 0.0
+        local ignitableAt
+        while health > 0 and elapsed < 3600 do
+            local resist = Exposure.effectiveFireResist(integrity, tier)
+            health = health - Exposure.flameDamage(100, { fireResist = resist }, cfg.flame) * 0.5
+            integrity = math.max(0.0, integrity - Exposure.gearDegradation(100, tier) * 0.5)
+            if not ignitableAt and Exposure.canIgnite(integrity, tier) then
+                ignitableAt = elapsed
+            end
+            elapsed = elapsed + 0.5
+        end
+        return elapsed, ignitableAt
+    end
+
+    for _, name in ipairs({ 'wildland', 'structural', 'proximity' }) do
+        local tier = MIFireGear.tiers[name]
+        local death, ignitable = failureProfile(tier)
+
+        t.ok(ignitable ~= nil,
+            ('%s burns through before it kills you, so catching fire is reachable'):format(name))
+
+        if ignitable then
+            t.ok(death - ignitable > 5,
+                ('%s leaves a real window between failing and killing you'):format(name))
+        end
+    end
 
     t.describe('every tier eventually dies')
 

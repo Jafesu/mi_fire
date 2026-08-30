@@ -88,13 +88,14 @@ function Exposure.effectiveFireResist(integrity, tier)
 
     local fraction = math.max(0.0, math.min(1.0, integrity / capacity))
 
-    -- Falls to 70% of its rated value at zero integrity rather than to nothing. A burned
+    -- Falls to 88% of its rated value at zero integrity rather than to nothing. A burned
     -- coat is still a coat; it is just no longer doing its job properly.
     --
-    -- Not lower than that on purpose. Degradation this steep plus a damage rate high
-    -- enough to make fire frightening would collapse the gap between turnout and a shirt,
-    -- and the gap is the reason to wear the gear.
-    return resist * (0.7 + 0.3 * fraction)
+    -- Kept shallow on purpose. The real consequence of burning through gear is not that it
+    -- protects less -- it is that you become ignitable, which is a far sharper cliff than
+    -- a resistance number sliding. Making this steep as well punished the same mistake
+    -- twice and collapsed the working window that turnout exists to provide.
+    return resist * (0.88 + 0.12 * fraction)
 end
 
 -- ---------------------------------------------------------------------------

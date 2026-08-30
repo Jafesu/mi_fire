@@ -914,3 +914,58 @@ and that gap is the entire reason to wear the gear.
 **Next:** in-game test of the whole loop, which is now worth doing — `/fire here`, walk in
 without gear and die, then in turnout and survive, then watch a PASS alarm when it kills
 you.
+
+---
+
+## 2026-08-30 · session 014
+
+**Scope:** exposure balance, on the report that turnout gear lasted only about thirty
+seconds.
+
+**Changed:** `config/gear.lua`, `shared/exposure.lua`, `tools/tests/exposure_spec.lua`,
+`docs/configuration/README.md`, `docs/guides/scba-and-air.md`.
+
+**The report was right.** Thirty-five seconds standing in a fully developed fire is a dash
+in and out, not an interior attack.
+
+| Gear | Before | After | Gear now fails at |
+|---|---|---|---|
+| Station uniform | 11.5s | 12.5s | -- |
+| Wildland brush | 16.5s | 30.0s | 21s |
+| Structural turnout | 34.5s | **92.5s** | 60s |
+| Proximity | 57.5s | 116.5s | 97s |
+
+Changed `fireResist` to 0.62 / 0.93 / 0.95 for wildland, structural and proximity, raised
+their integrity pools, raised `degradeRate` to match, softened the degradation floor from
+70% to 88% of rated, and lowered `baseDamagePerTick` from 9 to 8.
+
+**Why the degradation floor moved the other way this time.** Session 013 raised it from 50%
+to 70% to stop damage collapsing the gear/no-gear gap. This time it went to 88%, for a
+different reason: the real consequence of burning through gear is not that it protects
+slightly less, it is that you become **ignitable**. That is a far sharper cliff than a
+resistance number sliding, and applying both punished the same mistake twice while eating
+the working window turnout exists to provide.
+
+**A bug caught by measuring rather than by testing.** The first candidate set raised
+resistance without raising degradation, and produced 96-second survival with the gear
+*never* burning through -- so `canIgnite` never returned true and catching fire became
+unreachable dead code. Every survival number looked healthy. The mechanic was simply never
+entering.
+
+That is now an assertion: for every tier with an integrity pool, gear must become ignitable
+before death, with at least five seconds between. Proximity gear failed it on the first fix
+with a three-second window and needed its `degradeRate` raised to 2.8.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` -- **499 passed, 0 failed** (was 493).
+- Four balance invariants now assert rather than hope: a station uniform gives under twenty
+  seconds, turnout gives over sixty, nothing survives four minutes, and turnout is at least
+  four times a shirt.
+- Survival *and* failure figures published in both the configuration reference and the
+  player guide, so the numbers are arguable without reading Lua.
+
+**Open:** unchanged from session 013. Still no smoke visual, no accountability board, and
+`mobility` is configured but applied nowhere.
+
+**Next:** in-game test of the full loop.

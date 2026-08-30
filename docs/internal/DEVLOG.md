@@ -288,3 +288,51 @@ double restart. The section now opens by saying the fire engine is not built yet
 
 **Next:** a real boot on the Qbox server, checking `mi_fire_migrations` has two rows. Then
 `FIRE-002`, the node lifecycle.
+
+---
+
+## 2026-08-30 · session 005
+
+**Scope:** first real boot — `SETUP-009` and `SETUP-010` verified in game
+
+**Changed:** nothing. This entry records a verification, not a change.
+
+**Verified:**
+
+First boot on the live Qbox server. The resource had never been started before this.
+
+- `ensure mi_fire` — **started clean, zero errors, zero warnings.**
+- Migration runner worked end to end. `mi_fire_migrations` created, then
+  `applied migration 0001_stations` and `applied migration 0002_sprinklers` both logged,
+  in order. This was the single largest unverified thing in the repo and it is now proven.
+- `ensure` run three times total: the resource stopped and restarted twice with no
+  teardown errors and no duplicate-registration complaints. That is the double-restart
+  check from `CONTRIBUTING.md`, passed.
+- oxmysql integration confirmed against MariaDB 12.1.2.
+
+**On the log looking short:** oxmysql printed only one `CREATE TABLE` per migration, which
+looked like the statement splitter dropping everything after the first semicolon. It is
+not. `took Xms to execute a query!` is oxmysql's **slow-query warning**, not a query log —
+it prints only above a threshold, so the faster statements ran silently. Confirmed by
+running the real `splitStatements` against both migration files outside the game: 3
+statements for `0001_stations`, 2 for `0002_sprinklers`, all five correct. Worth writing
+down because the log genuinely reads like a bug and the next person to see it will think
+the same thing.
+
+**Not** confirmed at the database: `SHOW TABLES LIKE 'mi_fire%'` should return six rows.
+The evidence above is strong but indirect, and the tables have not been listed.
+
+**Also expected, not a fault:** the `[mi_fire:boot] framework=... dispatch=... database=...`
+line did not appear, because `Config.debug` defaults to `false` and that line is debug-only.
+
+**Notes for later:**
+
+- Server thread hitch warnings of 211 ms and 670 ms appeared around resource start. The
+  447 ms `CREATE TABLE` suggests migrations contribute, but hitches also showed on the
+  restarts where no migration ran, so this is more likely ordinary resource-start
+  overhead. Not chasing it now; worth re-checking once there is a simulation tick.
+
+**Open:** unchanged. Phase 1 is still untouched and no fire has burned.
+
+**Next:** `FIRE-002`, the node lifecycle. The foundation is now verified rather than
+assumed, and there is no remaining excuse to keep writing configuration.

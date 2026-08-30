@@ -7,6 +7,11 @@ Versions follow [Semantic Versioning](https://semver.org).
 
 ### Added
 
+- `/fire gear` — explains why a truck is showing no turnout or SCBA options. An
+  ox_target option that does not appear produces no error and no log line, so it reports
+  the whole chain instead: ox_target's state, the job gate, whether the vehicle counts as
+  apparatus, and each option evaluated against the truck you are stood at. Reachable by
+  anyone, since the person who cannot see the option is the one who needs the reason.
 - **Gear condition, repair, and replacement.** Damaged turnout can be serviced or swapped
   for a fresh set, and how damage behaves is a server's choice between three models:
   gear that recovers on its own once you are clear of the fire, gear that stays damaged

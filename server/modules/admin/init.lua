@@ -400,6 +400,19 @@ subcommands.render = function(source)
     reply(source, 'render diagnosis printed to your chat and F8 console')
 end
 
+--- `/fire gear` -- why there is no turnout or SCBA option on the truck you are stood at.
+---
+--- Same reasoning as `render`: an ox_target option that does not appear is five booleans
+--- deep and produces no error, no log line, and nothing to look at. The client knows all
+--- five, so it is asked.
+subcommands.gear = function(source)
+    if source == 0 then
+        return reply(source, 'the console has no client to ask; run this in game', 'error')
+    end
+    TriggerClientEvent('mi_fire:client:diagnoseGear', source)
+    reply(source, 'gear diagnosis printed to your chat and F8 console')
+end
+
 --- `/fire perms` -- why you can or cannot use these commands.
 ---
 --- Deliberately reachable by anyone: someone who cannot run the commands is exactly who
@@ -421,6 +434,7 @@ local USAGE = {
     'fire classes | wind [heading] [speed]',
     'fire perms                           -- why you can or cannot use these',
     'fire render                          -- what your client is actually drawing',
+    'fire gear                            -- why the truck has no gear options',
     'fire sizeup [id]                     -- read the smoke',
     'fire vent <action> [id]              -- force_door | take_window | vertical_vent | close_up',
 }
@@ -446,7 +460,7 @@ function Admin.handle(source, args)
         return
     end
 
-    if sub ~= 'perms' then
+    if sub ~= 'perms' and sub ~= 'gear' then
         local allowed, why = Permissions.requireAdmin(source, sub)
         if not allowed then
             reply(source, why or 'not allowed', 'error')
@@ -479,7 +493,7 @@ CreateThread(function()
     lib.addCommand(name, {
         help = 'Fire administration. Run "/fire perms" if it refuses you.',
         params = {
-            { name = 'subcommand', type = 'string', help = 'start|here|at|agent|stop|stopall|list|info|classes|wind|perms', optional = true },
+            { name = 'subcommand', type = 'string', help = 'start|here|at|agent|stop|stopall|list|info|classes|wind|perms|gear', optional = true },
         },
         -- Intentionally unrestricted; see the note at the top of this file.
     }, function(source, args, raw)

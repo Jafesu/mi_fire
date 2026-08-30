@@ -12,11 +12,11 @@ Set `Config.debug = true` in `config/config.lua` before starting, and watch F8.
 
 ## 0. Before you start
 
-- [ ] Restart the server. Migration `0003_gear_appearance` must apply.
-- [ ] `SELECT * FROM mi_fire_migrations;` — expect **3** rows.
-- [ ] Repoint your SCBA item: `server = { export = 'mi_fire.useScba' }`
-- [ ] Check keybind conflicts: **J** SCBA valve, **K** PASS panic, **X** stop-drop-roll.
-- [ ] `/fire perms` — confirms you have access and shows which route granted it.
+- [ X ] Restart the server. Migration `0003_gear_appearance` must apply.
+- [ X ] `SELECT * FROM mi_fire_migrations;` — expect **3** rows.
+- [ X ] Repoint your SCBA item: `server = { export = 'mi_fire.useScba' }`
+- [ X ] Check keybind conflicts: **J** SCBA valve, **K** PASS panic, **X** stop-drop-roll.
+- [ X ] `/fire perms` — confirms you have access and shows which route granted it.
 
 ---
 
@@ -35,6 +35,20 @@ Set `Config.debug = true` in `config/config.lua` before starting, and watch F8.
 ## 2. Turnout gear
 
 The first thing built on top of the engine, and nothing after this works without it.
+
+> **If no option appears on the truck, run `/fire gear` while stood next to it.**
+>
+> Every one of these interactions is five booleans deep — ox_target running, the client
+> booted, the vehicle counting as apparatus, the job gate, and the option's own condition —
+> and any single false gives the identical symptom of nothing at all. `/fire gear` prints
+> all five, evaluates each option against the truck you are stood at, and names the gate
+> that refused. It is reachable by anyone, because the person who cannot see the option is
+> exactly the person who needs to know why.
+>
+> The usual answer is the **job gate**: taking equipment off an apparatus is department
+> business, so `Don turnout gear`, `Take an SCBA set`, and `Draw a fresh set` need a job in
+> `Config.fireJobs` and, by default, being clocked **on duty**. Protection itself is not
+> job-gated — only drawing kit off the rig is.
 
 - [ ] Stand at a fire truck. Third-eye it — **Don turnout gear** appears.
 - [ ] Don it. Your appearance changes: helmet, coat, boots, gloves.

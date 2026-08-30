@@ -232,10 +232,13 @@ local function coordsOf(entity)
     return { x = coords.x, y = coords.y, z = coords.z }
 end
 
-CreateThread(function()
-    while not MIFire.ready do Wait(250) end
-
-    Target.addGlobalVehicle({
+--- The apparatus options, kept in a file-local so `/fire gear` can evaluate the exact
+--- entries ox_target holds rather than a copy of them that can drift out of step.
+---
+--- `Target.addGlobalVehicle` decorates these in place -- the job gate is folded into
+--- `canInteract` and `requiresFirefighter` is cleared -- so the flag is snapshotted below
+--- before registration, purely so a refusal can name which gate refused.
+local apparatusOptions = {
         {
             name = 'mi_fire:repairGear',
             icon = 'screwdriver-wrench',
@@ -355,7 +358,21 @@ CreateThread(function()
                 TriggerServerEvent('mi_fire:server:refillScba', coordsOf(data.entity))
             end,
         },
-    })
+}
+
+--- `{ label, requiresFirefighter }` per option, taken before decoration clears the flag.
+local optionGates = {}
+for i = 1, #apparatusOptions do
+    optionGates[i] = {
+        label = apparatusOptions[i].label,
+        requiresFirefighter = apparatusOptions[i].requiresFirefighter == true,
+    }
+end
+
+CreateThread(function()
+    while not MIFire.ready do Wait(250) end
+
+    Target.addGlobalVehicle(apparatusOptions)
 
     -- Static station racks, for servers that want one before the station tool exists.
     for _, point in ipairs(MIFireScba.sources.station.points or {}) do
@@ -380,6 +397,125 @@ CreateThread(function()
     end
 
     Util.debug('turnout', 'gear and SCBA interactions registered')
+end)
+
+-- ---------------------------------------------------------------------------
+-- Diagnosis
+-- ---------------------------------------------------------------------------
+
+--- Why is there no gear option on this truck?
+---
+--- Every one of these interactions is a chain of quiet booleans -- ox_target running, the
+--- client booted, the entity counting as apparatus, the job gate, and the option's own
+--- `canInteract`. Any single false produces exactly the same symptom: no option, no error,
+--- no log line. That is not diagnosable by looking at it, so it reports itself instead.
+---@return string[]
+local function diagnoseGear()
+    local lines = {}
+    local function say(fmt, ...) lines[#lines + 1] = fmt:format(...) end
+
+    say('ox_target: %s', GetResourceState('ox_target'))
+    say('client ready: %s', tostring(MIFire.ready))
+    say('framework: %s', MIFire.Framework.name or 'none')
+
+    local job, onDuty, grade = MIFire.Framework.getJob()
+    say('your job: %s (on duty: %s, grade %d)', job or 'none', tostring(onDuty), grade or 0)
+
+    local known = {}
+    for name in pairs(Config.fireJobs) do known[#known + 1] = name end
+    table.sort(known)
+    say('Config.fireJobs: %s', table.concat(known, ', '))
+    say('Config.requireOnDuty: %s', tostring(Config.requireOnDuty))
+
+    local isFf = MIFire.Framework.isFirefighter()
+    say('counts as a firefighter: %s', tostring(isFf))
+
+    if not isFf then
+        if not job then
+            say('  -> no job at all. The framework bridge is not seeing your player data.')
+        elseif not Config.fireJobs[job] then
+            say('  -> "%s" is not in Config.fireJobs. Add it to config/config.lua.', job)
+        elseif Config.requireOnDuty and not onDuty then
+            say('  -> you hold the job but are off duty. Clock on, or set '
+                .. 'Config.requireOnDuty = false.')
+        end
+    end
+
+    -- The closest vehicle, which is the one they are stood at -- the same position they
+    -- would be in to target it. Deliberately not a raycast: a diagnostic that needs to be
+    -- aimed correctly is one more thing that can fail while you are diagnosing.
+    local ped = cache.ped
+    local coords = GetEntityCoords(ped)
+    local vehicle = GetVehiclePedIsIn(ped, false)
+
+    if vehicle == 0 then
+        vehicle = GetClosestVehicle(coords.x, coords.y, coords.z, 10.0, 0, 71)
+    end
+
+    if not vehicle or vehicle == 0 or not DoesEntityExist(vehicle) then
+        say('no vehicle within 10m -- stand next to the apparatus and run this again')
+        return lines
+    end
+
+    local model = GetEntityModel(vehicle)
+    local class = GetVehicleClass(vehicle)
+    say('nearest vehicle: %s (model %s, class %d)',
+        GetDisplayNameFromVehicleModel(model), tostring(model), class)
+
+    local apparatus = rawget(_G, 'MIFireApparatus')
+    if apparatus and apparatus.profiles then
+        say('apparatus config loaded, this model listed: %s',
+            tostring(apparatus.profiles[model] ~= nil))
+    else
+        say('no apparatus config yet (Phase 2), so any class 18 vehicle counts')
+    end
+
+    local apparatusOk = isApparatus(vehicle)
+    say('counts as apparatus: %s', tostring(apparatusOk))
+
+    if not apparatusOk then
+        say('  -> class %d is not 18 (emergency). Check the vehicle meta, or wait for '
+            .. 'config/apparatus.lua.', class)
+    end
+
+    say('gear: tier=%s worn=%s integrity=%.1f/%.1f',
+        gear.tier or 'none', tostring(gear.worn), gear.integrity, gear.capacity)
+    say('scba: worn=%s active=%s air=%.0f/%.0f',
+        tostring(scba.worn), tostring(scba.active), scba.air, scba.capacity)
+    say('integrity mode: %s (repair at apparatus: %s)',
+        MIFireGear.integrity.mode, tostring(MIFireGear.integrity.persist.repairAtApparatus))
+    say('SCBA from apparatus enabled: %s', tostring(MIFireScba.sources.apparatus.enabled))
+
+    say('--- what you should see on that vehicle ---')
+
+    -- Calls the decorated `canInteract` -- the same function object ox_target calls -- so
+    -- this cannot drift from the real gate.
+    local vehicleCoords = GetEntityCoords(vehicle)
+
+    for i = 1, #apparatusOptions do
+        local opt = apparatusOptions[i]
+        local gate = optionGates[i]
+        local ok = opt.canInteract == nil
+            or opt.canInteract(vehicle, 1.0, vehicleCoords, nil, nil) == true
+
+        local note = ''
+        if not ok and gate.requiresFirefighter and not isFf then
+            note = '  (blocked by the job gate)'
+        end
+
+        say('  [%s] %s%s', ok and 'x' or ' ', gate.label, note)
+    end
+
+    return lines
+end
+
+RegisterNetEvent('mi_fire:client:diagnoseGear', function()
+    local lines = diagnoseGear()
+    for i = 1, #lines do
+        TriggerEvent('chat:addMessage', { args = { 'mi_fire', lines[i] } })
+    end
+    print('[mi_fire] gear diagnosis:')
+    for i = 1, #lines do print('  ' .. lines[i]) end
 end)
 
 -- ---------------------------------------------------------------------------

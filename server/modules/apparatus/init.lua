@@ -181,9 +181,31 @@ function ApparatusServer.forget(netId)
     tanks[netId] = nil
 end
 
+--- Put the pump in or out of gear.
+---
+--- There was no way to do this at all: `setPump` existed and nothing ever called it, so every
+--- rig sat with its pump out of gear and every discharge refused. The panel is unreachable
+--- without it, which made the whole of Phase 4 unreachable.
+RegisterNetEvent('mi_fire:server:setPump', function(netId, engaged)
+    local source = source
+
+    local entity = NetworkGetEntityFromNetworkId(netId)
+    if not entity or entity == 0 then return end
+    if not MIFire.Permissions.isNear(source, GetEntityCoords(entity), 6.0) then return end
+
+    local ok, why = ApparatusServer.setPump(entity, engaged == true)
+
+    TriggerClientEvent('mi_fire:client:notify', source,
+        ok and (engaged and 'Pump engaged' or 'Pump disengaged') or (why or 'no'),
+        ok and 'success' or 'error')
+end)
+
 exports('GetApparatusProfile', function(entity) return ApparatusServer.profile(entity) end)
 exports('GetApparatusTank', function(entity) return ApparatusServer.tank(entity) end)
 exports('IsApparatus', function(entity) return ApparatusServer.isApparatus(entity) end)
+exports('SetPumpEngaged', function(entity, engaged)
+    return ApparatusServer.setPump(entity, engaged)
+end)
 exports('DrawWater', function(entity, gallons) return ApparatusServer.draw(entity, gallons) end)
 exports('FillTank', function(entity, gallons) return ApparatusServer.fill(entity, gallons) end)
 

@@ -215,6 +215,10 @@ it is our own model with our own texture, looking like hose, affecting nobody el
 lying where it was laid. Three problems, one rewrite. Worth doing that way rather than solving
 the rope's appearance first and throwing it away.
 
+**Rope type stops mattering after this.** There are no ropes afterwards, so the choice of 6 is
+temporary by construction -- it is the best of a bad set, taken because it costs nothing while
+the rewrite waits.
+
 ### `HOSE-011` — crew slots, unverified in game
 
 The state, the flow ceiling and the interactions are all written. **None of it has run with two
@@ -258,15 +262,13 @@ permission, and the gitignore is what keeps the distinction from mattering.
 The resource runs without them. The prop does not load, the server warns naming the model and
 its owner, and the hose works with nothing in the hand.
 
-**`rope.ytd` is back and under test.** A `.ytd` replaces textures by name, so whether it is
-global depends on what is in it -- only the entries for SmartHose's rope type, or the whole
-dictionary. The file is compressed and unreadable, so it is being answered by looking: pull a
-hose, then use the rappel rope in `mi_utils`, and see whether the rappel changed. The procedure
-is in `stream/README.md`.
+**`rope.ytd` was tested in game and is global.** Every rope changed, not only ours, so it is
+gone. That answer is worth keeping: the texture question is settled, it is not a matter of
+finding the right rope type or the right file, and nobody needs to try it again.
 
-If it is scoped, it stays and `HOSE-010` loses one of its three reasons. If it is global it has
-to go -- a hose that looks right at the cost of every other rope on the server is not a trade
-worth making -- and the rewrite becomes the answer.
+The rope is type **6** now, picked by looking at all eight with `/fire ropetypes` -- it is the
+thickest, which is as close to hose as a built-in type gets. Thickness is the whole of what is
+available without abandoning ropes.
 
 Two things make forgetting hard rather than merely discouraged: the server warns on every start,
 and `conventions_spec` fails if a model is used that is neither base game nor declared in

@@ -2,6 +2,11 @@
 
 Streamed assets for mi_fire.
 
+> **New files here need `refresh` on the server console, not just a restart.** The asset index
+> is built when a resource is refreshed; restarting one that already exists reuses the index it
+> had. `refresh` then `ensure mi_fire`. This is the usual reason a model that is plainly sitting
+> in this folder "would not load".
+
 **What is in here right now is borrowed and is not in the repository.**
 
 `w_am_hose.ydr` / `.ytd` are copied from **SmartHose** so the hose has a nozzle in hand while
@@ -12,26 +17,22 @@ deliberately.
 The resource runs without them. The prop does not load, `MIFireHose.visuals.nozzleProp` logs a
 warning, and the hose works with nothing in the hand.
 
-## `rope.ytd` — under test
+## `rope.ytd` — tested, global, removed
 
-Back in place to answer one question that cannot be answered from here.
+It was here to answer one question: does it retexture only the rope type SmartHose uses, or the
+whole dictionary?
 
-A `.ytd` replaces textures **by name**. If this one contains only the entries for the rope type
-SmartHose uses, it changes that type and nothing else. If it contains the whole dictionary, it
-changes **every** rope on the server — including the rappel rescue rope in `mi_utils`.
+**Tested in game. Every rope changed**, including the rappel rescue line in `mi_utils`. So it is
+gone, and the question is settled — this is not a matter of finding the right file or the right
+rope type. GTA resolves rope textures through `ropedata.xml` against one shared dictionary and
+nothing scopes that.
 
-The file is RSC7-compressed and unreadable, so the only way to find out is to look:
+The hose uses rope type **6** instead, the thickest of the eight built-in types, which is as
+close to hose as is available without abandoning ropes. `/fire ropetypes` lays them all out if
+you want to see for yourself.
 
-1. Pull a hose line. It should look like hose.
-2. Use the rappel rope in `mi_utils`.
-3. **Did the rappel rope change?**
-
-- **No** — it is scoped, this stays, and `HOSE-010` loses one of its three reasons.
-- **Yes** — it has to go. A hose that looks right at the cost of every other rope on the
-  server is not a trade worth making, and the answer becomes the rewrite in `HOSE-010`.
-
-Note the rope types were also moved off 7, which the rappel uses, so if the rappel *has*
-changed it is the texture doing it rather than a shared type.
+Looking like actual hose waits for `HOSE-010`, which replaces the rope with a chain of our own
+segments and makes rope type irrelevant.
 
 ---
 

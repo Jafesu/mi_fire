@@ -97,6 +97,20 @@ local function attachNozzle(ped)
 
     local model = joaat(name)
 
+    -- Two different failures that look identical from the outside, and only one of them is
+    -- worth acting on.
+    --
+    -- A model the game has never heard of is usually a streamed asset the server has not
+    -- indexed yet: dropping files into `stream/` and restarting the resource is not enough,
+    -- because the index is built when the resource is *refreshed*. `refresh` then
+    -- `ensure mi_fire` is the fix, and it is not obvious from "would not load".
+    if not IsModelInCdimage(model) and not IsModelValid(model) then
+        Util.warn('nozzle prop "%s" is not in the game files. If it was just added to '
+            .. 'stream/, run "refresh" on the server console and then "ensure mi_fire" -- a '
+            .. 'restart alone does not index new stream assets.', name)
+        return nil
+    end
+
     RequestModel(model)
     local waited = 0
     while not HasModelLoaded(model) and waited < 3000 do
@@ -105,7 +119,7 @@ local function attachNozzle(ped)
     end
 
     if not HasModelLoaded(model) then
-        Util.warn('nozzle prop "%s" would not load', name)
+        Util.warn('nozzle prop "%s" exists but would not load in three seconds', name)
         return nil
     end
 
@@ -887,15 +901,31 @@ function HoseClient.panel(entity)
         return lib.notify({ description = 'That rig has no pump', type = 'error' })
     end
 
-    if not state.engaged then
-        return lib.notify({
-            title = 'Pump not engaged',
-            description = 'Stop the rig and put the pump in gear first',
-            type = 'error',
-        })
-    end
-
     local options = {}
+
+    -- Offered rather than refused. Being told what is wrong and then having to find the
+    -- control somewhere else is the shape of a menu written by someone who already knew where
+    -- it was.
+    if not state.engaged then
+        options[#options + 1] = {
+            title = 'Engage the pump',
+            description = 'The rig has to be stopped. Nothing works until this is done.',
+            icon = 'gears',
+            onSelect = function()
+                TriggerServerEvent('mi_fire:server:setPump', netId, true)
+                Wait(200)
+                HoseClient.panel(entity)
+            end,
+        }
+
+        lib.registerContext({
+            id = 'mi_fire_pump',
+            title = ('%s -- pump panel'):format(state.label or 'Apparatus'),
+            options = options,
+        })
+
+        return lib.showContext('mi_fire_pump')
+    end
 
     -- --- The master reading ----------------------------------------------------------------
 
@@ -998,6 +1028,15 @@ function HoseClient.panel(entity)
             }
         end
     end
+
+    options[#options + 1] = {
+        title = 'Disengage the pump',
+        description = 'Shuts everything down. The rig can be driven again.',
+        icon = 'power-off',
+        onSelect = function()
+            TriggerServerEvent('mi_fire:server:setPump', netId, false)
+        end,
+    }
 
     lib.registerContext({
         id = 'mi_fire_pump',

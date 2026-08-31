@@ -240,13 +240,18 @@ MIFireHose.visuals = {
     --- is worth having while the rendering is the least proven part of the system.
     enabled = true,
 
-    --- Rope type. 4 is the one the working hose resource on this machine uses.
+    --- Rope type. 6, chosen by looking at all eight side by side with `/fire ropetypes` --
+    --- it is the thickest, which is the closest a built-in type gets to hose.
     ---
-    --- **Not 7.** `mi_utils`' rappel uses type 7 for its rescue rope, and while two resources
-    --- sharing a type does no harm on its own, it means any future attempt to make one of them
-    --- look different would drag the other along. Ours stay off it.
-    ropeType = 4,
-    ropeTypeLarge = 5,
+    --- The texture cannot be changed for one resource: it comes from a shared dictionary, and
+    --- replacing it was confirmed in game to change every rope on the server including the
+    --- rappel rescue line. So thickness is the whole of what is available here, and looking
+    --- like actual hose waits for `HOSE-010`.
+    ---
+    --- **Not 7.** `mi_utils`' rappel uses it, and sharing a type means any later attempt to
+    --- make one look different drags the other along.
+    ropeType = 6,
+    ropeTypeLarge = 6,
 
     --- Diameter above which the thicker rope is used, in inches.
     largeAbove = 2.5,

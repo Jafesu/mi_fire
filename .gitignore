@@ -33,4 +33,3 @@ scratch/
 # The resource works without them -- the prop simply does not load and the hose still runs.
 # See ASSET-001 in docs/internal/TASKS.md.
 stream/w_am_hose.*
-stream/rope.ytd

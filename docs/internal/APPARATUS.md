@@ -68,6 +68,31 @@ hookup photographs show where the discharges and intakes physically are, which i
 
 There is no `ERescueHT` panel photograph, consistent with it carrying little or no pump.
 
+### What the `EengineHT` panel establishes
+
+Read off `EengineHT-PumpPanel.png`. The label text is below legible resolution, so this is
+what the **layout** shows rather than what the plates say — the names come later, from the rig.
+
+| Reading | Consequence |
+|---|---|
+| Master intake and master discharge gauges, top left | Two compound gauges, the reference pair every other reading hangs off |
+| **Eight** individual discharge gauges | The rig has eight discharges. Three are authored so far. |
+| Gauges are **colour-coded** — orange, green, blue, yellow, white, red, light blue, purple | Standard Pierce practice: each outlet carries a matching coloured tag. **This is how to name the ports** — match the tag at the outlet to the gauge colour, and the panel and the truck agree by construction. |
+| Water level **and** foam level gauges | Confirms the foam system. `foamGallons = 30` stands. |
+| Two large chrome outlets with handwheels, on the panel face | Panel-mounted discharges, almost certainly 2.5 inch |
+| Large steamer intake, bottom left | The main intake. Big enough to be LDH, 4 or 5 inch. |
+| Colour-coded valve handwheels, bottom row | Match a subset of the gauge colours |
+| Throttle and what appears to be a pressure governor, right | Confirms `governor` for the Phase 4 `engine` family |
+
+**Eight discharges is the number that matters.** A typical engine splits them roughly as two
+crosslays, one or two front bumper, two side, two rear — and the rear photograph shows four
+fittings on the tailboard, which is consistent. The crosslays are the ones worth finding on
+the model: they are the first line off the truck, and Phase 3 has nothing to pull without one.
+
+Colour coding is the cheap way to author the rest. Rather than guessing which gauge belongs to
+which outlet, name each port for its tag colour — `discharge_red`, `discharge_green` — and the
+Phase 4 panel binds to the same names without anyone having to reconcile two lists.
+
 ---
 
 ## Bones

@@ -22,6 +22,18 @@ local Util = MIFire.Util
 --- Only one gizmo at a time. Two would fight over the same keys and the same camera.
 local active = nil
 
+--- Increments on every `start`, and each frame thread holds the value it was created with.
+---
+--- `while active do` is not enough to end a thread. Confirming clears `active` and then calls
+--- back, and a caller that immediately starts the next placement -- walking the corners of a
+--- compartment does exactly that -- makes `active` truthy again before the old thread's next
+--- `Wait(0)` returns. So it keeps running, and every corner leaves another thread behind
+--- reading the same keys.
+---
+--- The symptom was a four corner area that finished after three presses: several threads saw
+--- one ENTER and confirmed a corner each.
+local generation = 0
+
 --- Nudge step in metres, and how much a fine step is.
 local STEP = 0.05
 local FINE = 0.01
@@ -110,7 +122,11 @@ function Placement.start(opts)
         return false
     end
 
+    generation = generation + 1
+    local token = generation
+
     active = {
+        token = token,
         label = opts.label or 'Placing',
         maxDistance = opts.maxDistance or 12.0,
         parent = opts.parent,
@@ -122,10 +138,19 @@ function Placement.start(opts)
         normal = nil,
         entity = 0,
         step = STEP,
+
+        --- Frames this placement has run for.
+        ---
+        --- Confirm and cancel are ignored on the first couple, because the act that started
+        --- this placement was usually a keypress -- walking corners starts the next one from
+        --- inside the confirm handler of the last -- and `IsControlJustPressed` can still be
+        --- true for it. Without this, one ENTER lands two corners.
+        frames = 0,
     }
 
     CreateThread(function()
-        while active do
+        -- Ends when *this* placement ends, rather than when any placement does.
+        while active and active.token == token do
             Wait(0)
             Placement.frame()
         end
@@ -166,6 +191,8 @@ function Placement.frame()
         Placement.drawHelp(state, 'Aim at a surface')
         return
     end
+
+    state.frames = state.frames + 1
 
     Placement.drawPreview(state)
     Placement.drawHelp(state)
@@ -297,12 +324,15 @@ function Placement.readInput(state)
         state.following = true
     end
 
-    if IsControlJustPressed(0, 191) then                    -- enter
-        Placement.confirm()
-    end
+    -- See `frames` above: the press that started this placement must not also end it.
+    if state.frames > 2 then
+        if IsControlJustPressed(0, 191) then                -- enter
+            Placement.confirm()
+        end
 
-    if IsControlJustPressed(0, 194) then                    -- backspace
-        Placement.cancel()
+        if IsControlJustPressed(0, 194) then                -- backspace
+            Placement.cancel()
+        end
     end
 end
 

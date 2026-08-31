@@ -103,12 +103,30 @@ function ApparatusClient.atPort(entity, coords, portType, radius)
     if #ports == 0 then return true end
     if not coords then return true end
 
-    local reach = radius or 1.3
+    -- Converted once, then tested against every port. A box has to be checked in vehicle
+    -- space anyway, and doing the conversion here rather than per-port keeps it to one call.
+    local point = GetOffsetFromEntityGivenWorldCoords(entity, coords.x, coords.y, coords.z)
+    local local_ = { x = point.x, y = point.y, z = point.z }
 
     for i = 1, #ports do
-        local world = ApparatusClient.portCoords(entity, ports[i])
+        local port = ports[i]
 
-        if #(coords - world) <= reach then return true end
+        -- A bone-anchored port has no meaningful vehicle-space coordinate of its own, so it
+        -- is measured in world space against its resolved position instead.
+        if Apparatus.anchor(port) == 'bone' then
+            local world = ApparatusClient.portCoords(entity, port)
+            local _, r = Apparatus.reach(port, MIFireApparatus.portReach)
+
+            if #(coords - world) <= (radius or r) then return true end
+
+        elseif radius then
+            -- An explicit radius from the caller overrides the port's own zone.
+            local dx, dy, dz = local_.x - port.x, local_.y - port.y, local_.z - port.z
+            if (dx * dx + dy * dy + dz * dz) <= radius * radius then return true end
+
+        elseif Apparatus.contains(port, local_, MIFireApparatus.portReach) then
+            return true
+        end
     end
 
     return false

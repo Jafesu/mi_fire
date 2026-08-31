@@ -103,11 +103,20 @@ local function placePort(vehicle)
             description = 'Discharges only. 1.75, 2.5, 3 or 5.',
             default = portType == 'discharge' and 1.75 or nil,
         },
+        {
+            type = 'number',
+            label = 'Zone radius, metres',
+            description = 'How close you have to aim. Blank uses the sensible default for '
+                .. 'this type -- generous for compartments, tight for outlets.',
+            default = MIFireApparatus.portReach[portType],
+            min = 0.2,
+            max = 6.0,
+        },
     })
 
     if not idInput then return end
 
-    local id, label, size = idInput[1], idInput[2], idInput[3]
+    local id, label, size, zone = idInput[1], idInput[2], idInput[3], idInput[4]
 
     for _, port in ipairs(session.ports) do
         if port.id == id then
@@ -136,6 +145,9 @@ local function placePort(vehicle)
                 heading = result.relativeHeading or 0.0,
                 label = (label ~= '' and label) or nil,
                 size = size,
+                -- Only written when it differs from the type's default, so a config full of
+                -- ports does not repeat the same number ten times.
+                radius = (zone and zone ~= MIFireApparatus.portReach[portType]) and zone or nil,
             }
 
             lib.notify({

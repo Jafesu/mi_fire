@@ -174,4 +174,111 @@ return function(t)
     local nudged = Apparatus.format({ id = 'ldh', type = 'discharge', bone = 'misc_e',
         x = 0.1, y = 0.0, z = 0.0 })
     t.ok(nudged:find('x = 0.100') ~= nil, 'but a real nudge is kept')
+
+    -- -----------------------------------------------------------------------
+
+    t.describe('a port is a zone, not a point')
+
+    -- Aiming at a single point to open a locker is precision for its own sake. A gear
+    -- compartment is a metre and a half of truck and should be targetable like one.
+    local reach = MIFireApparatus.portReach
+
+    local locker = { id = 'gear1', type = 'gear', x = -1.2, y = -2.0, z = 0.2 }
+    local outlet = { id = 'd1', type = 'discharge', x = -0.9, y = 0.2, z = -0.4 }
+
+    local _, lockerRadius = Apparatus.reach(locker, reach)
+    local _, outletRadius = Apparatus.reach(outlet, reach)
+
+    t.ok(lockerRadius > outletRadius,
+        'a compartment is more generous than an outlet -- connecting a line to the right '
+        .. 'discharge is the interaction, and six generous zones side by side means picking '
+        .. 'from a list instead of pointing at one')
+
+    t.describe('and it defaults by type without being declared')
+
+    t.near(lockerRadius, reach.gear, 0.001, 'a gear port gets the gear reach')
+    t.near(select(2, Apparatus.reach({ type = 'nonsense' }, reach)), reach.default, 0.001,
+        'and an unlisted type falls back to the default rather than to nothing')
+
+    t.describe('an explicit radius wins')
+
+    t.near(select(2, Apparatus.reach({ type = 'gear', radius = 0.4 }, reach)), 0.4, 0.001,
+        'a port that declares its own zone gets it')
+
+    -- -----------------------------------------------------------------------
+
+    t.describe('boxes are vehicle-aligned')
+
+    -- The shape that matters for a rig. Compartments run along the side, and a sphere large
+    -- enough to cover a long hose bed also covers half the crew cab.
+    local bed = {
+        id = 'hosebed1', type = 'hosebed', x = 0.0, y = -3.0, z = 0.9,
+        size = { x = 2.0, y = 3.0, z = 0.8 },
+    }
+
+    t.equal(Apparatus.contains(bed, { x = 0.9, y = -4.0, z = 1.0 }, reach), true,
+        'a point inside the box is inside')
+
+    t.equal(Apparatus.contains(bed, { x = 0.0, y = -1.0, z = 0.9 }, reach), false,
+        'and one beyond its length is not, even though it is close in the other two axes')
+
+    t.equal(Apparatus.contains(bed, { x = 1.5, y = -3.0, z = 0.9 }, reach), false,
+        'nor is one beyond its width')
+
+    t.describe('spheres still work for anything that is round')
+
+    t.equal(Apparatus.contains(outlet, { x = -0.9, y = 0.2, z = -0.4 }, reach), true,
+        'dead on the outlet')
+    t.equal(Apparatus.contains(outlet, { x = -0.9, y = 2.0, z = -0.4 }, reach), false,
+        'and a metre and a half away is not')
+
+    -- -----------------------------------------------------------------------
+
+    t.describe('a zone the size of the truck is rejected')
+
+    -- Worse than no zone: every port on that side answers at once, and the player picks from
+    -- a list rather than pointing at the one they want.
+    local huge = Apparatus.validatePort(
+        { id = 'x', type = 'gear', x = 0, y = 0, z = 0, radius = 9.0 }, types, 1)
+
+    t.ok(huge, 'a nine metre radius is rejected')
+    t.ok(huge:find('covers most of the rig') ~= nil, 'and says why')
+
+    t.ok(Apparatus.validatePort(
+        { id = 'x', type = 'gear', x = 0, y = 0, z = 0, radius = -1 }, types, 1),
+        'so is a negative one')
+
+    t.ok(Apparatus.validatePort({ id = 'x', type = 'hosebed', x = 0, y = 0, z = 0,
+        size = { x = 20.0, y = 1.0, z = 1.0 } }, types, 1),
+        'and a box longer than the rig')
+
+    t.describe('but a hose diameter on a discharge is not a box')
+
+    -- `size` is overloaded: a box on a compartment, a hose diameter on an outlet. Worth being
+    -- explicit about rather than silently reading 1.75 as a bounding box.
+    t.equal(Apparatus.validatePort(
+        { id = 'd', type = 'discharge', x = 0, y = 0, z = 0, size = 1.75 }, types, 1), nil,
+        'a discharge may carry a numeric size')
+
+    t.ok(Apparatus.validatePort(
+        { id = 'g', type = 'gear', x = 0, y = 0, z = 0, size = 1.75 }, types, 1),
+        'a compartment may not')
+
+    -- -----------------------------------------------------------------------
+
+    t.describe('a crosslay is a discharge')
+
+    -- Asked directly, and worth asserting: an intake is water coming in from a hydrant or a
+    -- draft, a crosslay is water going out. Modelling it as its own type would mean the pump
+    -- panel, the hydraulics and the hose system each knowing two names mean one thing.
+    local crosslay = {
+        id = 'crosslay1', type = 'discharge', x = -0.9, y = 0.6, z = 0.4,
+        size = 1.75, preconnected = { feet = 200 },
+    }
+
+    t.equal(Apparatus.validatePort(crosslay, types, 1), nil,
+        'a preconnected crosslay is a valid discharge')
+
+    local formatted = Apparatus.format(crosslay)
+    t.ok(formatted:find('type = "discharge"') ~= nil, 'and it writes out as one')
 end

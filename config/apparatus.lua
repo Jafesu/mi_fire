@@ -21,7 +21,20 @@ MIFireApparatus = {}
 --- and a typo in a `type` should be a startup error rather than a control that silently does
 --- nothing at an incident.
 MIFireApparatus.portTypes = {
-    discharge   = true,   -- water out: crosslays, rear beds, LDH, deck gun feed
+    --- Water out: crosslays, rear beds, LDH, deck gun feed.
+    ---
+    --- **A crosslay is a discharge**, not an intake -- an intake is water coming in from a
+    --- hydrant or a draft, and a crosslay is water going out. It is a discharge that happens
+    --- to have hose already flaked on it, which is what `preconnected` describes:
+    ---
+    ---     { id = 'crosslay1', type = 'discharge', x = ..., y = ..., z = ...,
+    ---       size = 1.75, preconnected = { feet = 200 } }
+    ---
+    --- Modelling it as its own type would mean the pump panel, the hydraulics and the hose
+    --- system each needing to know that two type names mean the same thing. The panel has a
+    --- gauge and a valve for a crosslay exactly as it does for the rear bed, because on a real
+    --- rig it is the same plumbing.
+    discharge   = true,
     intake      = true,   -- water in: hydrant supply, draft, tank fill
     hosebed     = true,   -- where a line is pulled from
     deckgun     = true,   -- the monitor itself
@@ -30,6 +43,40 @@ MIFireApparatus.portTypes = {
     scba_rack   = true,   -- bottles
     ladder_rack = true,   -- ground ladders
     tool        = true,   -- general compartment
+}
+
+--- How big a port's interaction zone is, per type, when it does not say.
+---
+--- A port is a point, but almost nothing you interact with on a fire truck is. A gear locker
+--- is a metre and a half of compartment; a hose bed runs most of the length of the rig. Making
+--- someone aim at a single point to open a locker is precision for its own sake, and it reads
+--- as a script rather than as a truck.
+---
+--- Two shapes, per port:
+---
+---   `radius = 1.8`                  a sphere
+---   `size = { x = 2.4, y = 0.8, z = 1.2 }`   a box, **aligned to the vehicle**
+---
+--- The box is usually what you want: compartments run along the side of a rig, and a sphere
+--- big enough to cover a long hose bed also covers half the crew cab. Boxes are checked in
+--- vehicle-local space, so they stay correct however the truck is parked.
+---
+--- Discharges and intakes are deliberately tighter than compartments. Connecting a line to
+--- the right outlet is the interaction, and a generous zone on six adjacent discharges means
+--- picking from a list of six identical options instead of pointing at one.
+MIFireApparatus.portReach = {
+    discharge   = 0.55,
+    intake      = 0.55,
+    deckgun     = 0.9,
+    panel       = 1.4,
+    hosebed     = 1.8,
+    gear        = 1.5,
+    scba_rack   = 1.3,
+    ladder_rack = 1.8,
+    tool        = 1.5,
+
+    --- Anything not listed.
+    default     = 1.2,
 }
 
 --- Defaults merged under every profile, so a new rig only declares what differs.
@@ -82,12 +129,23 @@ MIFireApparatus.profiles = {
         panelFamily = 'engine',
         deployPanelMod = true,
         ports = {
-            { id = "hosebed1", type = "hosebed", x = -0.086, y = -4.142, z = 0.853, heading = 180.0 },
-            { id = "pumppanel", type = "panel", x = -0.902, y = 0.186, z = -0.328, heading = 105.0 },
-            { id = "gear1", type = "gear", x = -1.238, y = -2.054, z = 0.159, heading = 90.0 },
-            { id = "toolcompartment", type = "tool", x = -1.238, y = -2.054, z = 0.159, heading = 90.0 },
-            { id = "scba_rack1", type = "scba_rack", x = -1.238, y = -3.709, z = 0.221, heading = 90.0 },
-            { id = "ladder_rack", type = "ladder_rack", x = 0.934, y = -2.446, z = 0.467, heading = 270.0 },
+            --- A hose bed runs most of the width of the rig, so it is a box rather than a
+            --- sphere. Boxes are vehicle-aligned, so this stays correct however it is parked.
+            { id = "hosebed1", type = "hosebed", x = -0.086, y = -4.142, z = 0.853, heading = 180.0,
+              size = { x = 2.4, y = 1.6, z = 1.2 } },
+            { id = "pumppanel", type = "panel", x = -0.902, y = 0.186, z = -0.328, heading = 105.0,
+              size = { x = 1.0, y = 1.8, z = 1.6 } },
+            --- Gear and tools share one compartment, so they share a box. Two options on
+            --- one locker is correct -- it is one locker.
+            { id = "gear1", type = "gear", x = -1.238, y = -2.054, z = 0.159, heading = 90.0,
+              size = { x = 1.0, y = 1.8, z = 1.6 } },
+            { id = "toolcompartment", type = "tool", x = -1.238, y = -2.054, z = 0.159, heading = 90.0,
+              size = { x = 1.0, y = 1.8, z = 1.6 } },
+            { id = "scba_rack1", type = "scba_rack", x = -1.238, y = -3.709, z = 0.221, heading = 90.0,
+              size = { x = 1.0, y = 1.4, z = 1.4 } },
+            --- Ladders run nearly the length of the rig.
+            { id = "ladder_rack", type = "ladder_rack", x = 0.934, y = -2.446, z = 0.467, heading = 270.0,
+              size = { x = 1.0, y = 4.0, z = 1.2 } },
             { id = "discharge1", type = "discharge", x = -0.894, y = 0.178, z = -0.435, heading = 90.0 },
             { id = "discharge2", type = "discharge", x = -0.893, y = -0.260, z = -0.394, heading = 90.0 },
             { id = "intake1", type = "intake", x = -0.894, y = -0.060, z = -0.942, heading = 90.0 },

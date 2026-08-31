@@ -89,6 +89,52 @@ function Apparatus.anchor(port)
     return 'offset'
 end
 
+--- How big is this port's interaction zone, and what shape?
+---
+--- Returns a box when one is declared and a radius otherwise, so callers handle two shapes
+--- rather than every type of port having to declare one.
+---@param port table
+---@param reach table `MIFireApparatus.portReach`
+---@return table|nil box `{ x, y, z }` half-extents, vehicle-aligned
+---@return number radius Used when there is no box.
+function Apparatus.reach(port, reach)
+    if type(port.size) == 'table' then
+        return {
+            x = (tonumber(port.size.x) or 1.0) * 0.5,
+            y = (tonumber(port.size.y) or 1.0) * 0.5,
+            z = (tonumber(port.size.z) or 1.0) * 0.5,
+        }, 0.0
+    end
+
+    if tonumber(port.radius) then return nil, tonumber(port.radius) end
+
+    return nil, tonumber(reach and reach[port.type]) or tonumber(reach and reach.default) or 1.2
+end
+
+--- Is a point inside this port's zone?
+---
+--- Takes the point already converted to **vehicle-local** space, which is what makes a box
+--- work: compartments run along the side of a rig, and a box aligned to the truck stays
+--- correct however it is parked. A sphere big enough to cover a long hose bed would also
+--- cover half the crew cab.
+---@param port table
+---@param localPoint table `{ x, y, z }` in vehicle space
+---@param reach table `MIFireApparatus.portReach`
+---@return boolean
+function Apparatus.contains(port, localPoint, reach)
+    local box, radius = Apparatus.reach(port, reach)
+
+    local dx = localPoint.x - (port.x or 0.0)
+    local dy = localPoint.y - (port.y or 0.0)
+    local dz = localPoint.z - (port.z or 0.0)
+
+    if box then
+        return math.abs(dx) <= box.x and math.abs(dy) <= box.y and math.abs(dz) <= box.z
+    end
+
+    return (dx * dx + dy * dy + dz * dz) <= radius * radius
+end
+
 --- Check one port for the things that are wrong regardless of context.
 ---@param port table
 ---@param portTypes table `MIFireApparatus.portTypes`
@@ -141,6 +187,45 @@ function Apparatus.validatePort(port, portTypes, index)
         return ('port "%s" is %.1fm from the vehicle origin -- offsets are local to the '
             .. 'vehicle, in metres. A world coordinate pasted here would look exactly like '
             .. 'this.'):format(port.id, worst)
+    end
+
+    if port.radius ~= nil then
+        local r = tonumber(port.radius)
+
+        if not r or r <= 0 then
+            return ('port "%s" has a radius of %s'):format(port.id, tostring(port.radius))
+        end
+
+        if r > 6.0 then
+            return ('port "%s" has a %.1fm radius, which covers most of the rig -- a zone '
+                .. 'that large means every port on that side answers at once and the player '
+                .. 'picks from a list instead of pointing at one'):format(port.id, r)
+        end
+    end
+
+    if port.size ~= nil then
+        if type(port.size) ~= 'table' then
+            -- `size` is also the hose diameter on a discharge, which is a number. That
+            -- overload is deliberate and worth being explicit about rather than silently
+            -- treating 1.75 as a box.
+            if port.type ~= 'discharge' and port.type ~= 'intake' then
+                return ('port "%s" has a size that is neither a box nor a hose diameter')
+                    :format(port.id)
+            end
+        else
+            for _, axis in ipairs({ 'x', 'y', 'z' }) do
+                local value = tonumber(port.size[axis])
+
+                if not value or value <= 0 then
+                    return ('port "%s" has a box with no %s'):format(port.id, axis)
+                end
+
+                if value > 12.0 then
+                    return ('port "%s" has a %.1fm box on %s, which is longer than the rig')
+                        :format(port.id, value, axis)
+                end
+            end
+        end
     end
 
     return nil
@@ -201,8 +286,17 @@ function Apparatus.format(port)
             :format(port.id, port.type, port.bone, nudge)
     end
 
-    return ('        { id = %q, type = %q, x = %.3f, y = %.3f, z = %.3f, heading = %.1f },')
-        :format(port.id, port.type, port.x, port.y, port.z, port.heading or 0.0)
+    local zone = ''
+
+    if type(port.size) == 'table' then
+        zone = (', size = { x = %.2f, y = %.2f, z = %.2f }')
+            :format(port.size.x, port.size.y, port.size.z)
+    elseif tonumber(port.radius) then
+        zone = (', radius = %.2f'):format(port.radius)
+    end
+
+    return ('        { id = %q, type = %q, x = %.3f, y = %.3f, z = %.3f, heading = %.1f%s },')
+        :format(port.id, port.type, port.x, port.y, port.z, port.heading or 0.0, zone)
 end
 
 MIFire.Apparatus = Apparatus

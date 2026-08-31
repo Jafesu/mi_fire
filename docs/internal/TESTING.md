@@ -37,9 +37,19 @@ rather than anywhere on a twelve-metre truck.
       keep working; authoring ports tightens an interaction rather than being what makes it
       exist.*
 
-> `gear1` and `toolcompartment` are authored at the **same coordinates**. That is legal and
-> probably deliberate — one compartment, two things in it — but it means two ox_target options
-> at one point. Worth a look to confirm it reads the way you want.
+**Ports are zones now, not points.** Compartments carry a vehicle-aligned box, outlets keep a
+tight sphere.
+
+- [ ] The gear locker should be targetable anywhere along the compartment, not at one spot.
+- [ ] The hose bed likewise, across its width.
+- [ ] The discharges should still want you to point at the **specific** outlet — they are
+      deliberately tight, because six generous zones side by side means picking from a list
+      instead of pointing at one.
+- [ ] If a compartment still feels fiddly, its box is in `config/apparatus.lua` and is one
+      number to widen.
+
+> `gear1` and `toolcompartment` share coordinates *and* a box. That is correct — it is one
+> locker with two things in it.
 
 ---
 

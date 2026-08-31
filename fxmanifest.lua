@@ -22,6 +22,7 @@ shared_scripts {
     'shared/integrity.lua',
     'shared/scorch.lua',
     'shared/apparatus.lua',
+    'shared/hose.lua',
     'config/config.lua',
     'config/dispatch.lua',
     'config/zones.lua',
@@ -34,6 +35,7 @@ shared_scripts {
     'config/smoke.lua',
     'config/scorch.lua',
     'config/apparatus.lua',
+    'config/hose.lua',
 }
 
 client_scripts {
@@ -53,6 +55,7 @@ client_scripts {
     'client/modules/scorch/init.lua',
     'client/modules/apparatus/init.lua',
     'client/modules/placement/init.lua',
+    'client/modules/offsetfinder/scan.lua',
     'client/modules/offsetfinder/scan.lua',
     'client/modules/offsetfinder/scan.lua',
     'client/modules/offsetfinder/init.lua',

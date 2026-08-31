@@ -264,6 +264,68 @@ function Apparatus.validate(profile, portTypes)
     return errors
 end
 
+--- Things worth saying about a profile that are not errors.
+---
+--- Separate from `validate` because these must not stop a server booting. A rig that boots
+--- with a confusing eye menu is a worse outcome than one that boots with a warning about it,
+--- and refusing to start over ergonomics would be absurd.
+---
+--- The one that matters: **outlets on a real rig are inches apart**, so their zones overlap
+--- and ox_target offers all of them at once. That is fine, and better than making someone
+--- pixel-hunt a specific fitting -- but only if each option says which outlet it is. Two
+--- entries both reading "Connect a line" is the failure; "Rear (purple)" and "Crosslay
+--- (white)" is a menu.
+---@param profile table
+---@param reach table `MIFireApparatus.portReach`
+---@return string[] warnings
+function Apparatus.warnings(profile, reach)
+    local warnings = {}
+    local ports = profile.ports or {}
+
+    for i = 1, #ports do
+        for j = i + 1, #ports do
+            local a, b = ports[i], ports[j]
+
+            -- Only same-type ports compete: a discharge and a gear locker offering at once is
+            -- two different questions, not an ambiguous one.
+            if a.type == b.type
+                and Apparatus.anchor(a) == 'offset' and Apparatus.anchor(b) == 'offset' then
+
+                local dx = (a.x or 0) - (b.x or 0)
+                local dy = (a.y or 0) - (b.y or 0)
+                local dz = (a.z or 0) - (b.z or 0)
+                local distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+
+                local _, ra = Apparatus.reach(a, reach)
+                local _, rb = Apparatus.reach(b, reach)
+
+                if distance < ra + rb and (not a.label or not b.label) then
+                    warnings[#warnings + 1] = ('ports "%s" and "%s" are %.2fm apart and their '
+                        .. 'zones overlap, so both will offer at once -- give them labels or '
+                        .. 'the player sees two identical options')
+                        :format(a.id, b.id, distance)
+                end
+            end
+        end
+    end
+
+    for i = 1, #ports do
+        local port = ports[i]
+
+        if port.preconnected and not tonumber(port.size) then
+            warnings[#warnings + 1] = ('port "%s" has hose preconnected but no size -- the '
+                .. 'hose system cannot work out what diameter it is pulling'):format(port.id)
+        end
+
+        if port.preconnected and not tonumber(port.preconnected.feet) then
+            warnings[#warnings + 1] = ('port "%s" is preconnected but does not say how much '
+                .. 'hose is on it'):format(port.id)
+        end
+    end
+
+    return warnings
+end
+
 --- Render one port as the config line `/fireoffset` should paste.
 ---
 --- Lives here rather than in the finder so the format is one thing rather than two that drift,

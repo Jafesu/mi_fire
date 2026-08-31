@@ -46,6 +46,13 @@ function ApparatusServer.build()
             errors[#errors + 1] = ('apparatus "%s": %s'):format(name, problems[i])
         end
 
+        -- Ergonomics rather than correctness, so these are said and then ignored. Refusing to
+        -- boot a server over a confusing eye menu would be absurd; letting one ship without
+        -- anyone noticing is how it stays confusing.
+        for _, warning in ipairs(Apparatus.warnings(resolved, MIFireApparatus.portReach)) do
+            Util.warn('apparatus "%s": %s', name, warning)
+        end
+
         byHash[GetHashKey(name)] = resolved
     end
 

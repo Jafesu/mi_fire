@@ -118,6 +118,7 @@ return function(t)
         'shared/integrity.lua',
         'shared/scorch.lua',
         'shared/apparatus.lua',
+        'shared/hose.lua',
         'config/config.lua',
         'config/dispatch.lua',
         'config/zones.lua',
@@ -130,6 +131,7 @@ return function(t)
         'config/smoke.lua',
         'config/scorch.lua',
         'config/apparatus.lua',
+        'config/hose.lua',
     }
 
     local serverFiles = {
@@ -218,6 +220,7 @@ return function(t)
             'client/modules/placement/init.lua',
             'client/modules/offsetfinder/scan.lua',
             'client/modules/offsetfinder/scan.lua',
+            'client/modules/offsetfinder/scan.lua',
             'client/modules/offsetfinder/init.lua',
         }) do known[path] = true end
 
@@ -235,7 +238,7 @@ return function(t)
         'Enums', 'Util', 'Hydraulics', 'Validate', 'FireClass', 'Suppression',
         'Framework', 'Dispatch', 'Inventory', 'DB', 'State', 'Permissions',
         'Fire', 'Spread', 'Admin', 'Turnout', 'Appearance', 'GearAppearance',
-        'Pass', 'PassServer', 'Exposure', 'ExposureServer', 'Medical', 'Smoke', 'SmokeServer', 'GearMatch', 'Integrity', 'Scorch', 'Apparatus',
+        'Pass', 'PassServer', 'Exposure', 'ExposureServer', 'Medical', 'Smoke', 'SmokeServer', 'GearMatch', 'Integrity', 'Scorch', 'Apparatus', 'Hose',
     }
     for _, name in ipairs(expected) do
         t.ok(type(MIFire) == 'table' and MIFire[name] ~= nil,

@@ -182,10 +182,31 @@ MIFireApparatus.profiles = {
             --- Ladders run nearly the length of the rig.
             { id = "ladder_rack", type = "ladder_rack", x = 0.934, y = -2.446, z = 0.467, heading = 270.0,
               size = { x = 1.0, y = 4.0, z = 1.2 } },
-            { id = "discharge1", type = "discharge", x = -0.894, y = 0.178, z = -0.435, heading = 90.0 },
-            { id = "discharge2", type = "discharge", x = -0.893, y = -0.260, z = -0.394, heading = 90.0 },
-            { id = "intake1", type = "intake", x = -0.894, y = -0.060, z = -0.942, heading = 90.0 },
-            { id = "discharge3", type = "discharge", x = -1.044, y = 0.440, z = -0.913, heading = 90.0 },
+            --- The outlets are inches apart on a real rig, so these zones overlap and
+            --- ox_target offers several at once. That is correct rather than a problem, but
+            --- only while every option says which outlet it is -- two entries both reading
+            --- "connect a line" is the failure the labels exist to prevent.
+            ---
+            --- **Rename these to match the panel tags.** The panel gauges are colour coded
+            --- and each outlet carries a matching tag, so `discharge_green` and a green gauge
+            --- agree by construction and Phase 4 binds to them without a second list.
+            { id = "discharge1", type = "discharge", x = -0.894, y = 0.178, z = -0.435, heading = 90.0,
+              label = "Panel discharge, upper front", size = 2.5 },
+            { id = "discharge2", type = "discharge", x = -0.893, y = -0.260, z = -0.394, heading = 90.0,
+              label = "Panel discharge, upper rear", size = 2.5 },
+            --- The steamer. Large diameter, so this is the hydrant and the rig-to-rig fill.
+            { id = "intake1", type = "intake", x = -0.894, y = -0.060, z = -0.942, heading = 90.0,
+              label = "Steamer intake", size = 5.0 },
+            { id = "discharge3", type = "discharge", x = -1.044, y = 0.440, z = -0.913, heading = 90.0,
+              label = "Panel discharge, lower", size = 2.5 },
+            { id = "rear_purple", type = "discharge", x = -0.389, y = -4.699, z = -0.266, heading = 180.0,
+              label = "Rear discharge (purple)", size = 2.5 },
+            --- Preconnected, so there is already hose on it and a crew pulls the load rather
+            --- than connecting a line. 200ft of 1.75 inch is the conventional load; correct it
+            --- against the rig if it carries something else.
+            { id = "rear_crosslay_white", type = "discharge", x = -0.120, y = -4.469, z = -0.209, heading = 180.0,
+              label = "Crosslay (white)", size = 1.75, preconnected = { feet = 200 } },
+
         },
     },
 

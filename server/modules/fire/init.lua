@@ -520,6 +520,13 @@ local function tickNode(node, dt)
         node.state = Enums.NodeState.STEADY
     end
 
+    -- The hardest it ever burned, for sizing the scorch it leaves. A fire knocked down and
+    -- reflashing should be marked by its worst moment, not by whatever it was doing at the
+    -- instant the fuel ran out.
+    if node.intensity > (node.peakIntensity or 0) then
+        node.peakIntensity = node.intensity
+    end
+
     if math.abs(node.intensity - previousIntensity) >= 0.5 then
         markDirty(node)
     end
@@ -543,8 +550,20 @@ function Fire.tick(dt)
 
     if doomed then
         for i = 1, #doomed do
-            State.removeNode(doomed[i])
-            markRemoved(doomed[i])
+            local nodeId = doomed[i]
+            local node = State.getNode(nodeId)
+
+            -- Leave a mark before the node goes. Done here rather than while it burns
+            -- because a decal under an active fire is invisible under the flames and would
+            -- have to be resized every tick to follow it.
+            if node and MIFire.ScorchServer then
+                MIFire.ScorchServer.mark(node.coords,
+                    os.time() - (node.createdAt or os.time()),
+                    node.peakIntensity or node.intensity or 0)
+            end
+
+            State.removeNode(nodeId)
+            markRemoved(nodeId)
         end
     end
 

@@ -104,6 +104,7 @@ return function(t)
         'shared/smoke.lua',
         'shared/gearmatch.lua',
         'shared/integrity.lua',
+        'shared/scorch.lua',
         'config/config.lua',
         'config/dispatch.lua',
         'config/zones.lua',
@@ -114,6 +115,7 @@ return function(t)
         'config/sprinklers.lua',
         'config/scba.lua',
         'config/smoke.lua',
+        'config/scorch.lua',
     }
 
     local serverFiles = {
@@ -132,6 +134,7 @@ return function(t)
         'server/modules/scba/pass.lua',
         'server/modules/exposure/init.lua',
         'server/modules/smoke/init.lua',
+        'server/modules/scorch/init.lua',
         'server/modules/admin/init.lua',
         'server/api/exports.lua',
     }
@@ -195,6 +198,7 @@ return function(t)
             'client/modules/scba/pass.lua',
             'client/modules/exposure/init.lua',
             'client/modules/smoke/init.lua',
+            'client/modules/scorch/init.lua',
         }) do known[path] = true end
 
         for path in pairs(declared) do
@@ -211,7 +215,7 @@ return function(t)
         'Enums', 'Util', 'Hydraulics', 'Validate', 'FireClass', 'Suppression',
         'Framework', 'Dispatch', 'Inventory', 'DB', 'State', 'Permissions',
         'Fire', 'Spread', 'Admin', 'Turnout', 'Appearance', 'GearAppearance',
-        'Pass', 'PassServer', 'Exposure', 'ExposureServer', 'Medical', 'Smoke', 'SmokeServer', 'GearMatch', 'Integrity',
+        'Pass', 'PassServer', 'Exposure', 'ExposureServer', 'Medical', 'Smoke', 'SmokeServer', 'GearMatch', 'Integrity', 'Scorch',
     }
     for _, name in ipairs(expected) do
         t.ok(type(MIFire) == 'table' and MIFire[name] ~= nil,

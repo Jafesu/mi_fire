@@ -20,6 +20,7 @@ shared_scripts {
     'shared/smoke.lua',
     'shared/gearmatch.lua',
     'shared/integrity.lua',
+    'shared/scorch.lua',
     'config/config.lua',
     'config/dispatch.lua',
     'config/zones.lua',
@@ -30,6 +31,7 @@ shared_scripts {
     'config/sprinklers.lua',
     'config/scba.lua',
     'config/smoke.lua',
+    'config/scorch.lua',
 }
 
 client_scripts {
@@ -46,6 +48,7 @@ client_scripts {
     'client/modules/scba/pass.lua',
     'client/modules/exposure/init.lua',
     'client/modules/smoke/init.lua',
+    'client/modules/scorch/init.lua',
 }
 
 server_scripts {
@@ -65,6 +68,7 @@ server_scripts {
     'server/modules/scba/pass.lua',
     'server/modules/exposure/init.lua',
     'server/modules/smoke/init.lua',
+    'server/modules/scorch/init.lua',
     'server/modules/admin/init.lua',
     'server/api/exports.lua',
 }

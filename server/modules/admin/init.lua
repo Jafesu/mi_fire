@@ -476,6 +476,35 @@ subcommands.gear = function(source)
     reply(source, 'gear diagnosis printed to your F8 console -- both halves')
 end
 
+--- `/fire decals` -- find a decal type that actually draws on this build.
+---
+--- Every other visual constant in this resource is pinned to a name verified in something
+--- already running. There was no `AddDecal` call anywhere on this machine to check against,
+--- and a bad decal type returns 0 and prints nothing -- the same silent failure that made an
+--- invented particle name look like broken rendering for a whole session. So the value gets
+--- authored by looking at it.
+subcommands.decals = function(source)
+    if source == 0 then
+        return reply(source, 'the console has no client to draw on; run this in game', 'error')
+    end
+    TriggerClientEvent('mi_fire:client:decalTest', source)
+    reply(source, 'candidates laid out ahead of you; they last two minutes')
+end
+
+--- `/fire scorch` -- how many burn marks exist, and clear them.
+subcommands.scorch = function(source, args)
+    if args[2] == 'clear' then
+        local removed = MIFire.ScorchServer.clear()
+        return reply(source, ('cleared %d burn mark(s)'):format(removed))
+    end
+
+    local count = 0
+    for _ in pairs(MIFire.ScorchServer.all()) do count = count + 1 end
+
+    reply(source, ('%d burn mark(s), lasting %.0f minutes each')
+        :format(count, MIFireScorch.lifetimeMinutes))
+end
+
 --- `/fire perms` -- why you can or cannot use these commands.
 ---
 --- Deliberately reachable by anyone: someone who cannot run the commands is exactly who
@@ -498,6 +527,8 @@ local USAGE = {
     'fire perms                           -- why you can or cannot use these',
     'fire render                          -- what your client is actually drawing',
     'fire gear                            -- why the truck has no gear options',
+    'fire decals                          -- find a working burn-mark decal type',
+    'fire scorch [clear]                  -- burn marks: count, or remove them all',
     'fire sizeup [id]                     -- read the smoke',
     'fire vent <action> [id]              -- force_door | take_window | vertical_vent | close_up',
 }

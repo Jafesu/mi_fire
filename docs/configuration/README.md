@@ -298,6 +298,42 @@ Replacing is deliberately **faster** than repairing. That is the whole trade —
 is quick but it is department property and job-gated, and repairing the one you have is
 slower but yours.
 
+### Burn marks
+
+A fire that vanishes the moment it goes out never happened. `config/scorch.lua` decides what
+it leaves behind.
+
+**Before anything else, run `/fire decals` in game.** Every other visual constant in this
+resource is pinned to a name verified in something already running. There is no `AddDecal`
+call on this machine to check against, so the decal type is the one that has not been. A
+wrong type draws nothing and reports nothing. `/fire decals` lays every candidate out in a
+row in front of you, says which the game accepted, and you set the one that looks right as
+`MIFireScorch.decal`.
+
+**Both cleanup models run together**, on purpose:
+
+```lua
+MIFireScorch.lifetimeMinutes = 180.0   -- ages out on its own after three hours
+MIFireScorch.cleanup.enabled = true    -- and a crew can wash it away sooner
+```
+
+The timeout stops an unattended server accumulating thousands of marks. The cleanup gives
+overhaul a visible product and a reason to come back to a scene. Set `lifetimeMinutes = 0`
+for marks that **only** ever go when someone removes them — they stop fading too, since a
+mark that must be cleaned should stay legible.
+
+Marks are sized by what actually happened: `Scorch.size` weights how long a node burned at
+70% and how hard it burned at 30%, so a knockdown in the first ten seconds leaves a scuff and
+a fire that ate its fuel leaves a floor. Cleaning time scales the same way.
+
+Marks within 60% of an existing one's radius **merge into it** rather than stacking, so a fire
+that spread through six nodes in a room leaves a scorched room and not six circles fighting
+over the same square metre.
+
+`/fire scorch` counts them; `/fire scorch clear` removes them all. Note that `/fire stopall`
+does **not** — an admin stopping a test fire should not scatter marks across the map, and
+the two are deliberately separate.
+
 ### PASS audio
 
 ```lua

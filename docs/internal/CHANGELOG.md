@@ -39,6 +39,14 @@ Versions follow [Semantic Versioning](https://semver.org).
 
 ### Added
 
+- Fires leave burn marks. Sized by how long and how hard the node burned, merged when they
+  overlap so a spreading fire scorches an area rather than stacking circles, and cleared
+  either by a crew washing the scene down or by ageing out after three hours. Both models
+  run together and either can be switched off.
+- `/fire decals`, which lays every candidate decal type out in front of you and says which
+  the game accepted — the decal type is the one visual constant that could not be verified
+  against anything already running, so it is chosen by eye rather than guessed.
+- `/fire scorch`, to count burn marks or clear them.
 - A fireground HUD: air remaining, gear condition, and heat load. Each row appears only
   when it has something to say.
 - `/fire gear` — explains why a truck is showing no turnout or SCBA options. An

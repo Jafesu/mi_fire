@@ -183,7 +183,38 @@ flammable-liquid fire smoked white while it was still small.
 
 ---
 
-## 9. Teardown, with the new particle
+## 9. Burn marks
+
+**Do this first, before anything else in this section.**
+
+- [ ] `/fire decals` — a row of candidates appears ahead of you, numbered, each labelled
+      *placed* or *REJECTED by the game*.
+- [ ] Note which ones you can actually see. Some may be "placed" and still invisible.
+- [ ] Set the one that looks most like scorching as `MIFireScorch.decal` in
+      `config/scorch.lua`, restart, and carry on.
+
+*This step exists because the decal type is the one visual constant in the resource that
+could not be verified against anything already running on this machine. If burn marks never
+appear, this is the cause, and F8 will carry a warning naming it.*
+
+Then:
+
+- [ ] `/fire here`, let it burn out on its own. A mark is left where it was.
+- [ ] `/fire here` again and put it out **immediately**. That mark should be noticeably
+      **smaller** — size follows how long it burned.
+- [ ] `/fire start A 6 5` and let it run a while. The spread should leave a **scorched area**,
+      not five separate circles — marks merge.
+- [ ] Third-eye a mark. **Wash down the scene** appears.
+- [ ] Clean it. A big mark should take longer than a small one.
+- [ ] `/fire scorch` — reports the count.
+- [ ] `/fire scorch clear` — they all go.
+- [ ] Restart the resource with marks on the ground. They should come back, because the
+      server owns them and the client re-requests on start.
+- [ ] Second player: do they see the same marks in the same places?
+
+---
+
+## 10. Teardown, with the new particle
 
 Only worth re-running because burning is now a particle we start rather than an engine
 effect, and an orphaned one would survive the restart.

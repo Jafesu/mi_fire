@@ -1436,3 +1436,79 @@ rather than a sentence in a document.
 
 **Next:** the remainder of `TESTING.md`, starting with the repair modes -- none of which has
 ever executed, since both options were unreachable until two sessions ago.
+
+---
+
+## 2026-08-30 · session 021
+
+**Scope:** the roll made real, and burn marks (`SCORCH-001`).
+
+**Changed:** `shared/scorch.lua`, `config/scorch.lua`, `server/modules/scorch/init.lua`,
+`client/modules/scorch/init.lua` (all new), `client/modules/exposure/init.lua`,
+`server/modules/exposure/init.lua`, `server/modules/fire/init.lua`, `config/gear.lua`,
+`server/modules/admin/init.lua`, `tools/tests/{scorch,exposure}_spec.lua`, manifest, docs.
+
+**"Just barely" is a bug report.** The roll completed, so it would have been easy to call it
+done. But an action that barely beats doing nothing is a delay, not a mechanic -- the player
+learns that the correct response did not really matter. Rolling now cuts flame, burn and gear
+degradation to 40% while it runs, which is defensible on its own terms: prone is below the
+fire and the ground is what smothers a burning coat. Rolling without backing out of the flame
+first went from marginal to about 36 seconds against a 3 second roll, and the margin is
+asserted rather than left to feel.
+
+It is also an actual roll now -- drop via a short ragdoll, a ground animation with the ped
+turning over underneath it, then up. `combat@damage@writhe` is what qbx_medical uses for last
+stand, so it is verified rather than chosen from a list.
+
+**Burn marks, and an honest gap.** Every visual constant in this resource is pinned to
+something already running: the particle pairs came out of a working fire resource, the roll
+animation out of qbx_medical. There is no `AddDecal` call anywhere on this machine, so the
+decal type is the first visual constant that **could not** be verified that way -- and
+`AddDecal` returns 0 for a bad type and prints nothing, which is precisely the silent failure
+that cost a whole session to an invented particle name.
+
+Rather than guess and hope, `/fire decals` lays every candidate out in a numbered row in
+front of the player, reports which the game accepted, and the value gets authored by looking
+at it. Same principle as the offset finder. The client also warns once, loudly, naming the
+config key, if a decal comes back 0 in normal use.
+
+**Decisions:**
+
+- **Both cleanup models, together**, per the user's call. Marks age out after three hours so
+  an unattended server stays bounded, and a crew can wash a scene down sooner. Neither alone
+  is right: a timeout only means scenes tidy themselves and overhaul has no product, while
+  cleanup only means a server nobody polices accumulates marks forever.
+  `lifetimeMinutes = 0` gives permanent marks, and those deliberately stop fading -- a mark
+  that must be cleaned should stay legible.
+
+- **Marks merge rather than stack.** Anything within 60% of an existing mark's radius grows
+  it instead of adding another. A fire that spread through six nodes in a room should leave a
+  scorched room, not six circles fighting over the same square metre.
+
+- **Size follows what happened**, weighted 70% duration and 30% peak intensity. A brief flare
+  at full intensity is still brief. Without the duration term every scene reads identically
+  and the marks stop carrying information, which is most of the reason to have them.
+
+- **Marks are made when a node dies, not while it burns.** A decal under an active fire is
+  invisible under the flames and would have to be resized every tick to follow it.
+
+- **`/fire stopall` does not clear marks.** An admin stopping a test fire should not scatter
+  scorching across the map; `/fire scorch clear` is separate and explicit.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **692 passed, 0 failed** (was 663).
+- All 56 Lua files parse.
+- **Not** tested in game. The decal type in particular is unproven by construction -- see
+  `TESTING.md` section 9, which is deliberately ordered to run `/fire decals` first.
+
+**Open:**
+
+- The decal type. Nothing else in this session is uncertain; this is.
+- Whether the ragdoll-then-animate transition reads cleanly or looks like a stutter, and
+  whether 9 degrees per 20ms is the right spin rate for the roll.
+- Marks are not persisted to the database, so a server restart loses them. Given a three hour
+  lifetime that is defensible, but a station that burned last night having no trace of it is
+  a reasonable thing to want.
+
+**Next:** in-game round three, starting with `/fire decals`.

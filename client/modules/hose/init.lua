@@ -108,21 +108,44 @@ local function createNozzle(ped)
     if not name then return nil end
 
     local hash = joaat(name)
-    local coords = GetEntityCoords(ped)
 
+    -- A weapon asset has to be requested and loaded before an object can be made from it, the
+    -- same as a model. Missing this returned 0 from `CreateWeaponObject` and looked exactly
+    -- like a missing archetype -- which is what it was read as, twice.
+    --
+    -- SmartHose's config had this in it too: `HoseModelTimeout = 2500` is the wait, and it
+    -- being called a *model* timeout for a *weapon* hash is the whole clue.
+    if not HasWeaponAssetLoaded(hash) then
+        RequestWeaponAsset(hash, 31, 0)
+
+        local waited = 0
+        while not HasWeaponAssetLoaded(hash) and waited < 2500 do
+            Wait(50)
+            waited = waited + 50
+        end
+    end
+
+    if not HasWeaponAssetLoaded(hash) then
+        Util.warn('nozzle "%s" would not load. Its weapon asset never became available, which '
+            .. 'means the archetype is genuinely absent: check data/weaponarchetypes.meta and '
+            .. 'data/weapons.meta are present and declared with `data_file` in fxmanifest.lua, '
+            .. 'then restart the resource and reconnect.', name)
+        return nil
+    end
+
+    local coords = GetEntityCoords(ped)
     local object = CreateWeaponObject(hash, 1, coords.x, coords.y, coords.z, true, 1.0, 0)
 
     if not object or object == 0 then
-        Util.warn('nozzle "%s" would not create. It needs data/weaponarchetypes.meta and '
-            .. 'data/weapons.meta present and declared with `data_file` in fxmanifest.lua, and '
-            .. 'the client has to reconnect after they are added -- a weapon model is inert '
-            .. 'without its archetype.', name)
+        Util.warn('nozzle "%s" loaded but would not create an object', name)
         return nil
     end
 
     -- Right hand. The offsets put the grip in the palm rather than the body of it.
     AttachEntityToEntity(object, ped, GetPedBoneIndex(ped, 57005),
         0.10, 0.03, -0.02, -80.0, 10.0, 0.0, true, true, false, true, 1, true)
+
+    RemoveWeaponAsset(hash)
 
     return object
 end
@@ -969,6 +992,47 @@ end)
 --- is that particular model not reaching this client? A base game prop appearing proves the
 --- first is fine and the answer is the second.
 RegisterNetEvent('mi_fire:client:testNozzle', function()
+    -- The weapon first, through exactly the path the real one uses.
+    local weapon = MIFireHose.visuals.nozzleWeapon
+
+    if weapon then
+        local hash = joaat(weapon)
+
+        RequestWeaponAsset(hash, 31, 0)
+
+        local waited = 0
+        while not HasWeaponAssetLoaded(hash) and waited < 2500 do
+            Wait(50)
+            waited = waited + 50
+        end
+
+        local loaded = HasWeaponAssetLoaded(hash)
+        local object = loaded
+            and CreateWeaponObject(hash, 1,
+                GetEntityCoords(cache.ped).x, GetEntityCoords(cache.ped).y,
+                GetEntityCoords(cache.ped).z, true, 1.0, 0)
+            or 0
+
+        local line = ('  %-26s assetLoaded=%s object=%s')
+            :format(weapon, tostring(loaded), tostring(object ~= 0))
+
+        TriggerEvent('chat:addMessage', { args = { 'mi_fire', line } })
+        print('[mi_fire] ' .. line)
+
+        if object and object ~= 0 then
+            AttachEntityToEntity(object, cache.ped, GetPedBoneIndex(cache.ped, 57005),
+                0.10, 0.03, -0.02, -80.0, 10.0, 0.0, true, true, false, true, 1, true)
+
+            TriggerEvent('chat:addMessage',
+                { args = { 'mi_fire', '      attached -- look at your hand' } })
+
+            Wait(3000)
+            DeleteEntity(object)
+        end
+
+        RemoveWeaponAsset(hash)
+    end
+
     local candidates = {
         MIFireHose.visuals.nozzleProp,
         'hei_prop_heist_hose_01',

@@ -34,11 +34,14 @@ TARGET_TRIS = 8000
 # hand bone and the animation does the rest. There are no attach offsets to tune in Lua, so
 # this constant is the one knob, and it is why the origin is not simply the centre.
 #
-# On the barrel axis (z = 0) because a hand wrapping a cylinder sits on its centreline, and a
-# little behind the middle so the bale handle ends up above and slightly forward of the fist,
-# which is where it belongs. This model has no pistol grip -- the disc underneath is the bale
-# handle's pivot plate, not something to hold.
-GRIP_ORIGIN = (0.0, -0.015, 0.0)
+# **On the bale handle**, which is what a bale handle is for -- it is the grab handle a
+# firefighter actually carries and works a nozzle by. The first attempt put it on the barrel
+# axis, which held the nozzle by its body like a rifle and looked wrong for the same reason
+# carrying a kettle by the spout would.
+#
+# z = 0.128 is the middle of the ribbed grip bar, which runs roughly 0.100 to 0.151. y = 0.008
+# is the handle centre along the barrel. x = 0 because the handle is on the centreline.
+GRIP_ORIGIN = (0.0, 0.008, 0.128)
 
 # 0.1 mm. STL stores every triangle's corners independently, so the mesh arrives as loose
 # triangles that merely touch. Without this there are no shared edges: nothing is smoothable

@@ -142,21 +142,47 @@ end
 
 --- How a charged line is carried.
 ---
---- A nozzle on a charged line is braced at the waist in both hands, so the minigun stance is
---- the right shape. Getting the game to adopt it is the awkward part.
+--- Two different clipsets, two different natives, and picking the wrong pairing is what T-posed
+--- a firefighter. The distinction is the whole thing:
 ---
---- **`SetPedMovementClipset` wants a *movement* clipset, and most weapon poses are not one.**
---- `weapons@heavy@minigun` is what `weaponanimations.meta` lists as the minigun motion clipset,
---- which makes it look like the obvious answer -- and passing it here T-posed the ped. A
---- movement clipset carries the walk, run and idle clips; a weapon clipset does not, so there
---- is nothing to stand in and the skeleton falls back to its bind pose.
+---   **movement clipset** -- `SetPedMovementClipset`. The walk, run and idle. Names generally
+---                           begin `move_`.
 ---
---- `HasAnimSetLoaded` does not help tell them apart: it answered true for the one that T-posed.
---- So the only reliable way to find a good one is to try it on a live ped, which is what
---- `/fire nozzlehold` exists for. Whatever wins goes in `MIFireHose.visuals.nozzleClipset`.
+---   **weapon clipset**   -- `SetPedStrafeClipset`. How the thing is actually held and aimed.
+---                           This is the one that decides whether a nozzle looks like a pistol
+---                           or a minigun.
 ---
---- Defaults to nothing, deliberately. A wrong clipset is a T-pose, and a T-posed firefighter is
---- worse than a plain one.
+--- `weapons@heavy@minigun` is a *weapon* clipset -- it is what the game own weaponanimations
+--- lists as the minigun `WeaponClipSetHash`. Passing it to `SetPedMovementClipset` T-poses,
+--- because a weapon clipset has no walk or idle clips in it and the skeleton falls back to its
+--- bind pose. `HasAnimSetLoaded` answers true either way, so there is no check to write, only
+--- the right native to call.
+---@param ped integer
+---@param clipset string|nil
+---@return boolean applied
+local function applyNozzleStrafe(ped, clipset)
+    clipset = clipset or MIFireHose.visuals.nozzleStrafeClipset
+    if not clipset or clipset == '' then return false end
+
+    RequestAnimSet(clipset)
+
+    local waited = 0
+    while not HasAnimSetLoaded(clipset) and waited < 2000 do
+        Wait(50)
+        waited = waited + 50
+    end
+
+    if not HasAnimSetLoaded(clipset) then
+        Util.warn('nozzle strafe clipset "%s" would not load', clipset)
+        return false
+    end
+
+    SetPedStrafeClipset(ped, clipset)
+    return true
+end
+
+--- The walk, as opposed to the hold. Usually not needed -- the weapon clipset above is what
+--- changes how the nozzle is carried.
 ---@param ped integer
 ---@param clipset string|nil
 ---@return boolean applied
@@ -173,8 +199,7 @@ local function applyNozzleHold(ped, clipset)
     end
 
     if not HasAnimSetLoaded(clipset) then
-        Util.warn('nozzle clipset "%s" would not load; the stance will be the weapon default',
-            clipset)
+        Util.warn('nozzle movement clipset "%s" would not load', clipset)
         return false
     end
 
@@ -182,9 +207,11 @@ local function applyNozzleHold(ped, clipset)
     return true
 end
 
+--- Both of them, because either one left behind outlasts the nozzle.
 ---@param ped integer
 local function clearNozzleHold(ped)
     ResetPedMovementClipset(ped, 0.0)
+    ResetPedStrafeClipset(ped)
 end
 
 --- A plain prop, for a server without the weapon registered.
@@ -401,7 +428,9 @@ local function reconcileNozzle()
                 -- Only once the weapon is genuinely in hand. Posing an empty-handed ped with a
                 -- weapon stance is how the T-pose happened: the strip below removed the weapon
                 -- and the clipset stayed.
-                applyNozzleHold(cache.ped)
+                applyNozzleStrafe(cache.ped)
+                applyNozzleStrafe(cache.ped)
+            applyNozzleHold(cache.ped)
             else
                 heldNozzle = attachNozzleProp(cache.ped)
             end
@@ -424,7 +453,11 @@ local function reconcileNozzle()
                 end
 
                 nozzleEquipped = equipNozzle(cache.ped)
-                if nozzleEquipped then applyNozzleHold(cache.ped) end
+
+                if nozzleEquipped then
+                    applyNozzleStrafe(cache.ped)
+                    applyNozzleHold(cache.ped)
+                end
             end
         end
 
@@ -1211,14 +1244,15 @@ RegisterNetEvent('mi_fire:client:testNozzle', function()
     TriggerServerEvent('mi_fire:server:relayHoseDiagnosis', out)
 end)
 
---- `/fire nozzlehold <clipset|off>` -- try a carrying stance without a restart.
+--- `/fire nozzlehold <clipset|off> [move]` -- try a carrying stance without a restart.
 ---
---- The stance is the one part of the nozzle that cannot be reasoned out from a file. A
---- movement clipset either has walk, run and idle clips in it or it does not, `HasAnimSetLoaded`
---- answers true either way, and the failure mode is a T-pose. So it is found by trying.
+--- The stance is the one part of the nozzle that cannot be settled from a file. Two clipsets do
+--- two different jobs through two different natives, `HasAnimSetLoaded` answers true for both,
+--- and the wrong pairing is a T-pose -- so it gets tried rather than reasoned about.
 ---
---- Whatever looks right goes into `MIFireHose.visuals.nozzleClipset` and stops being a command.
-RegisterNetEvent('mi_fire:client:nozzleHold', function(clipset)
+--- Default is the **weapon** clipset, which is the hold. Pass `move` for the movement clipset,
+--- which is the walk. Whatever looks right goes into `MIFireHose.visuals`.
+RegisterNetEvent('mi_fire:client:nozzleHold', function(clipset, kind)
     local function say(text)
         TriggerEvent('chat:addMessage', { args = { 'mi_fire', text } })
         print('[mi_fire] ' .. text)
@@ -1226,7 +1260,7 @@ RegisterNetEvent('mi_fire:client:nozzleHold', function(clipset)
 
     if not clipset or clipset == 'off' or clipset == 'reset' then
         clearNozzleHold(cache.ped)
-        return say('stance cleared')
+        return say('stance cleared -- both clipsets')
     end
 
     -- Cleared first, so a bad clipset leaves the ped standing normally rather than stacking on
@@ -1234,9 +1268,14 @@ RegisterNetEvent('mi_fire:client:nozzleHold', function(clipset)
     clearNozzleHold(cache.ped)
     Wait(100)
 
-    if applyNozzleHold(cache.ped, clipset) then
-        say(('applied "%s" -- walk around. If you are T-posing it is not a movement clipset; '):format(clipset)
-            .. 'run "/fire nozzlehold off"')
+    local movement = kind == 'move'
+    local ok = movement and applyNozzleHold(cache.ped, clipset)
+        or (not movement and applyNozzleStrafe(cache.ped, clipset))
+
+    if ok then
+        say(('applied "%s" as the %s clipset -- aim, and walk around')
+            :format(clipset, movement and 'movement' or 'weapon'))
+        say('T-posing means it is the other kind. "/fire nozzlehold off" undoes it.')
     else
         say(('"%s" would not load'):format(clipset))
     end

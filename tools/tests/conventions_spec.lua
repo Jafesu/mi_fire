@@ -250,8 +250,14 @@ return function(t)
         t.ok(clipset == nil or type(clipset) == 'string',
             'nozzleClipset is a clipset name or nothing')
 
+        -- Both of them. The hold is a weapon clipset through `SetPedStrafeClipset` and the
+        -- walk is a movement clipset through `SetPedMovementClipset`, and either one left
+        -- applied outlasts the nozzle -- on a ped with nothing in their hands.
         t.ok(findCode(source, 'ResetPedMovementClipset') ~= nil,
-            'the carrying stance is cleared when the nozzle is put down')
+            'the carrying walk is cleared when the nozzle is put down')
+
+        t.ok(findCode(source, 'ResetPedStrafeClipset') ~= nil,
+            'and so is the hold')
     end
 
     -- -----------------------------------------------------------------------

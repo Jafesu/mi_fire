@@ -590,12 +590,12 @@ subcommands.nozzle = function(source)
     reply(source, 'trying each candidate for two seconds; watch your hand')
 end
 
---- `/fire nozzlehold <clipset|off>` -- try a carrying stance without a restart.
+--- `/fire nozzlehold <clipset|off> [move]` -- try a carrying stance without a restart.
 ---
---- The stance a nozzle is held in is the one part that cannot be settled from a file: a
---- movement clipset either contains walk, run and idle clips or it does not, the game answers
---- "loaded" either way, and getting it wrong is a T-pose. So it gets tried rather than reasoned
---- about, and the winner goes into `MIFireHose.visuals.nozzleClipset`.
+--- The stance a nozzle is held in cannot be settled from a file. Two clipsets do two different
+--- jobs through two different natives -- the weapon clipset is the hold, the movement clipset
+--- is the walk -- the game reports both as loaded, and the wrong pairing is a T-pose. So it
+--- gets tried, and the winner goes into `MIFireHose.visuals`.
 subcommands.nozzlehold = function(source, args)
     if source == 0 then
         return reply(source, 'the console has no body to pose; run this in game', 'error')
@@ -605,13 +605,14 @@ subcommands.nozzlehold = function(source, args)
 
     if not clipset then
         return reply(source,
-            'usage: /fire nozzlehold <clipset|off>. Try move_ballistic_minigun, or any name '
-            .. 'beginning move_. "off" puts you back to normal.', 'error')
+            'usage: /fire nozzlehold <clipset|off> [move]. Default is the weapon clipset, '
+            .. 'which is the hold -- try weapons@heavy@minigun. Add "move" for the walk, '
+            .. 'where names begin move_. "off" puts you back to normal.', 'error')
     end
 
-    TriggerClientEvent('mi_fire:client:nozzleHold', source, clipset)
-    reply(source, ('trying "%s" -- walk around. T-posing means it is not a movement clipset.')
-        :format(clipset))
+    TriggerClientEvent('mi_fire:client:nozzleHold', source, clipset, args[2])
+    reply(source, ('trying "%s" as the %s clipset -- aim, and walk around')
+        :format(clipset, args[2] == 'move' and 'movement' or 'weapon'))
 end
 
 --- `/fire perms` -- why you can or cannot use these commands.

@@ -16,19 +16,27 @@ client and the model is real. Two things were wrong and are now fixed, pending a
 
 - **It was not equipped.** `CreateWeaponObject` makes a world object and attaches it to a bone,
   which cannot be fired and has no stance. Now `GiveWeaponToPed` + `SetCurrentPedWeapon`.
-- **The model origin was its centre.** For an equipped weapon the origin *is* the grip, so it
-  hung out of the fist at an angle. `GRIP_ORIGIN` in `build_nozzle.py` moves it.
+- **The model origin was its centre, and then its barrel.** For an equipped weapon the origin
+  *is* the grip. It is now on the **bale handle**, which is what a bale handle is for — the grab
+  handle a firefighter actually carries and works a nozzle by. Holding it by the barrel looked
+  wrong for the same reason carrying a kettle by the spout would.
 
-**The carrying stance is unsolved, and it is off.** A nozzle on a charged line is braced at the
-waist in both hands, which is the minigun shape. `weapons@heavy@minigun` looked like the answer —
-it is what the game's own `weaponanimations.meta` lists as the minigun motion clipset — and
-passing it to `SetPedMovementClipset` **T-posed the ped**. A movement clipset carries walk, run
-and idle clips; a weapon clipset does not, so there is nothing to stand in and the skeleton falls
-back to its bind pose. `HasAnimSetLoaded` returns true for both, so it cannot tell them apart.
+**The carrying stance is two clipsets, not one, and that was the T-pose.** A nozzle on a charged
+line is braced at the waist in both hands — the minigun shape. Getting there means calling the
+right native:
 
-`nozzleClipset` is therefore `nil`, and `/fire nozzlehold <clipset|off>` applies one live so a
-working name can be found by trying rather than reasoned about. Whatever wins goes in the config
-and the command stops mattering. Names beginning `move_` are movement clipsets.
+| Kind | Native | What it is | Names |
+|---|---|---|---|
+| **weapon** | `SetPedStrafeClipset` | how it is **held** and aimed | `weapons@heavy@minigun` |
+| **movement** | `SetPedMovementClipset` | the walk, run and idle | usually `move_…` |
+
+`weapons@heavy@minigun` is what the game's own `weaponanimations.meta` lists as the minigun
+`WeaponClipSetHash`, so it is the right name — it was being passed to the wrong native. A weapon
+clipset carries no walk or idle clips, so as a movement clipset there is nothing to stand in and
+the skeleton falls back to its bind pose. `HasAnimSetLoaded` returns true either way, so there is
+no check to write, only the right call to make.
+
+`/fire nozzlehold <clipset|off> [move]` tries either kind live.
 
 Still shipped as a native call rather than a `weaponanimations.meta`: that file replaces the
 game's whole animation set instead of merging, which is why both resources here that ship one

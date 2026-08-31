@@ -296,21 +296,28 @@ MIFireHose.visuals = {
     --- equipped and ox_inventory has nothing to strip.
     nozzleWeapon = 'WEAPON_MINOZZLE',
 
-    --- How a charged line is carried, as a **movement** clipset.
+    --- How a charged line is **held**, as a weapon clipset.
     ---
-    --- A nozzle on a charged line is braced at the waist in both hands -- the minigun shape.
-    --- Getting the game to adopt it is the awkward part, and this is off until one is found
-    --- that works, because a wrong value here is a **T-pose**.
+    --- A nozzle on a charged line is braced at the waist in both hands, which is the minigun
+    --- shape -- and `weapons@heavy@minigun` is exactly what the game own weaponanimations lists
+    --- as the minigun `WeaponClipSetHash`.
     ---
-    --- `weapons@heavy@minigun` looks like the obvious answer: it is what the game own
-    --- `weaponanimations.meta` lists as the minigun motion clipset. It T-poses. A movement
-    --- clipset carries walk, run and idle clips; a weapon clipset does not, so there is nothing
-    --- to stand in and the skeleton falls back to its bind pose. `HasAnimSetLoaded` returns
-    --- true for both, so it cannot be used to tell them apart.
+    --- Applied with `SetPedStrafeClipset`. That native is the point: passing this same name to
+    --- `SetPedMovementClipset` **T-poses**, because a weapon clipset carries no walk or idle
+    --- clips and the skeleton falls back to its bind pose. Two clipsets, two natives, and
+    --- `HasAnimSetLoaded` says true for both, so the only way to tell is which native you call.
     ---
-    --- Find one with `/fire nozzlehold <clipset>`, which applies it live and can be undone with
-    --- `/fire nozzlehold off`. Then put the winner here. Names beginning `move_` are movement
-    --- clipsets; most other things are not.
+    --- Try alternatives live with `/fire nozzlehold <clipset>`, and undo with
+    --- `/fire nozzlehold off`.
+    nozzleStrafeClipset = 'weapons@heavy@minigun',
+
+    --- How the firefighter **walks** while carrying it, as a movement clipset.
+    ---
+    --- Separate from the hold above and usually not needed -- the weapon clipset is what
+    --- changes the carry. Names beginning `move_` are movement clipsets; anything else almost
+    --- certainly is not, and getting it wrong here is the T-pose.
+    ---
+    --- Try one with `/fire nozzlehold <clipset> move`.
     nozzleClipset = nil,
 
     --- Only if the weapon fails to load, which means the metas did not reach the client.

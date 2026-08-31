@@ -1840,3 +1840,63 @@ times and taken away four times. And pulling a hose T-posed the player.
 
 **Next:** the convar, then a stance, then finally look at where the thing sits.
 
+---
+
+## 2026-08-31 (fifth) — it holds, and the T-pose was the wrong native
+
+**Scope:** third in-game run. The convar worked; the nozzle stays in hand.
+
+**What the test showed:** the weapon holds. The stance was the fire extinguisher's rather than
+the minigun's, and the nozzle was gripped by its body rather than its handle.
+
+**Changed:**
+
+- `tools/assets/nozzle/build_nozzle.py` — `GRIP_ORIGIN` moved to the bale handle.
+- `client/modules/hose/init.lua` — `applyNozzleStrafe` alongside `applyNozzleHold`; both cleared
+  together.
+- `config/hose.lua` — `nozzleStrafeClipset = 'weapons@heavy@minigun'`.
+- `/fire nozzlehold <clipset|off> [move]` now picks which kind of clipset to try.
+
+**Decisions:**
+
+- **The T-pose was the wrong native, not the wrong name.** `weapons@heavy@minigun` was right all
+  along -- it is what the game's own `weaponanimations.meta` lists as the minigun
+  `WeaponClipSetHash`. It was being passed to `SetPedMovementClipset`, and a weapon clipset
+  carries no walk or idle clips, so there was nothing to stand in and the skeleton fell back to
+  its bind pose. The right native is `SetPedStrafeClipset`.
+
+  Worth recording because the previous entry in this log concluded the name was unusable and
+  gave up on it. It was one function call away. `HasAnimSetLoaded` answers true for both kinds,
+  so nothing in the API distinguishes them -- the distinction is only in which setter you call,
+  which is exactly the sort of thing that is invisible until someone reads the vanilla data and
+  notices the field is called *Weapon*ClipSetHash.
+
+- **Two clipsets, cleared together.** The hold and the walk are separate, and either one left
+  applied outlasts the nozzle on a ped with empty hands. `conventions_spec` now requires both
+  resets.
+
+- **The origin is on the bale handle.** That is what a bale handle is for. The first attempt put
+  it on the barrel axis and held the nozzle by its body, which is wrong for the same reason
+  carrying a kettle by the spout would be. `z = 0.128` is the middle of the ribbed grip bar.
+
+- **Still no `weaponanimations.meta`, and now definitely not needed.** That file replaces the
+  game's whole animation set rather than merging -- both resources here that ship one carry a
+  13,000 line copy of the vanilla data. Two natives do the same job with no global blast radius.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1042 passed, 0 failed**.
+- Rebuilt and re-exported: `w_mi_nozzle.ydr`, 363,853 bytes. Bounds
+  `(-0.061, -0.157, -0.193) .. (0.061, 0.139, 0.022)` -- the origin now sits at the top, with
+  the nozzle hanging below it, which is what a hand on the bale handle looks like.
+- **Not** retested in game.
+
+**Open:**
+
+- Retest the hold and the grip together.
+- Nothing has been fired yet. Water out of the nozzle is the next real milestone and none of it
+  is written.
+- `HOSE-010`, `HOSE-011`, `SCORCH-002` unchanged.
+
+**Next:** water.
+

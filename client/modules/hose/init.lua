@@ -654,6 +654,96 @@ end)
 --- The server's list and a client's list disagreeing is the whole bug class here -- "back up
 --- this line" not appearing looked like a rule refusing, and was a table arriving in a shape
 --- the client could not read. Asking only the server could never have shown that.
+--- Lay all eight rope types out side by side.
+---
+--- GTA ships eight, and they differ in thickness and texture. We picked 4 because the hose
+--- resource on this machine uses it, which is evidence but not a comparison -- and since a
+--- rope's texture cannot be changed for one resource without changing it for every rope on the
+--- server, the eight built-in types are the whole of what is available without abandoning
+--- ropes entirely.
+---
+--- So: look at them. If one reads as hose, that is the answer and it costs nothing. If none
+--- do, the answer is the rewrite in HOSE-010 and this will have taken a minute to find out.
+RegisterNetEvent('mi_fire:client:ropeTypes', function()
+    RopeLoadTextures()
+
+    local waited = 0
+    while not RopeAreTexturesLoaded() and waited < 3000 do
+        Wait(50)
+        waited = waited + 50
+    end
+
+    local origin = GetEntityCoords(cache.ped)
+    local forward = GetEntityForwardVector(cache.ped)
+    local right = vector3(forward.y, -forward.x, 0.0)
+
+    local made = {}
+
+    for ropeType = 0, 7 do
+        -- Two metres apart across your facing, each a five metre span at chest height so the
+        -- texture is visible rather than foreshortened.
+        local offset = ropeType * 2.0 - 7.0
+
+        local ax = origin.x + right.x * offset + forward.x * 3.0
+        local ay = origin.y + right.y * offset + forward.y * 3.0
+        local bx = origin.x + right.x * offset + forward.x * 8.0
+        local by = origin.y + right.y * offset + forward.y * 8.0
+        local z = origin.z + 1.2
+
+        local rope = AddRope(ax, ay, z, 0.0, 0.0, 0.0,
+            6.0, ropeType, 6.0, 0.5, 1.0, false, false, false, 1.0, false, 0)
+
+        if rope and rope ~= 0 then
+            Wait(0)
+
+            local vertices = GetRopeVertexCount(rope) or 0
+
+            if vertices >= 2 then
+                ActivatePhysics(rope)
+                PinRopeVertex(rope, 0, ax, ay, z)
+                PinRopeVertex(rope, vertices - 1, bx, by, z)
+            end
+
+            made[#made + 1] = { rope = rope, type = ropeType, x = ax, y = ay, z = z }
+        end
+    end
+
+    lib.notify({
+        title = ('%d rope type(s)'):format(#made),
+        description = 'Numbered left to right. Two minutes. Pick the one that reads as hose.',
+        type = 'inform',
+    })
+
+    CreateThread(function()
+        local until_ = GetGameTimer() + 120000
+
+        while GetGameTimer() < until_ do
+            Wait(0)
+
+            for i = 1, #made do
+                local entry = made[i]
+                local onScreen, sx, sy = GetScreenCoordFromWorldCoord(
+                    entry.x, entry.y, entry.z + 0.4)
+
+                if onScreen then
+                    SetTextFont(4)
+                    SetTextScale(0.0, 0.4)
+                    SetTextColour(255, 220, 120, 240)
+                    SetTextOutline()
+                    SetTextCentre(true)
+                    SetTextEntry('STRING')
+                    AddTextComponentString(('type %d'):format(entry.type))
+                    DrawText(sx, sy)
+                end
+            end
+        end
+
+        for i = 1, #made do
+            if DoesRopeExist(made[i].rope) then DeleteRope(made[i].rope) end
+        end
+    end)
+end)
+
 RegisterNetEvent('mi_fire:client:diagnoseHoses', function()
     local me = GetPlayerServerId(PlayerId())
     local lineCount = 0

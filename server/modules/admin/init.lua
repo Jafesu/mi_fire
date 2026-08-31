@@ -562,6 +562,20 @@ subcommands.hose = function(source, args)
     TriggerClientEvent('mi_fire:client:diagnoseHoses', source)
 end
 
+--- `/fire ropetypes` -- lay all eight rope types out and pick one.
+---
+--- A rope's texture cannot be changed for one resource without changing it for every rope on
+--- the server, so the eight built-in types are the whole of what is available without giving
+--- up ropes entirely. Worth a minute of looking before committing to a rewrite.
+subcommands.ropetypes = function(source)
+    if source == 0 then
+        return reply(source, 'the console has nowhere to put them; run this in game', 'error')
+    end
+
+    TriggerClientEvent('mi_fire:client:ropeTypes', source)
+    reply(source, 'eight ropes ahead of you, numbered. Set the best as MIFireHose.visuals.ropeType')
+end
+
 --- `/fire perms` -- why you can or cannot use these commands.
 ---
 --- Deliberately reachable by anyone: someone who cannot run the commands is exactly who
@@ -587,6 +601,7 @@ local USAGE = {
     'fire decals [sweep]                  -- find a working burn-mark decal type',
     'fire scorch [clear]                  -- burn marks: count, or remove them all',
     'fire hose [drop|clear]               -- lines out, and a way out of a stuck one',
+    'fire ropetypes                       -- compare the eight rope types',
     'fire sizeup [id]                     -- read the smoke',
     'fire vent <action> [id]              -- force_door | take_window | vertical_vent | close_up',
 }

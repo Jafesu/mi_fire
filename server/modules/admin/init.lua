@@ -327,7 +327,7 @@ subcommands.sizeup = function(source, args)
         reply(source, conclusions.backdraft, 'error')
     elseif reading.stage == MIFire.Smoke.Stage.PYROLYSIS then
         reply(source, conclusions.pyrolysis)
-    elseif reading.density < 0.35 then
+    elseif reading.values.density < 0.35 then
         reply(source, conclusions.clean)
     end
 end

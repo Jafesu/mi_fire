@@ -326,10 +326,26 @@ function Smoke.read(attributes, ventilation, confined, config)
     end
 
     return {
+        --- The four attributes as an officer would say them out loud. These are **words**,
+        --- not numbers -- "thick", "turbulent" -- because that is what a size-up is.
         volume = volumeWord,
         velocity = velocityWord,
         density = densityWord,
         colour = colourWord,
+
+        --- And the same four as numbers, for anything that needs to compare rather than
+        --- report.
+        ---
+        --- Both exist because a field called `density` holding the string "thick" is a trap:
+        --- `reading.density < 0.35` reads as obviously correct, parses fine, and throws
+        --- "attempt to compare string with number" only when a player runs the command. It
+        --- did exactly that. Words for saying, `values` for deciding.
+        values = {
+            volume = attributes.volume,
+            velocity = attributes.velocity,
+            density = attributes.density,
+        },
+
         stage = attributes.stage,
         turbulent = attributes.turbulent,
         pulsing = Smoke.isPulsing(backdraft, config),

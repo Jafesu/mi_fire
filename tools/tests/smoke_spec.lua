@@ -212,4 +212,39 @@ return function(t)
         t.ok(cfg.ventilation[action.setsVentilation] ~= nil,
             ('the "%s" action sets a ventilation state that exists'):format(name))
     end
+
+    -- -----------------------------------------------------------------------
+
+    t.describe('a reading says the four attributes in words')
+
+    -- Because a size-up is words. An officer says "thick, turbulent, brown" -- not 0.82.
+    local attributes = Smoke.attributes({
+        intensity = 80, class = MIFireClasses.classes.A, ventilation = 'limited',
+        fuelFraction = 0.6, confined = true,
+    }, MIFireSmoke)
+
+    local reading = Smoke.read(attributes, 'limited', true, MIFireSmoke)
+
+    t.equal(type(reading.volume), 'string', 'volume is a word')
+    t.equal(type(reading.velocity), 'string', 'velocity is a word')
+    t.equal(type(reading.density), 'string', 'density is a word')
+    t.equal(type(reading.colour), 'string', 'colour is a word')
+
+    t.describe('and carries the numbers separately')
+
+    -- The bug this pins, found by a player running /fire sizeup: `reading.density < 0.35`
+    -- reads as obviously correct, parses fine, and throws "attempt to compare string with
+    -- number" only at the moment somebody uses it. A field called `density` holding "thick"
+    -- is a trap, so the numbers live under `values` and the words stay where they read well.
+    --
+    -- Note the client's smoke payload is a *different* shape that sends density as a number
+    -- directly. Two structures both called a reading is the hazard; this is the one with
+    -- words in it.
+    t.ok(reading.values ~= nil, 'there is a values table')
+    t.equal(type(reading.values.density), 'number', 'and density in it is a number')
+    t.equal(type(reading.values.volume), 'number', 'as is volume')
+    t.equal(type(reading.values.velocity), 'number', 'and velocity')
+
+    t.near(reading.values.density, attributes.density, 0.001,
+        'and it is the same number the attributes carried, not a rounded copy that can drift')
 end

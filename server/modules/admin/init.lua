@@ -576,6 +576,20 @@ subcommands.ropetypes = function(source)
     reply(source, 'eight ropes ahead of you, numbered. Set the best as MIFireHose.visuals.ropeType')
 end
 
+--- `/fire nozzle` -- why there is nothing in your hand.
+---
+--- Tries the configured prop and then base game ones, loading and attaching each in turn. A
+--- base game prop appearing proves the attaching works and the answer is that the configured
+--- model is not reaching this client; none appearing means something else entirely.
+subcommands.nozzle = function(source)
+    if source == 0 then
+        return reply(source, 'the console has no hands; run this in game', 'error')
+    end
+
+    TriggerClientEvent('mi_fire:client:testNozzle', source)
+    reply(source, 'trying each candidate for two seconds; watch your hand')
+end
+
 --- `/fire perms` -- why you can or cannot use these commands.
 ---
 --- Deliberately reachable by anyone: someone who cannot run the commands is exactly who
@@ -602,6 +616,7 @@ local USAGE = {
     'fire scorch [clear]                  -- burn marks: count, or remove them all',
     'fire hose [drop|clear]               -- lines out, and a way out of a stuck one',
     'fire ropetypes                       -- compare the eight rope types',
+    'fire nozzle                          -- why there is nothing in your hand',
     'fire sizeup [id]                     -- read the smoke',
     'fire vent <action> [id]              -- force_door | take_window | vertical_vent | close_up',
 }

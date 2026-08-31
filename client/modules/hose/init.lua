@@ -413,8 +413,22 @@ CreateThread(function()
                         -- reason to delete a hose.
 
                     else
-                        local hand = GetWorldPositionOfEntityBone(holder,
-                            GetPedBoneIndex(holder, 6286))
+                        -- `GetPedBoneCoords` rather than `GetWorldPositionOfEntityBone` with
+                        -- a converted index.
+                        --
+                        -- 6286 is PH_R_Hand, a prop-attachment bone that not every ped model
+                        -- carries. `GetPedBoneIndex` returns -1 when it is absent, and asking
+                        -- for the world position of bone -1 gives a point near the world
+                        -- origin -- which is why the hose was heading off into the distance
+                        -- instead of to the firefighter holding it. 57005 is SKEL_R_Hand and
+                        -- is on every ped.
+                        local hand = GetPedBoneCoords(holder, 57005, 0.0, 0.0, 0.0)
+
+                        -- And a guard, because a bad bone gives a plausible-looking vector
+                        -- rather than an error. A hand is not fifty metres from its owner.
+                        if #(hand - GetEntityCoords(holder)) > 5.0 then
+                            hand = GetEntityCoords(holder)
+                        end
 
                         PinRopeVertex(entry.rope, 0, hand.x, hand.y, hand.z)
 
@@ -918,6 +932,74 @@ RegisterNetEvent('mi_fire:client:ropeTypes', function()
             if DoesRopeExist(made[i].rope) then DeleteRope(made[i].rope) end
         end
     end)
+end)
+
+--- Try to put each candidate prop in your hand, one at a time.
+---
+--- Separates two questions that look identical from the outside: is the attaching broken, or
+--- is that particular model not reaching this client? A base game prop appearing proves the
+--- first is fine and the answer is the second.
+RegisterNetEvent('mi_fire:client:testNozzle', function()
+    local candidates = {
+        MIFireHose.visuals.nozzleProp,
+        'prop_fire_hosereel_l1',
+        'prop_fire_hosebox_01',
+        'prop_tool_fireaxe',
+    }
+
+    local out = { '--- nozzle prop test ---' }
+
+    for _, name in ipairs(candidates) do
+        if name then
+            local model = joaat(name)
+            local known = IsModelInCdimage(model) or IsModelValid(model)
+
+            RequestModel(model)
+
+            local waited = 0
+            while not HasModelLoaded(model) and waited < 2000 do
+                Wait(50)
+                waited = waited + 50
+            end
+
+            local loaded = HasModelLoaded(model)
+
+            out[#out + 1] = ('  %-26s known=%s loaded=%s')
+                :format(name, tostring(known), tostring(loaded))
+
+            if loaded then
+                -- Actually put it in the hand for two seconds. Loading and attaching are
+                -- different failures and only one of them is visible from a log line.
+                local coords = GetEntityCoords(cache.ped)
+                local prop = CreateObject(model, coords.x, coords.y, coords.z, false, true, false)
+
+                if prop and prop ~= 0 then
+                    AttachEntityToEntity(prop, cache.ped,
+                        GetPedBoneIndex(cache.ped, 57005),
+                        0.12, 0.02, -0.02, -75.0, 12.0, 0.0,
+                        true, true, false, true, 1, true)
+
+                    out[#out + 1] = '      attached -- look at your hand'
+                    Wait(2500)
+                    DeleteEntity(prop)
+                else
+                    out[#out + 1] = '      CreateObject returned nothing'
+                end
+
+                SetModelAsNoLongerNeeded(model)
+            end
+        end
+    end
+
+    out[#out + 1] = 'If a base game prop appeared and yours did not, the model is not reaching '
+        .. 'this client -- reconnect (F8, "reconnect").'
+
+    for i = 1, #out do
+        TriggerEvent('chat:addMessage', { args = { 'mi_fire', out[i] } })
+        print('[mi_fire] ' .. out[i])
+    end
+
+    TriggerServerEvent('mi_fire:server:relayHoseDiagnosis', out)
 end)
 
 RegisterNetEvent('mi_fire:client:diagnoseHoses', function()

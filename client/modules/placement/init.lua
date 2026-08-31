@@ -212,17 +212,35 @@ function Placement.drawHelp(state, override)
         lines[3] = ('~c~%.2f, %.2f, %.2f'):format(state.coords.x, state.coords.y, state.coords.z)
     end
 
+    -- `SetTextScale`'s first argument is not a second axis -- it is effectively ignored on
+    -- most fonts, and passing the same value twice was rendering this at roughly three times
+    -- the intended size, wide enough to cross the screen and with the lines overlapping each
+    -- other. Zero for the first, the real size in the second, and line spacing derived from
+    -- that size rather than guessed.
+    local size = 0.30
+    local spacing = size * 0.075
+
+    -- A backdrop, because outlined white text over a bright red fire station is unreadable
+    -- whatever size it is.
+    local height = spacing * (#lines + 0.8)
+    DrawRect(0.145, 0.34 + height * 0.5 - spacing * 0.4, 0.27, height, 0, 0, 0, 150)
+
     SetTextFont(4)
-    SetTextScale(0.34, 0.34)
-    SetTextColour(255, 255, 255, 220)
+    SetTextScale(0.0, size)
+    SetTextColour(235, 240, 245, 230)
     SetTextOutline()
 
-    local y = 0.32
+    local y = 0.34
     for i = 1, #lines do
         SetTextEntry('STRING')
         AddTextComponentString(lines[i])
-        DrawText(0.015, y)
-        y = y + 0.022
+
+        -- Constrain the width, or a long label runs off the side of the backdrop instead of
+        -- wrapping inside it.
+        SetTextWrap(0.015, 0.28)
+        DrawText(0.02, y)
+
+        y = y + spacing
     end
 end
 

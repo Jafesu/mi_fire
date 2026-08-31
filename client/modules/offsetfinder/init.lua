@@ -19,7 +19,7 @@ local Scan = MIFire.Scan
 
 --- Ports authored this session, per vehicle. Cleared when you change rigs, because a port
 --- list is only meaningful against the truck it was measured on.
-local session = { model = nil, modelName = nil, ports = {} }
+local session = { model = nil, modelName = nil, ports = {}, lastType = 'discharge' }
 
 --- The order the type picker offers, most-used first. A discharge is what you are almost
 --- always placing, and it should not be four keystrokes down a list.
@@ -72,12 +72,16 @@ local function placePort(vehicle)
                 return options
             end)(),
             required = true,
-            default = 'discharge',
+            --- Defaults to whatever was placed last. A rig has six discharges and one of
+            --- most other things, so re-picking "discharge" every time is the single most
+            --- repeated action in authoring a truck.
+            default = session.lastType or 'discharge',
         },
     })
 
     if not typeInput then return end
     local portType = typeInput[1]
+    session.lastType = portType
 
     local idInput = lib.inputDialog('New port', {
         {

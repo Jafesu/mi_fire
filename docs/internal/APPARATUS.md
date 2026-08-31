@@ -70,6 +70,25 @@ There is no `ERescueHT` panel photograph, consistent with it carrying little or 
 
 ---
 
+## Bones
+
+**`EengineHT` has no bones at its hookups.** Checked in game on 2026-08-30 with
+`/fireoffset` → *Scan this rig*.
+
+This was worth checking rather than assuming, because a bone at a hookup would have made
+ports free: nothing to measure, and correct forever even if the model is updated. The pack's
+panel mod switching off `misc_p` suggested the author used the conventional `misc_*` slots,
+and that turned out to be for the mod geometry rather than for connection points.
+
+So **apparatus ports on this fleet are hand-measured offsets**, and that is not a fallback we
+are settling for — it is the only option the models give us. `/fireoffset` still offers the
+bone route because other packs do ship useful bones, and the scan costs a minute to rule it
+out on a rig nobody has checked.
+
+Re-run the scan if the pack is ever updated. A future version might add them.
+
+---
+
 ## Mod slots
 
 The 2026 pack attaches functional-looking geometry to **vehicle mod slots**, which means it can

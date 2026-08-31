@@ -233,25 +233,24 @@ local function draw(id, line)
     drawn[id].vehicle = vehicle
     drawn[id].pending = true
 
-    -- A rope has no vertices until it has been simulated once, and it needs enough of them to
-    -- have a *middle*.
+    -- A rope has no vertices until it has been simulated once.
     --
-    -- Four is not enough: the hand takes vertex 0 and the coupling takes the last three, which
-    -- pins every vertex there is. A fully pinned rope has no freedom, so it draws taut and
-    -- shakes as the pins disagree by a centimetre each frame -- which is what "spazzing out"
-    -- was. Eight leaves four in the middle to hang.
+    -- How many it ends up with is the rope *type's* business, not the length's -- type 6 comes
+    -- back with three however long it is made. Demanding eight and refusing to draw below that
+    -- meant the thickest type could never be used, which was the wrong lesson to draw from a
+    -- rope that shook: the shaking was pinning every vertex there was, and the fix is to pin
+    -- fewer rather than to insist on more.
     local vertices = 0
     local waited = 0
 
-    while vertices < 8 and waited < 500 do
+    while vertices < 2 and waited < 500 do
         Wait(0)
         vertices = GetRopeVertexCount(rope) or 0
         waited = waited + 16
     end
 
-    if vertices < 8 then
-        Util.warn('rope for line %s came back with %d vertices, too few to hang; '
-            .. 'raise MIFireHose.visuals.initialLength', id, vertices)
+    if vertices < 2 then
+        Util.warn('rope for line %s never simulated', id)
         if DoesRopeExist(rope) then DeleteRope(rope) end
         drawn[id] = nil
         return
@@ -437,12 +436,20 @@ CreateThread(function()
 
                         PinRopeVertex(entry.rope, last, from.x, from.y, from.z)
 
-                        -- One more, a little way out along the outlet, so the hose leaves the
-                        -- fitting straight. Three was over-constraining a short rope; two ends
-                        -- and one guide is enough to set the direction and still leave a
-                        -- middle to hang.
-                        PinRopeVertex(entry.rope, last - 1,
-                            from.x + axis.x * 0.3, from.y + axis.y * 0.3, from.z + axis.z * 0.3)
+                        -- The guide vertex, which makes the hose leave the fitting straight
+                        -- rather than at whatever angle the physics settles on -- but only
+                        -- when there is a vertex to spare.
+                        --
+                        -- With four or fewer, pinning it would leave nothing free between the
+                        -- two ends, and a rope with no free vertices is a taut line that
+                        -- shakes as its pins disagree. Whatever the rope has left over is what
+                        -- hangs, so it never gets spent.
+                        if entry.vertices >= 5 then
+                            PinRopeVertex(entry.rope, last - 1,
+                                from.x + axis.x * 0.3,
+                                from.y + axis.y * 0.3,
+                                from.z + axis.z * 0.3)
+                        end
 
                         -- Pay the line out as the crew walks and haul it in as they return,
                         -- capped at what is on the bed.
@@ -942,8 +949,10 @@ end)
 RegisterNetEvent('mi_fire:client:testNozzle', function()
     local candidates = {
         MIFireHose.visuals.nozzleProp,
+        'hei_prop_heist_hose_01',
         'prop_fire_hosereel_l1',
         'prop_fire_hosebox_01',
+        'prop_fire_exting_1a',
         'prop_tool_fireaxe',
     }
 

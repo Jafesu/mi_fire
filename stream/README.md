@@ -14,15 +14,24 @@ Streamed assets for mi_fire.
 > If a model survives both, it is not being streamed at all — check the filename matches the
 > model name exactly, and that both the `.ydr` and its `.ytd` are present.
 
-**What is in here right now is borrowed and is not in the repository.**
+**Nothing is in here right now.**
 
-`w_am_hose.ydr` / `.ytd` are copied from **SmartHose** so the hose has a nozzle in hand while
-our own model is made. They are gitignored, so a clone of this repository contains the code and
-none of somebody else's art — which means shipping them cannot happen by accident, only
-deliberately.
+`w_am_hose.ydr` and `.ytd` were copied from **SmartHose** and then removed, because they do not
+work on their own and the reason is worth keeping.
 
-The resource runs without them. The prop does not load, `MIFireHose.visuals.nozzleProp` logs a
-warning, and the hose works with nothing in the hand.
+`w_am_hose` is not a prop. It is a **weapon archetype**, defined in SmartHose's
+`weaponarchetypes.meta` and registered through four `data_file` declarations in its manifest.
+Copying the `.ydr` gives the game a mesh with no archetype to hang it on, so it stays unknown to
+every client no matter how many times anyone refreshes or reconnects — which is exactly what
+happened, twice, before anyone read the other manifest.
+
+Making it work would mean copying four meta files and registering a custom weapon into the
+game's weapon tables. Larger borrow, a collision with SmartHose if it were ever enabled, and —
+the deciding point — it would build the nozzle around a weapon when the replacement will be a
+prop. That is a pipeline to throw away.
+
+The nozzle is a base game prop instead. `/fire nozzle` tries the candidates in turn and attaches
+each for two seconds, which is the quickest way to find one that does not look absurd.
 
 ## `rope.ytd` — tested, global, removed
 

@@ -277,28 +277,31 @@ MIFireHose.visuals = {
     --- Props. Base game, all four confirmed present in resources on this machine.
     --- The prop in a firefighter's hands.
     ---
-    --- There is no vanilla model that looks like a nozzle. `prop_fire_hosereel_l1` is the reel
-    --- itself, and in hand it reads as someone carrying a large flat coil.
+    --- **`w_am_hose` was the wrong answer and is worth recording as such.** It is SmartHose's
+    --- nozzle and it is not a prop -- it is a *weapon archetype*, defined in a
+    --- `weaponarchetypes.meta` and registered through four `data_file` declarations. Copying
+    --- the `.ydr` gives the game a mesh with no archetype to hang it on, so it stays unknown
+    --- to every client however many times anyone reconnects.
     ---
-    --- `w_am_hose` is SmartHose's nozzle model, copied into `stream/` because those resources
-    --- are not running on this server and a model can only be used by name while the resource
-    --- that streams it is loaded.
+    --- Making it work would mean copying four meta files and registering a custom weapon into
+    --- the game's weapon tables, which is a considerably larger borrow than a model, would
+    --- collide with SmartHose if it were ever enabled, and -- the deciding point -- would
+    --- build this around a weapon when the replacement will be a prop. That is a pipeline to
+    --- throw away.
     ---
-    --- The files are **gitignored**. A clone of this repository gets the code and none of
-    --- somebody else's art, so shipping them cannot happen by accident -- only deliberately.
-    --- The resource runs without them: the prop does not load, this warns, and the hose works
-    --- with nothing in the hand.
-    ---
-    --- **Replace before release.** See `ASSET-001` and `stream/README.md`.
-    nozzleProp = 'w_am_hose',
+    --- So: a base game prop, or nothing. `/fire nozzle` tries the candidates in turn and
+    --- attaches each for two seconds, which is the quickest way to find one that does not look
+    --- absurd.
+    nozzleProp = 'hei_prop_heist_hose_01',
 
     --- Models borrowed from another resource for development.
     ---
     --- Listed so the boot check can say so out loud every time the server starts. A borrowed
     --- asset that nobody is reminded about is one that ships.
-    borrowed = {
-        w_am_hose = 'SmartHose',
-    },
+    --- Models borrowed from another resource. Nothing is, currently -- `w_am_hose` turned out
+    --- to be a weapon rather than a prop and was abandoned. Kept because the boot check and
+    --- `conventions_spec` both read it, so the next borrow is declared rather than quiet.
+    borrowed = {},
     couplingProp = 'prop_fire_hosebox_01',
     reelProp = 'prop_fire_hosereel',
 

@@ -1,3 +1,24 @@
+### `ASSET-001` — a nozzle model of our own
+
+Nothing is borrowed at the moment. The nozzle is a base game prop, which is adequate and not
+right.
+
+**Do not reach for `w_am_hose` again.** It is SmartHose's nozzle and it is not a prop -- it is a
+weapon archetype, defined in a `weaponarchetypes.meta` and registered through four `data_file`
+declarations. Copying the `.ydr` gives the game a mesh with no archetype, so it stays unknown to
+every client however many refreshes and reconnects it is given. That was diagnosed twice as a
+streaming problem before anyone read the other manifest.
+
+Making it work would mean copying four meta files and registering a custom weapon into the
+game's weapon tables -- a larger borrow, a collision with SmartHose if it were ever enabled, and
+a pipeline built around a weapon when the replacement will be a prop.
+
+**So the model to make is a prop**, attached to `SKEL_R_Hand`. `MIFireHose.visuals.nozzleProp`
+takes its name and nothing else changes.
+
+The boot check and `conventions_spec` still read `visuals.borrowed`, which is empty -- so the
+next borrow has to be declared rather than slipping in quietly.
+
 # Tasks
 
 Status is one of `todo`, `in-progress`, `review`, `done`, `blocked`.

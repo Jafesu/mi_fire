@@ -475,13 +475,15 @@ local function diagnoseGear()
     say('nearest vehicle: %s (model %s, class %d)',
         GetDisplayNameFromVehicleModel(model), tostring(model), class)
 
-    local apparatus = rawget(_G, 'MIFireApparatus')
-    if apparatus and apparatus.profiles then
-        say('apparatus config loaded, this model listed: %s',
-            tostring(apparatus.profiles[model] ~= nil))
-    else
-        say('no apparatus config yet (Phase 2), so any class 18 vehicle counts')
-    end
+    -- Profiles are keyed by model *name*, lowercase. Looking them up by hash always missed,
+    -- so this line reported "not listed" for a rig that is listed -- which is worse than no
+    -- line at all, because it sends someone to check a config that was already correct.
+    local name = GetDisplayNameFromVehicleModel(model)
+    local profile = name and MIFireApparatus.profiles[name:lower()]
+
+    say('profile: %s (%d port(s))',
+        profile and 'listed' or 'not listed -- falling back to any emergency vehicle',
+        profile and #(profile.ports or {}) or 0)
 
     local apparatusOk = isApparatus(vehicle)
     say('counts as apparatus: %s', tostring(apparatusOk))
@@ -501,15 +503,39 @@ local function diagnoseGear()
 
     say('--- what you should see on that vehicle ---')
 
-    -- Calls the decorated `canInteract` -- the same function object ox_target calls -- so
-    -- this cannot drift from the real gate.
-    local vehicleCoords = GetEntityCoords(vehicle)
+    -- Calls the decorated `canInteract` -- the same function object ox_target calls -- so this
+    -- cannot drift from the real gate.
+    --
+    -- Aimed at each option's own compartment rather than at the middle of the truck. Passing
+    -- the vehicle centre answered "would this work if you aimed at a point inside the engine
+    -- block", which is no, for everything with a zone -- so every option read as blocked and
+    -- the report was useless exactly when it was needed.
+    local centre = GetEntityCoords(vehicle)
+
+    ---@param portType string
+    ---@return vector3
+    local function aimFor(portType)
+        local _, coords = MIFire.ApparatusClient.nearestPort(vehicle, portType, centre)
+        return coords or centre
+    end
+
+    local aims = {
+        ['mi_fire:repairGear'] = 'gear',
+        ['mi_fire:replaceGear'] = 'gear',
+        ['mi_fire:donTurnout'] = 'gear',
+        ['mi_fire:doffTurnout'] = 'gear',
+        ['mi_fire:donScba'] = 'scba_rack',
+        ['mi_fire:rackScba'] = 'scba_rack',
+        ['mi_fire:refillScba'] = 'scba_rack',
+    }
 
     for i = 1, #apparatusOptions do
         local opt = apparatusOptions[i]
         local gate = optionGates[i]
+        local at = aims[opt.name] and aimFor(aims[opt.name]) or centre
+
         local ok = opt.canInteract == nil
-            or opt.canInteract(vehicle, 1.0, vehicleCoords, nil, nil) == true
+            or opt.canInteract(vehicle, 1.0, at, nil, nil) == true
 
         local note = ''
         if not ok and gate.requiresFirefighter and not isFf then
@@ -518,6 +544,8 @@ local function diagnoseGear()
 
         say('  [%s] %s%s', ok and 'x' or ' ', gate.label, note)
     end
+
+    say('(each tested aimed at its own compartment, not at the middle of the rig)')
 
     return lines
 end

@@ -25,11 +25,7 @@ scratch/
 
 # Borrowed assets, development only.
 #
-# These are streamed models copied from another resource so the hose has something in hand
-# while our own is modelled. They are deliberately **not** in the repository: a clone gets the
-# code and none of somebody else's art, which means the question of shipping them cannot come
-# up by accident.
-#
-# The resource works without them -- the prop simply does not load and the hose still runs.
+# Nothing is borrowed at the moment, and the pattern stays so the next one cannot be committed
+# by reflex. A clone should get the code and none of somebody else's art.
 # See ASSET-001 in docs/internal/TASKS.md.
 stream/w_am_hose.*

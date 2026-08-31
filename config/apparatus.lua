@@ -186,13 +186,14 @@ MIFireApparatus.profiles = {
                 { x = 1.114, y = -3.342, z = 0.853 },
                 { x = -1.286, y = -3.342, z = 0.853 },
               } },
+                  
             { id = "pumppanel", type = "panel",
               corners = {
-                { x = -1.402, y = -0.714, z = -0.328 },
-                { x = -0.402, y = -0.714, z = -0.328 },
-                { x = -0.402, y = 1.086, z = -0.328 },
-                { x = -1.402, y = 1.086, z = -0.328 },
-              } },
+            { x = -0.893, y = 0.614, z = 0.071 },
+            { x = -0.894, y = -0.338, z = 0.100 },
+            { x = -0.894, y = -0.330, z = -1.050 },
+            { x = -0.894, y = 0.611, z = -1.031 },
+          } },
             --- Gear and tools share one compartment, so they share a box. Two options on
             --- one locker is correct -- it is one locker.
             { id = "gear1", type = "gear",

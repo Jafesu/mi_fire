@@ -153,11 +153,41 @@ local function draw(id, line)
         false, false, false, 1.0, false, 0)
 
     if not rope or rope == 0 then
-        Util.warn('AddRope failed for line %s', id)
+        Util.warn('AddRope failed for line %s -- check the rope type in config/hose.lua', id)
         return
     end
 
+    -- Claimed before the wait below, so two syncs arriving close together cannot both get
+    -- past the `drawn[id]` check and leave one rope orphaned with nothing tracking it.
+    drawn[id] = { rope = rope, vehicle = vehicle, pending = true }
+
     MIFire.trackRope(rope)
+
+    -- A rope has no vertices until it has been simulated once. Asking immediately returns
+    -- nothing useful, and a vertex count of zero would put the pin back on vertex 0 -- which is
+    -- the end the firefighter is attached to, and exactly the fight that made it flicker.
+    local vertices = 0
+    local waited = 0
+
+    while vertices < 2 and waited < 500 do
+        Wait(0)
+        vertices = GetRopeVertexCount(rope) or 0
+        waited = waited + 16
+    end
+
+    if vertices < 2 then
+        Util.warn('rope for line %s never simulated; not drawing it', id)
+        if DoesRopeExist(rope) then DeleteRope(rope) end
+        drawn[id] = nil
+        return
+    end
+
+    -- The wait gave the world a chance to change.
+    if not lines[id] or not DoesEntityExist(holderPed) then
+        if DoesRopeExist(rope) then DeleteRope(rope) end
+        drawn[id] = nil
+        return
+    end
 
     -- **The truck is never attached to the rope.**
     --
@@ -169,18 +199,32 @@ local function draw(id, line)
     --
     -- Pinning a vertex sets where that end of the rope *is*, and applies force to nothing. The
     -- pin is refreshed as the rig moves, so the hose still comes off the right outlet.
-    PinRopeVertex(rope, 0, from.x, from.y, from.z)
+    --
+    -- **Opposite ends.** `AttachRopeToEntity` attaches the rope's *start*, which is vertex 0 --
+    -- so pinning vertex 0 to the rig as well left both fighting over one point every frame, and
+    -- the rope flickered between the two answers. The rig gets the last vertex and the
+    -- firefighter gets the first.
+    local pin = vertices - 1
 
     local hand = GetPedBoneCoords(holderPed, 57005, 0.0, 0.0, 0.0)
     AttachRopeToEntity(rope, holderPed, hand.x, hand.y, hand.z, true)
 
-    local entry = { rope = rope, vehicle = vehicle, nozzle = nil, holder = holderPed }
+    PinRopeVertex(rope, pin, from.x, from.y, from.z)
+
+    local entry = {
+        rope = rope,
+        vehicle = vehicle,
+        nozzle = nil,
+        holder = holderPed,
+        pin = pin,
+        pinnedAt = from,
+    }
+
+    drawn[id] = entry
 
     if line.nozzleHolder == GetPlayerServerId(PlayerId()) then
         entry.nozzle = attachNozzle(cache.ped)
     end
-
-    drawn[id] = entry
 end
 
 ---@param id string
@@ -206,11 +250,22 @@ CreateThread(function()
         for id, entry in pairs(drawn) do
             local line = lines[id]
 
-            if not line or not entry.rope or not DoesRopeExist(entry.rope) then
+            if entry.pending then
+                -- Still waiting for its first simulation. Pinning now would use vertex 0,
+                -- which is the end the firefighter is on.
+
+            elseif not line or not entry.rope or not DoesRopeExist(entry.rope) then
                 undraw(id)
             else
                 local from = sourceCoords(line)
-                if from then PinRopeVertex(entry.rope, 0, from.x, from.y, from.z) end
+
+                -- Only when the rig has actually moved. Re-pinning an unmoved vertex is a
+                -- correction the rope does not need, and doing it on a timer is its own source
+                -- of jitter.
+                if from and (not entry.pinnedAt or #(from - entry.pinnedAt) > 0.05) then
+                    PinRopeVertex(entry.rope, entry.pin or 0, from.x, from.y, from.z)
+                    entry.pinnedAt = from
+                end
             end
         end
     end

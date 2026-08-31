@@ -1443,12 +1443,21 @@ RegisterNetEvent('mi_fire:client:nozzleGrip', function(action, axis, amount)
         print('[mi_fire] ' .. text)
     end
 
+    --- Rotations wrap into 0-359.
+    ---
+    --- Nudging by 15 a few dozen times walks straight past 360, and `rz = 840` is a nuisance to
+    --- read and to copy into a config even though it behaves exactly as 120 does. Wrapped here
+    --- rather than at apply time, so what gets reported is what gets stored.
+    local function wrap(degrees)
+        return degrees % 360
+    end
+
     local function defaults(from)
         from = from or {}
         return {
             bone = from.bone or 'right',
             x = from.x or 0.0, y = from.y or 0.0, z = from.z or 0.0,
-            rx = from.rx or 0.0, ry = from.ry or 0.0, rz = from.rz or 0.0,
+            rx = wrap(from.rx or 0.0), ry = wrap(from.ry or 0.0), rz = wrap(from.rz or 0.0),
         }
     end
 
@@ -1473,7 +1482,7 @@ RegisterNetEvent('mi_fire:client:nozzleGrip', function(action, axis, amount)
         setAimLock(false)
         saveGrips()
         applyNozzleGrip(cache.ped, true)
-        say('cleared both placements -- back to the game\'s own')
+        say('cleared the local override -- whatever is in config/hose.lua applies now')
         return
     end
 
@@ -1504,6 +1513,10 @@ RegisterNetEvent('mi_fire:client:nozzleGrip', function(action, axis, amount)
         end
 
         grip[axis] = grip[axis] + amount
+
+        if axis == 'rx' or axis == 'ry' or axis == 'rz' then
+            grip[axis] = wrap(grip[axis])
+        end
 
     elseif action == 'bone' then
         grip.bone = axis

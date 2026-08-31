@@ -2273,3 +2273,58 @@ unasked.
 - Both placements still unset.
 - Still nothing fired.
 
+---
+
+## 2026-08-31 (thirteenth) — the placements, found and baked in
+
+**Scope:** `ASSET-001` is finished except for water coming out of it.
+
+**Changed:**
+
+- `config/hose.lua` — both placements, found in game.
+- `client/modules/hose/init.lua` — rotations wrap into 0-359; the `off` message stopped lying.
+- `tools/tests/conventions_spec.lua` — the placements are checked for shape.
+
+**The numbers:**
+
+```lua
+nozzleGrip       = { bone = 'left', x = 0.100, y = 0, z = 0, rx = 30, ry = 203, rz = 120 }
+nozzleGripAiming = { bone = 'left', x = 0.100, y = 0, z = 0, rx = 55, ry = 203, rz = 220 }
+```
+
+**Decisions:**
+
+- **The left hand.** That is the one the minigun animation puts forward on the weapon, so the
+  nozzle sits in the leading hand and the hose runs back past the trailing one -- which is how a
+  charged line is actually worked. Worth noting because every guess made here assumed the right
+  hand, on the grounds that GTA equips weapons there. The animation had other ideas, and only
+  trying it showed that.
+
+- **The two placements differ by 25 degrees of pitch and 100 of yaw, and nothing else.** That is
+  the hand rotating as the ped brings the nozzle up. Small -- and the whole reason one set of
+  numbers could not serve both, which took a screenshot of a nozzle sticking sideways to notice.
+
+- **Rotations wrap into 0-359 as they are nudged.** They arrived as `rx = 390` and `rz = 840`,
+  which is what nudging by 15 a few dozen times produces. Identical in behaviour, a nuisance to
+  read, and worse to copy into a config where the next person has to work out whether 840 means
+  something. Wrapped at nudge time so what is reported is what is stored.
+
+- **The shape is tested even though the values cannot be.** They were found by hand over two
+  sessions, one of which was lost to a crash. Nobody would notice a typo until the next time they
+  picked up a line, so the test asserts a real bone name, offsets within half a metre of the
+  hand, and wrapped rotations. A misplaced decimal puts the nozzle out in the road.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1083 passed, 0 failed** (was 1055).
+- The values are the ones reported in game, wrapped: `rx 390 -> 30`, `rz 840 -> 120`,
+  `rx 415 -> 55`, `rz 940 -> 220`. Modular, so behaviour is unchanged.
+
+**Open:**
+
+- **Water.** Nothing has ever been fired. This is the whole remaining point of the nozzle, and
+  none of it is written.
+- `HOSE-010`, `HOSE-011`, `SCORCH-002` unchanged.
+
+**Next:** water out of the nozzle, and onto a fire.
+

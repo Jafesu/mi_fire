@@ -1,4 +1,4 @@
-### `ASSET-001` — a nozzle of our own, in game, being tuned
+### `ASSET-001` — a nozzle of our own, in game, held correctly. Done bar the water.
 
 **Done on disk.** A real fog nozzle, built from a CAD model, with nothing borrowed:
 

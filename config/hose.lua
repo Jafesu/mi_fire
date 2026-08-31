@@ -361,8 +361,14 @@ MIFireHose.visuals = {
     --- prints the line to paste back here. Baking a new origin into the model instead costs an
     --- export and a restart per attempt.
     ---
+    --- Found by nudging in game with `/fire nozzlegrip`, not by arithmetic.
+    ---
+    --- The left hand, which is the one the minigun animation puts forward on the weapon -- so
+    --- the nozzle ends up in the leading hand and the hose runs back past the trailing one,
+    --- which is how a charged line is actually worked.
+    ---
     --- nil leaves the placement entirely to the game.
-    nozzleGrip = nil,
+    nozzleGrip = { bone = 'left', x = 0.100, y = 0.000, z = 0.000, rx = 30.0, ry = 203.0, rz = 120.0 },
 
     --- The same, for while the player is aiming.
     ---
@@ -372,7 +378,11 @@ MIFireHose.visuals = {
     --- so aiming and then nudging fixes the aiming pose.
     ---
     --- nil falls back to `nozzleGrip`, so a half-tuned setup is imperfect rather than broken.
-    nozzleGripAiming = nil,
+    ---
+    --- It differs from the carrying placement by 25 degrees of pitch and 100 of yaw and nothing
+    --- else, which is the hand rotating as the ped brings the nozzle up. Small, and the reason
+    --- one set of numbers could not serve both.
+    nozzleGripAiming = { bone = 'left', x = 0.100, y = 0.000, z = 0.000, rx = 55.0, ry = 203.0, rz = 220.0 },
 
     --- Only if the weapon fails to load, which means the metas did not reach the client.
     ---

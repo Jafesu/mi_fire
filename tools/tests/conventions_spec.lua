@@ -242,6 +242,47 @@ return function(t)
 
     -- -----------------------------------------------------------------------
 
+    t.describe('the nozzle placements are usable numbers')
+
+    -- These were found by nudging in game over two sessions, one of which was lost to a crash.
+    -- They are not derivable from anything and nobody will notice a typo in them until they next
+    -- pick up a line, so the shape is worth asserting even though the values cannot be.
+    do
+        local visuals = MIFireHose.visuals or {}
+
+        for _, name in ipairs({ 'nozzleGrip', 'nozzleGripAiming' }) do
+            local grip = visuals[name]
+
+            if grip ~= nil then
+                t.equal(type(grip), 'table', ('%s is a table'):format(name))
+
+                t.ok(grip.bone == 'left' or grip.bone == 'right',
+                    ('%s.bone is left or right'):format(name))
+
+                for _, axis in ipairs({ 'x', 'y', 'z' }) do
+                    t.equal(type(grip[axis]), 'number', ('%s.%s is a number'):format(name, axis))
+
+                    -- An offset from a hand bone measured in metres. Anything approaching a
+                    -- metre is a typo, and it puts the nozzle somewhere near the player's feet
+                    -- or out in the road rather than in their hand.
+                    t.ok(math.abs(grip[axis] or 0) < 0.5,
+                        ('%s.%s is within half a metre of the hand'):format(name, axis))
+                end
+
+                for _, axis in ipairs({ 'rx', 'ry', 'rz' }) do
+                    t.equal(type(grip[axis]), 'number', ('%s.%s is a number'):format(name, axis))
+
+                    -- Wrapped, so a value carried over from nudging past a full turn does not
+                    -- get copied into the config where it reads as nonsense.
+                    t.ok((grip[axis] or 0) >= 0 and (grip[axis] or 0) < 360,
+                        ('%s.%s is wrapped into 0-359'):format(name, axis))
+                end
+            end
+        end
+    end
+
+    -- -----------------------------------------------------------------------
+
     t.describe('the nozzle is equipped, not glued to the hand')
 
     -- `CreateWeaponObject` makes a world object out of a weapon hash and it can be attached to

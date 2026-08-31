@@ -1,22 +1,46 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <!--
-  WEAPON_MINOZZLE – the fire hose nozzle.
+  WEAPON_MINOZZLE, the fire hose nozzle.
 
-  A weapon rather than a prop, because a nozzle sprays and a prop cannot be fired. Being a
-  weapon is also what supplies the two-handed stance and the aiming, which is what holding a
-  charged line actually looks like.
+  A weapon rather than a prop, because a nozzle sprays and a prop cannot be fired. Being a weapon
+  is also what supplies the two-handed stance and the aiming.
 
-  Everything about how it behaves is inherited from the base game fire extinguisher –
-  AMMO_FIREEXTINGUISHER, FIRE_EXT_STRAFE, GROUP_FIREEXTINGUISHER, DamageType
-  FIRE_EXTINGUISHER, FireType VOLUMETRIC_PARTICLE. Those are Rockstar's own identifiers, so
-  this file defines a new weapon without carrying anyone else's content. The only thing that is
-  ours is the model.
+  Everything about how it behaves is inherited from the base game fire extinguisher:
+  AMMO_FIREEXTINGUISHER, FIRE_EXT_STRAFE, GROUP_FIREEXTINGUISHER, DamageType FIRE_EXTINGUISHER,
+  FireType VOLUMETRIC_PARTICLE. Those are Rockstar's own identifiers, so this defines a new weapon
+  without carrying anyone else's content. The only thing that is ours is the model.
 
-  It does no damage on purpose. Water knocking a fire down is mi_fire's own simulation, applied
-  server-side from the hose module; the weapon exists to be aimed and held, not to hurt anyone.
-  NonViolent and SuppressGunshotEvent keep NPCs from panicking and the police from being called
-  every time a crew opens a line.
+  It does no damage, and the flags say NonViolent and SuppressGunshotEvent, so NPCs do not panic
+  and nobody calls the police when a crew opens a line. Water knocking a fire down is mi_fire's
+  own simulation, applied server-side.
+
+  ============================================================================================
+  Every value here is deliberately aligned with a weapon that is known to fire without crashing.
+  ============================================================================================
+
+  This file crashed the game on the trigger, twice, from values that were invented rather than
+  taken from anything:
+
+    * `FlashFx` was empty. FireType VOLUMETRIC_PARTICLE emits a particle and takes its name from
+      that field; empty sends the game looking for something that is not there.
+
+    * `DefaultCameraHash` was DEFAULT_FIRE_EXTINGUISHER_CAMERA, which **does not exist**. It was
+      written because it sounded like the right shape. `CoverCameraHash` and
+      `RunAndGunCameraHash` were left empty, which is not "no camera" but a lookup that finds
+      nothing.
+
+    * Around forty other fields held 0 where the working configuration holds -1. Those are not
+      the same thing: -1 is the sentinel for "unset" and 0 is a real value, so ranges, rumble
+      timings and cache windows were all being given a meaningful zero instead of being disabled.
+
+  So the whole CWeaponInfo was aligned field by field against one that works, and it now differs
+  in exactly four places: Name, Model, Slot and HumanNameHash. If this ever crashes again, the
+  cause is the model or the archetype, because nothing else is left to be wrong.
+
+  **Re-tune from here rather than from zero.** A value changed one at a time from a working
+  baseline can be tested; a file rewritten from first principles cannot, which is what produced
+  two days of crashes.
 -->
 <CWeaponInfoBlob>
   <SlotNavigateOrder>
@@ -71,29 +95,29 @@
           <Group>GROUP_FIREEXTINGUISHER</Group>
           <AmmoInfo ref="AMMO_FIREEXTINGUISHER" />
           <AimingInfo ref="FIRE_EXT_STRAFE" />
-          <ClipSize value="1000" />
+          <ClipSize value="2000" />
           <AccuracySpread value="1.000000" />
-          <AccurateModeAccuracyModifier value="1.000000" />
-          <RunAndGunAccuracyModifier value="1.000000" />
+          <AccurateModeAccuracyModifier value="0.500000" />
+          <RunAndGunAccuracyModifier value="2.000000" />
           <RunAndGunAccuracyMaxModifier value="1.000000" />
           <RecoilAccuracyMax value="1.000000" />
           <RecoilErrorTime value="0.000000" />
           <RecoilRecoveryRate value="1.000000" />
-          <RecoilAccuracyToAllowHeadShotAI value="1.000000" />
-          <MinHeadShotDistanceAI value="0.000000" />
-          <MaxHeadShotDistanceAI value="0.000000" />
-          <HeadShotDamageModifierAI value="0.000000" />
-          <RecoilAccuracyToAllowHeadShotPlayer value="1.000000" />
-          <MinHeadShotDistancePlayer value="0.000000" />
-          <MaxHeadShotDistancePlayer value="0.000000" />
-          <HeadShotDamageModifierPlayer value="0.000000" />
+          <RecoilAccuracyToAllowHeadShotAI value="1000.000000" />
+          <MinHeadShotDistanceAI value="1000.000000" />
+          <MaxHeadShotDistanceAI value="1000.000000" />
+          <HeadShotDamageModifierAI value="1000.000000" />
+          <RecoilAccuracyToAllowHeadShotPlayer value="0.175000" />
+          <MinHeadShotDistancePlayer value="5.000000" />
+          <MaxHeadShotDistancePlayer value="40.000000" />
+          <HeadShotDamageModifierPlayer value="18.000000" />
           <Damage value="0.000000" />
           <DamageTime value="0.000000" />
           <DamageTimeInVehicle value="0.000000" />
           <DamageTimeInVehicleHeadShot value="0.000000" />
-          <HitLimbsDamageModifier value="0.000000" />
-          <NetworkHitLimbsDamageModifier value="0.000000" />
-          <LightlyArmouredDamageModifier value="0.000000" />
+          <HitLimbsDamageModifier value="0.500000" />
+          <NetworkHitLimbsDamageModifier value="0.800000" />
+          <LightlyArmouredDamageModifier value="0.750000" />
           <Force value="0.000000" />
           <ForceHitPed value="0.000000" />
           <ForceHitVehicle value="0.000000" />
@@ -101,33 +125,33 @@
           <OverrideForces />
           <ForceMaxStrengthMult value="1.000000" />
           <ForceFalloffRangeStart value="0.000000" />
-          <ForceFalloffRangeEnd value="10.000000" />
+          <ForceFalloffRangeEnd value="50.000000" />
           <ForceFalloffMin value="1.000000" />
           <ProjectileForce value="0.000000" />
-          <FragImpulse value="0.000000" />
-          <Penetration value="0.000000" />
+          <FragImpulse value="250.000000" />
+          <Penetration value="0.010000" />
           <VerticalLaunchAdjustment value="0.000000" />
           <DropForwardVelocity value="0.000000" />
-          <Speed value="100.000000" />
+          <Speed value="2000.000000" />
           <BulletsInBatch value="1" />
           <BatchSpread value="0.000000" />
           <ReloadTimeMP value="-1.000000" />
           <ReloadTimeSP value="-1.000000" />
-          <VehicleReloadTime value="1.000000" />
+          <VehicleReloadTime value="-1.000000" />
           <AnimReloadRate value="1.000000" />
           <BulletsPerAnimLoop value="1" />
           <TimeBetweenShots value="0.000000" />
-          <TimeLeftBetweenShotsWhereShouldFireIsCached value="0.000000" />
+          <TimeLeftBetweenShotsWhereShouldFireIsCached value="-1.000000" />
           <SpinUpTime value="0.000000" />
           <SpinTime value="0.000000" />
           <SpinDownTime value="0.000000" />
           <AlternateWaitTime value="-1.000000" />
           <BulletBendingNearRadius value="0.000000" />
-          <BulletBendingFarRadius value="0.000000" />
-          <BulletBendingZoomedRadius value="0.000000" />
+          <BulletBendingFarRadius value="0.750000" />
+          <BulletBendingZoomedRadius value="0.375000" />
           <FirstPersonBulletBendingNearRadius value="0.000000" />
-          <FirstPersonBulletBendingFarRadius value="0.000000" />
-          <FirstPersonBulletBendingZoomedRadius value="0.000000" />
+          <FirstPersonBulletBendingFarRadius value="0.750000" />
+          <FirstPersonBulletBendingZoomedRadius value="0.375000" />
           <Fx>
             <EffectGroup>WEAPON_EFFECT_GROUP_PISTOL_SMALL</EffectGroup>
 
@@ -160,7 +184,7 @@
             <FlashFxAltChance value="0.000000" />
             <FlashFxScale value="1.000000" />
             <FlashFxLightEnabled value="false" />
-            <FlashFxLightCastsShadows value="false" />
+            <FlashFxLightCastsShadows value="true" />
             <FlashFxLightOffsetDist value="0.000000" />
             <FlashFxLightRGBAMin x="0.000000" y="0.000000" z="0.000000" />
             <FlashFxLightRGBAMax x="0.000000" y="0.000000" z="0.000000" />
@@ -168,7 +192,7 @@
             <FlashFxLightRangeMinMax x="0.000000" y="0.000000" />
             <FlashFxLightFalloffMinMax x="0.000000" y="0.000000" />
             <GroundDisturbFxEnabled value="false" />
-            <GroundDisturbFxDist value="0.000000" />
+            <GroundDisturbFxDist value="5.000000" />
             <GroundDisturbFxNameDefault />
             <GroundDisturbFxNameSand />
             <GroundDisturbFxNameDirt />
@@ -177,27 +201,27 @@
           </Fx>
           <InitialRumbleDuration value="0" />
           <InitialRumbleIntensity value="0.000000" />
-          <InitialRumbleIntensityTrigger value="0.000000" />
-          <RumbleDuration value="0" />
-          <RumbleIntensity value="0.000000" />
-          <RumbleIntensityTrigger value="0.000000" />
-          <RumbleDamageIntensity value="0.000000" />
+          <InitialRumbleIntensityTrigger value="0.300000" />
+          <RumbleDuration value="110" />
+          <RumbleIntensity value="0.020000" />
+          <RumbleIntensityTrigger value="0.100000" />
+          <RumbleDamageIntensity value="1.000000" />
           <NetworkPlayerDamageModifier value="1.000000" />
           <NetworkPedDamageModifier value="1.000000" />
           <NetworkHeadShotPlayerDamageModifier value="1.000000" />
-          <LockOnRange value="0.000000" />
-          <WeaponRange value="20.000000" />
+          <LockOnRange value="45.000000" />
+          <WeaponRange value="50.000000" />
           <BulletDirectionOffsetInDegrees value="0.000000" />
-          <AiSoundRange value="0.000000" />
-          <AiPotentialBlastEventRange value="0.000000" />
-          <DamageFallOffRangeMin value="0.000000" />
-          <DamageFallOffRangeMax value="20.000000" />
-          <DamageFallOffModifier value="1.000000" />
+          <AiSoundRange value="-1.000000" />
+          <AiPotentialBlastEventRange value="-1.000000" />
+          <DamageFallOffRangeMin value="50.000000" />
+          <DamageFallOffRangeMax value="50.000000" />
+          <DamageFallOffModifier value="0.300000" />
           <VehicleWeaponHash />
-          <DefaultCameraHash>DEFAULT_FIRE_EXTINGUISHER_CAMERA</DefaultCameraHash>
-          <CoverCameraHash />
+          <DefaultCameraHash>HIP_AIM_CAMERA</DefaultCameraHash>
+          <CoverCameraHash>HIP_AIM_IN_COVER_CAMERA</CoverCameraHash>
           <CoverReadyToFireCameraHash />
-          <RunAndGunCameraHash />
+          <RunAndGunCameraHash>HIP_RUN_AND_GUN_CAMERA</RunAndGunCameraHash>
           <CinematicShootingCameraHash />
           <AlternativeOrScopedCameraHash />
           <RunAndGunAlternativeOrScopedCameraHash />
@@ -207,9 +231,9 @@
           <RecoilShakeHash />
           <RecoilShakeHashFirstPerson />
           <AccuracyOffsetShakeHash />
-          <MinTimeBetweenRecoilShakes value="0" />
-          <RecoilShakeAmplitude value="0.000000" />
-          <ExplosionShakeAmplitude value="0.000000" />
+          <MinTimeBetweenRecoilShakes value="150" />
+          <RecoilShakeAmplitude value="1.000000" />
+          <ExplosionShakeAmplitude value="-1.000000" />
           <ReticuleHudPosition x="0.000000" y="0.000000" />
           <AimOffsetMin x="0.000000" y="0.000000" z="0.000000" />
           <AimProbeLengthMin value="0.000000" />
@@ -234,7 +258,7 @@
           <AttachPoints />
           <GunFeedBone />
           <TargetSequenceGroup />
-          <WeaponFlags>CarriedInHand Automatic CanFreeAim AnimCrouchFire UsableOnFoot UsableClimbing AllowEarlyExitFromFireAnimAfterBulletFired CanBeFiredLikeGun NonViolent SuppressGunshotEvent</WeaponFlags>
+          <WeaponFlags>CarriedInHand Automatic CanFreeAim AnimCrouchFire UsableOnFoot UsableClimbing AllowEarlyExitFromFireAnimAfterBulletFired DoesRevivableDamage CanBeFiredLikeGun NonViolent SuppressGunshotEvent</WeaponFlags>
           <TintSpecValues ref="TINT_DEFAULT" />
           <FiringPatternAliases ref="NULL" />
           <ReloadUpperBodyFixupExpressionData ref="default" />
@@ -253,7 +277,7 @@
           <HudSpeed value="100" />
           <HudCapacity value="100" />
           <HudAccuracy value="10" />
-          <HudRange value="20" />
+          <HudRange value="35" />
         </Item>
       </Infos>
     </Item>

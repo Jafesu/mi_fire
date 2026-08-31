@@ -14,6 +14,18 @@ return function(t)
         return source
     end
 
+    --- XML with its comments removed.
+    ---
+    --- The same reason `findCode` exists for Lua: a rule written down in a file should not trip
+    --- its own check. The camera check caught the invented hash inside the paragraph explaining
+    --- that it had been removed, which is correct behaviour from the test and a bad question to
+    --- be asking of the text.
+    ---@param source string
+    ---@return string
+    local function withoutXmlComments(source)
+        return (source:gsub('<!%-%-.-%-%->', ''))
+    end
+
     --- Lines that are not comments, so a rule written down in a file does not trip its own
     --- check.
     ---@param source string
@@ -385,6 +397,35 @@ return function(t)
 
     -- -----------------------------------------------------------------------
 
+    t.describe('the weapon names real cameras, and no empty ones')
+
+    -- A camera slot left empty is not "no camera" -- it is a lookup that finds nothing, and the
+    -- game does that lookup when you aim, take cover, or move while firing. Two of these were
+    -- empty and the third was `DEFAULT_FIRE_EXTINGUISHER_CAMERA`, which does not exist anywhere:
+    -- it was written because it sounded like the right shape.
+    --
+    -- This cannot check that a hash is real, which is the failure that actually cost the most.
+    -- It can check that one is present, which would have caught two of the three, and it records
+    -- the shape of the mistake for whoever edits this next.
+    do
+        local weapons = withoutXmlComments(read('data/weapons.meta') or '')
+
+        for _, tag in ipairs({ 'DefaultCameraHash', 'CoverCameraHash', 'RunAndGunCameraHash' }) do
+            local paired = weapons:match('<' .. tag .. '>([^<]*)</' .. tag .. '>')
+            local selfClosing = weapons:find('<' .. tag .. '%s*/>')
+
+            t.equal(selfClosing, nil, ('%s is not left empty'):format(tag))
+            t.ok(paired ~= nil and paired:gsub('%s', '') ~= '',
+                ('%s names a camera'):format(tag))
+        end
+
+        -- The one invented value, by name. Cheap, and it never comes back.
+        t.equal(weapons:find('DEFAULT_FIRE_EXTINGUISHER_CAMERA', 1, true), nil,
+            'the invented camera hash is gone')
+    end
+
+    -- -----------------------------------------------------------------------
+
     t.describe('a volumetric weapon names the particle it fires')
 
     -- This one crashed the game. `FireType VOLUMETRIC_PARTICLE` makes the game emit a particle
@@ -399,7 +440,7 @@ return function(t)
     -- Nothing else in this repository could have caught it: the XML is valid, the weapon loads,
     -- and the fault only appears when someone pulls the trigger.
     do
-        local weapons = read('data/weapons.meta') or ''
+        local weapons = withoutXmlComments(read('data/weapons.meta') or '')
         local fireType = weapons:match('<FireType>([%w_]+)</FireType>')
 
         if fireType == 'VOLUMETRIC_PARTICLE' then

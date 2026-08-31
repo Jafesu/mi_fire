@@ -2571,3 +2571,57 @@ press the button.
 - Whether it actually stops crashing. Nothing here is verified in game.
 - The stream particle offsets are still zero and unfound.
 
+---
+
+## 2026-08-31 (eighteenth) — stop guessing at the weapon, align it
+
+**Scope:** the same crash, after the FlashFx fix. Identical hash, identical stack.
+
+**What the second dump said:** `fivem.exe+16A275F`, `vegan-chicken-football`, and a stack
+matching the first one frame for frame. So the empty `FlashFx` was a real bug and not this one.
+Four guesses now, all wrong, all reasoned from the code rather than from anything measured.
+
+**What changed in approach:** the whole `CWeaponInfo` was diffed field by field against one that
+is known to fire without crashing. That found fifty differences, and among them:
+
+- **`DefaultCameraHash` was `DEFAULT_FIRE_EXTINGUISHER_CAMERA`, which does not exist.** It was
+  written because it looked like the right shape next to `FIRE_EXT_STRAFE`. Nothing on this
+  machine contains that string. Real weapons use `HIP_AIM_CAMERA`.
+- **`CoverCameraHash` and `RunAndGunCameraHash` were empty.** An empty camera slot is not "no
+  camera", it is a lookup that finds nothing -- and the game does that lookup when you aim, take
+  cover, or move while firing.
+- **Around forty fields held `0` where the working configuration holds `-1`.** Those are not the
+  same thing. `-1` is the sentinel for "unset"; `0` is a real value. Ranges, rumble timings and
+  the shot cache window were all being handed a meaningful zero rather than being disabled.
+
+All forty-six are now aligned. The file differs from a working weapon in exactly four places:
+`Name`, `Model`, `Slot`, `HumanNameHash`. Damage stays at zero and the `NonViolent` and
+`SuppressGunshotEvent` flags stay, so the intent survives.
+
+**The lesson, which is the point of this entry:** this file was written from the schema outwards,
+filling every field with what seemed sensible, and a comment was attached to each decision
+explaining the reasoning. The reasoning was confident and wrong in at least three places, and the
+comments made it look considered. A configuration that has to satisfy an engine you cannot read
+is not somewhere to be original: start from one that works and change one thing at a time, which
+is now written at the top of the file.
+
+**Changed:**
+
+- `data/weapons.meta` — 46 fields aligned; the header rewritten to record why.
+- `tools/tests/conventions_spec.lua` — camera hashes must be present and named; the invented one
+  is barred by name; meta checks now strip XML comments first.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1103 passed, 0 failed**.
+- Mutation tested: emptying `CoverCameraHash` fails two assertions by name.
+- The comment-stripping was itself found by a test -- the invented hash was caught inside the
+  paragraph explaining its removal, which is the check being right and the matching being sloppy.
+- **Not** tested in game. If it crashes again, the cause is the model or the archetype, because
+  nothing else is left to differ.
+
+**Open:**
+
+- Whether it holds.
+- The stream particle offsets are still zero.
+

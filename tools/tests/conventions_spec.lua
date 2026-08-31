@@ -365,4 +365,64 @@ return function(t)
             end
         end
     end
+
+    -- -----------------------------------------------------------------------
+
+    t.describe('every declared data file is also shipped')
+
+    -- `data_file` says what a file *is*. `files` is what actually sends it to a client. Only
+    -- declaring them meant every client asked for the weapon asset and never received it,
+    -- which presents as an archetype that is genuinely absent -- and was diagnosed that way
+    -- three times running, through the metas, the streaming and the natives, while the
+    -- manifest was simply not shipping them.
+    --
+    -- Nothing about that is visible in either block on its own. It is only visible in the gap.
+    do
+        local manifest = read('fxmanifest.lua')
+
+        if manifest then
+            local shipped = {}
+
+            local block = manifest:match('files%s*{(.-)}')
+
+            -- Comment lines are dropped before anything is read out of the block. An
+            -- apostrophe in prose -- "SmartHose's manifest" -- opens a string as far as a
+            -- pattern is concerned and swallows the rest of the block, which made this test
+            -- fail against a manifest that was correct.
+            if block then
+                local code = {}
+
+                for line in block:gmatch('[^\n]+') do
+                    if not line:match('^%s*%-%-') then code[#code + 1] = line end
+                end
+
+                block = table.concat(code, '\n')
+
+                for path in block:gmatch("'([^']+)'") do
+                    shipped[path] = true
+
+                    -- A glob covers everything under it.
+                    local prefix = path:match('^(.-)%*')
+                    if prefix then shipped['glob:' .. prefix] = true end
+                end
+            end
+
+            for path in manifest:gmatch("data_file%s+'[%w_]+'%s+'([^']+)'") do
+                local covered = shipped[path] ~= nil
+
+                if not covered then
+                    for key in pairs(shipped) do
+                        local prefix = key:match('^glob:(.+)$')
+                        if prefix and path:sub(1, #prefix) == prefix then
+                            covered = true
+                            break
+                        end
+                    end
+                end
+
+                t.ok(covered,
+                    ('%s is declared with data_file and shipped in files'):format(path))
+            end
+        end
+    end
 end

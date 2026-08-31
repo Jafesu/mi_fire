@@ -1033,14 +1033,21 @@ RegisterNetEvent('mi_fire:client:testNozzle', function()
         RemoveWeaponAsset(hash)
     end
 
-    local candidates = {
-        MIFireHose.visuals.nozzleProp,
+    -- Built rather than declared, because `nozzleProp` is usually nil and `ipairs` stops at
+    -- the first hole. `{ nil, 'a', 'b' }` iterates zero times, which is why the prop test
+    -- printed its heading and its footer and nothing at all in between.
+    local candidates = {}
+
+    for _, name in ipairs({
+        MIFireHose.visuals.nozzleProp or false,
         'hei_prop_heist_hose_01',
         'prop_fire_hosereel_l1',
         'prop_fire_hosebox_01',
         'prop_fire_exting_1a',
         'prop_tool_fireaxe',
-    }
+    }) do
+        if name then candidates[#candidates + 1] = name end
+    end
 
     local out = { '--- nozzle prop test ---' }
 

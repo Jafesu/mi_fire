@@ -127,6 +127,17 @@ data_file 'PED_PERSONALITY_FILE' 'data/pedpersonality.meta'
 ui_page 'web/index.html'
 
 files {
+    --- The weapon metas have to be **sent** as well as declared.
+    ---
+    --- `data_file` says what a file is; `files` is what actually ships it to a client. Only
+    --- declaring them meant every client asked for the weapon asset and never got it, which
+    --- presents as an archetype that is genuinely absent -- and was read that way three times.
+    --- SmartHose's manifest lists all four in both blocks.
+    'data/weapons.meta',
+    'data/weaponarchetypes.meta',
+    'data/weaponanimations.meta',
+    'data/pedpersonality.meta',
+
     'install/migrations/*.sql',
     'web/index.html',
     'web/sounds.js',

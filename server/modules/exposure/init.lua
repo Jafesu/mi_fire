@@ -231,7 +231,22 @@ local function tickPlayer(source, dt)
 
     if player.heat > 0 then
         local effects = Exposure.heatEffects(player.heat, cfg.heat)
-        damage = damage + effects.damagePerSecond * dt
+
+        -- Radiant heat is what reaches you *near* a fire. Standing in one, the flame damage
+        -- above already accounts for the thermal insult of contact, and charging both was
+        -- counting the same heat twice.
+        --
+        -- It was not a rounding error. With both applied, a firefighter in full structural
+        -- turnout died at 39.5 seconds while the gear needed 45.7 to burn through -- so you
+        -- died before you could catch fire, catching fire was unreachable, and stop-drop-roll
+        -- could never be performed. The published survival figures only ever modelled flame,
+        -- which is why the arithmetic looked right.
+        --
+        -- The load still builds and is still reported, because it is what makes backing out
+        -- of a doorway matter and what the HUD reads.
+        if sample.flameIntensity <= 0 then
+            damage = damage + effects.damagePerSecond * dt
+        end
 
         payload.heat = {
             load = Util.round(player.heat, 1),

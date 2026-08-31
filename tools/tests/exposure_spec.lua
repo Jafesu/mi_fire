@@ -199,31 +199,67 @@ return function(t)
     -- outlasts the wearer, so catching fire becomes unreachable dead code. It was very
     -- nearly shipped that way -- the survival numbers looked fine and the mechanic was
     -- simply never entering.
-    local function failureProfile(tier)
-        local health, integrity, elapsed = 100.0, tier.integrity, 0.0
-        local ignitableAt
+    --- Every channel the server applies, not just flame.
+    ---
+    --- This modelled flame alone until it was caught in play, and that omission is the whole
+    --- reason the bug survived: the profile said gear failed at 45.5s and death came at
+    --- 63.8s, a comfortable window, while a real firefighter standing in a real fire was
+    --- dead at 39.5s having never caught fire at all. The arithmetic was correct and the
+    --- thing being modelled was not what the game did.
+    ---
+    --- `valveOpen` matters because smoke is the largest single channel and a shut valve
+    --- stops none of it.
+    ---@param tier table
+    ---@param valveOpen boolean
+    ---@return number death
+    ---@return number|nil ignitableAt
+    ---@return number|nil healthAtIgnition
+    local function failureProfile(tier, valveOpen)
+        local health, integrity, elapsed, heat = 100.0, tier.integrity, 0.0, 0.0
+        local ignitableAt, healthAtIgnition
+        local dt = 0.5
+
         while health > 0 and elapsed < 3600 do
             local resist = Exposure.effectiveFireResist(integrity, tier)
-            health = health - Exposure.flameDamage(100, { fireResist = resist }, cfg.flame) * 0.5
-            integrity = math.max(0.0, integrity - Exposure.gearDegradation(100, tier) * 0.5)
-            if not ignitableAt and Exposure.canIgnite(integrity, tier) then
-                ignitableAt = elapsed
+
+            health = health - Exposure.flameDamage(100, { fireResist = resist }, cfg.flame) * dt
+            integrity = math.max(0.0, integrity - Exposure.gearDegradation(100, tier) * dt)
+
+            -- Heat builds but does not damage while in contact, matching the server: the
+            -- flame term already accounts for the heat of standing in it.
+            heat = math.min(cfg.heat.maxLoad, heat + cfg.heat.buildPerTick * dt)
+
+            if not valveOpen then
+                health = health - (cfg.smoke.damagePerTick or 0) * dt
             end
-            elapsed = elapsed + 0.5
+
+            if not ignitableAt and Exposure.canIgnite(integrity, tier) then
+                ignitableAt, healthAtIgnition = elapsed, health
+            end
+
+            elapsed = elapsed + dt
         end
-        return elapsed, ignitableAt
+
+        return elapsed, ignitableAt, healthAtIgnition
     end
 
     for _, name in ipairs({ 'wildland', 'structural', 'proximity' }) do
         local tier = MIFireGear.tiers[name]
-        local death, ignitable = failureProfile(tier)
+        local death, ignitable, hp = failureProfile(tier, true)
 
         t.ok(ignitable ~= nil,
-            ('%s burns through before it kills you, so catching fire is reachable'):format(name))
+            ('%s burns through before it kills you, so catching fire is reachable at all')
+                :format(name))
 
         if ignitable then
             t.ok(death - ignitable > 5,
                 ('%s leaves a real window between failing and killing you'):format(name))
+
+            -- The check that would have caught it: reaching ignition on fumes is the same as
+            -- not reaching it. There has to be enough left to act on.
+            t.ok(hp and hp > 15,
+                ('%s leaves you %s health when the gear gives out -- enough to do something '
+                    .. 'about it'):format(name, hp and ('%.0f'):format(hp) or 'no'))
         end
     end
 
@@ -271,6 +307,10 @@ return function(t)
         local roll = tier.selfExtinguish
 
         local clear = secondsOnceAlight(tier, false)
+        local _, ignitesAt = failureProfile(tier, true)
+        t.ok(ignitesAt ~= nil,
+            ('%s: you reach ignition before dying, with every channel applied'):format(name))
+
         t.ok(clear > roll,
             ('%s: getting out of the flame and rolling is survivable (%.1fs of life for a '
                 .. '%.1fs roll)'):format(name, clear, roll))

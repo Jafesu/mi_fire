@@ -97,9 +97,14 @@ local function visualsFor(node)
     local base = MIFireClasses.base or {}
     if not class then return base end
 
+    -- Built field by field rather than merged, so anything added to `base` has to be added
+    -- here too. `light` was added to the config and silently never arrived because of this,
+    -- which is exactly the failure this shape invites -- but the alternative is a merge per
+    -- node per render, so the cost is a comment and this note.
     return {
         ptfx = class.ptfx or base.ptfx,
         scriptFire = class.scriptFire ~= nil and class.scriptFire or base.scriptFire,
+        light = class.light or base.light,
     }
 end
 

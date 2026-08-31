@@ -26,7 +26,11 @@ scratch/
 # Borrowed assets.
 #
 # Nothing is borrowed and nothing can be: assets from an escrowed resource are encrypted and
-# make FiveM refuse to load this one. The patterns stay so a copy made in haste is not also
+# make FiveM refuse to load this one. The pattern stays so a copy made in haste is not also
 # committed. See ASSET-001 in docs/internal/TASKS.md.
 stream/w_am_hose.*
-data/*.meta
+
+# `data/*.meta` used to be ignored alongside it, back when the only metas here were SmartHose's.
+# They are ours now -- written from the schema, naming our own model -- so they are committed
+# like any other source file. They are also useless without stream/w_mi_nozzle.ydr, and the
+# resource will not load the weapon if any of the three disagree, which conventions_spec tests.

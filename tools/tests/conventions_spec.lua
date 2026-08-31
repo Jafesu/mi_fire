@@ -217,6 +217,39 @@ return function(t)
 
     -- -----------------------------------------------------------------------
 
+    t.describe('the nozzle weapon agrees across every file that names it')
+
+    -- Four files have to say the same thing for a custom weapon to load, and nothing in Lua
+    -- notices when they drift. The symptom is a weapon that silently never appears, which is
+    -- indistinguishable from a missing archetype and cost a round of testing to diagnose once.
+    do
+        local weapons = read('data/weapons.meta') or ''
+        local archetypes = read('data/weaponarchetypes.meta') or ''
+        local hose = MIFireHose.visuals or {}
+
+        local weaponName = weapons:match('<Name>(WEAPON_[%w_]+)</Name>')
+        local weaponModel = weapons:match('<Model>([%w_]+)</Model>')
+        local archetypeModel = archetypes:match('<modelName>([%w_]+)</modelName>')
+        local archetypeTxd = archetypes:match('<txdName>([%w_]+)</txdName>')
+
+        t.equal(weaponName, hose.nozzleWeapon,
+            'config nozzleWeapon matches <Name> in data/weapons.meta')
+        t.equal(weaponModel, archetypeModel,
+            '<Model> in weapons.meta matches <modelName> in weaponarchetypes.meta')
+        t.equal(archetypeTxd, archetypeModel,
+            'the archetype txdName matches its own modelName')
+
+        t.ok(weaponModel ~= nil and read('stream/' .. weaponModel .. '.ydr') ~= nil,
+            ('stream/%s.ydr is shipped'):format(tostring(weaponModel)))
+
+        -- The slot has to exist in the navigate order or the weapon is unreachable.
+        local slot = weapons:match('<Slot>(SLOT_[%w_]+)</Slot>')
+        t.ok(slot ~= nil and weapons:find('<Entry>' .. slot .. '</Entry>', 1, true) ~= nil,
+            'the weapon slot appears in SlotNavigateOrder')
+    end
+
+    -- -----------------------------------------------------------------------
+
     t.describe('borrowed assets are declared, not hidden')
 
     -- `w_am_hose` belongs to SmartHose. Referencing a streamed model by name while that
@@ -235,13 +268,14 @@ return function(t)
             prop_fire_hosereel_l1 = true,
             prop_fire_hosebox_01 = true,
             hei_prop_heist_hose_01 = true,
-            WEAPON_FIREEXTINGUISHER = true,
+
+            -- Ours, built from CAD by tools/assets/nozzle/ and shipped in stream/.
+            WEAPON_MINOZZLE = true,
         }
 
         for key, value in pairs(visuals) do
             if type(value) == 'string' and value:find('^[%w_]+$') and key ~= 'borrowed' then
                 local vanilla = ours[value] or value:find('^prop_') or value:find('^hei_')
-                    or value:find('^WEAPON_')
 
                 t.ok(vanilla ~= nil or borrowed[value] ~= nil,
                     ('%s = "%s" is either a base game model or declared as borrowed')

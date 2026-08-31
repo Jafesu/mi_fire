@@ -276,29 +276,33 @@ MIFireHose.visuals = {
 
     --- The nozzle in a firefighter's hands.
     ---
-    --- `WEAPON_FIREEXTINGUISHER`, which is **base game**. Nothing is borrowed, nothing is
-    --- streamed, and it works on any server without a single asset shipped.
+    --- **`WEAPON_MINOZZLE` is ours.** A real fog nozzle -- bale handle, pistol grip, toothed
+    --- bumper -- built from a CAD model by `tools/assets/nozzle/`, which turns a 183,404
+    --- triangle millimetre-scale STL into an 8,000 triangle drawable with the texture baked
+    --- and embedded. Nothing is borrowed. See that directory's README for how to rebuild it,
+    --- and `ASSET-001` for why borrowing was never going to work.
     ---
-    --- It is not a hose nozzle. It is a thing held two-handed that sprays, with the animations
-    --- and the stance already right, and its `FIRE_EXTINGUISHER` damage type is the same one
-    --- SmartHose gave its own nozzle -- which is a fair signal that this is the shape the game
-    --- expects a nozzle to be.
+    --- A weapon rather than a prop, because a nozzle sprays and a prop cannot be fired. It is
+    --- also what supplies the two-handed stance and the aiming, which is what holding a
+    --- charged line looks like.
+    ---
+    --- Everything about how it *behaves* is inherited from the base game fire extinguisher --
+    --- `AMMO_FIREEXTINGUISHER`, `FIRE_EXT_STRAFE`, `DamageType FIRE_EXTINGUISHER`. Those are
+    --- Rockstar's own identifiers, so `data/weapons.meta` defines a new weapon without
+    --- carrying anyone else's content. It does no damage: water knocking a fire down is this
+    --- resource's own simulation, applied server-side.
     ---
     --- Made into a world object with `CreateWeaponObject` rather than given, so nothing is
     --- equipped and ox_inventory has nothing to strip.
-    nozzleWeapon = 'WEAPON_FIREEXTINGUISHER',
+    nozzleWeapon = 'WEAPON_MINOZZLE',
 
-    --- Swap in a nozzle of our own by changing the line above and nothing else.
+    --- Only if the weapon fails to load, which means the metas did not reach the client.
     ---
-    --- The work is a mesh and a `weapons.meta` entry. The entry is small -- a `CWeaponInfo`
-    --- with a `Model` and `DamageType FIRE_EXTINGUISHER` -- and the mesh is the part that
-    --- needs modelling. If the mesh reuses a base game model there is no
-    --- `weaponarchetypes.meta` at all, because an archetype exists to declare a *new* model.
-    ---
-    --- See `ASSET-001` for the four things that have to be right, each of which cost a round
-    --- of testing to learn.
-
-    --- Used only if the weapon above fails, which on a stock server it will not.
+    --- Deliberately still here. A weapon needs `data/weapons.meta` and
+    --- `data/weaponarchetypes.meta` declared with `data_file` **and** listed in `files`, and a
+    --- client that has not reconnected since they were added will not have them. An empty hand
+    --- is a worse failure than the wrong prop, because it looks like the hose system is broken
+    --- rather than the asset.
     nozzleProp = 'hei_prop_heist_hose_01',
 
     --- Nothing is borrowed, and nothing from an escrowed resource can be: those assets are

@@ -1,51 +1,34 @@
-### `ASSET-001` — a nozzle of our own, half done
+### `ASSET-001` — a nozzle of our own, built and wired, untested in game
 
-**The model exists.** Built from a CAD nozzle, not borrowed from anyone, and the whole recipe is
-in `tools/assets/nozzle/` -- see the README there. `183,404` triangles of millimetre-scale CAD
-down to `8,000`, oriented for GTA, unwrapped, with ambient occlusion baked to a diffuse map, and
-exported through Sollumz to `mi_nozzle.ydr`: `RSC7`, resource version 165, a genuine RAGE
-drawable container. Both halves run headless and are reproducible from the STL.
+**Done on disk.** A real fog nozzle, built from a CAD model, with nothing borrowed:
 
-**It is not yet a weapon in game.** What remains is the wiring, and it is the part already
-written down below:
+- `stream/w_mi_nozzle.ydr` — 8,000 triangles from 183,404, texture embedded.
+- `data/weaponarchetypes.meta` — the archetype, required because this is a new model.
+- `data/weapons.meta` — `WEAPON_MINOZZLE`, behaviour inherited from the base game extinguisher.
+- `fxmanifest.lua` — both metas declared with `data_file` **and** listed in `files`.
+- `config/hose.lua` — `nozzleWeapon = 'WEAPON_MINOZZLE'`.
 
-1. Get the texture to the client -- embedded in the drawable, or a `.ytd` beside it. An
-   unembedded texture renders untextured, which reads as a broken model rather than a missing
-   file.
-2. `weapons.meta` and `weaponarchetypes.meta`. The archetype **is** required here, because this
-   is a new model; a weapon reusing a base game model needs none.
-3. Declare both with `data_file` *and* list them in `files`.
-4. Point `MIFireHose.visuals.nozzleWeapon` at it. One line.
+`tools/assets/nozzle/` holds the whole recipe in two headless scripts, and its README explains
+the parts that were not obvious.
 
-Until then `WEAPON_FIREEXTINGUISHER` stays, and it is a reasonable stand-in: base game, sprays,
-right stance, nothing shipped.
+**What remains is one in-game test.** Restart, reconnect — a client that has not reconnected
+since the metas were added will not have them — and run `/fire nozzle`. If the nozzle is
+missing, the fallback prop appears instead, which is the deliberate signal that the metas did
+not reach the client rather than that the hose system is broken.
 
-**Nothing from SmartHose can be borrowed. This is settled, not open.** Copying the model and its
-four weapon metas made FiveM refuse to start the resource at all:
+Four things that had to be right, each of which cost a round of testing:
 
-> Couldn't find asset key for encrypted resource mi_fire
+- `CreateWeaponObject`, not `GiveWeaponToPed`. ox_inventory owns the ped's weapons and strips
+  anything handed over directly within a second.
+- `RequestWeaponAsset` then wait on `HasWeaponAssetLoaded`. Skipping it returns 0, which looks
+  exactly like a missing archetype.
+- The metas need `data_file` **and** `files`. Declaring alone ships nothing, which also looks
+  exactly like a missing archetype.
+- Sollumz will only embed **DDS**. A PNG is skipped with a warning and the export still reports
+  success — recognisable only by a .ydr that did not grow.
 
-Their assets are escrow-encrypted and tied to their own asset key. Readable from disk and
-completely unusable anywhere else, which is exactly what escrow is for. Earlier notes in this
-repository said escrow covered the Lua and not the stream folder; that was wrong, and the error
-above is the proof. **Do not try again**, with these or with `Supply-Line`'s water pump.
-
-**It wants to be a weapon, not a prop**, because a nozzle sprays and a prop cannot be fired.
-Everything needed to *use* one is already written and waiting on the metas:
-
-- `MIFireHose.visuals.nozzleWeapon` takes the name; nothing else changes.
-- `CreateWeaponObject` makes a world object from the hash and attaches it to `SKEL_R_Hand`, so
-  nothing is ever equipped and no inventory strips it. That last part matters: ox_inventory owns
-  the ped's weapons and removes anything handed over with `GiveWeaponToPed` within a second.
-- A weapon asset loads like a model -- `RequestWeaponAsset`, then wait on
-  `HasWeaponAssetLoaded` -- and skipping that returns 0 in a way that looks exactly like a
-  missing archetype.
-- It needs a `weaponarchetypes.meta` and a `weapons.meta`, declared with `data_file` **and**
-  listed in `files`. Only declaring them sends nothing to the client, which also looks exactly
-  like a missing archetype.
-
-Those four are written down because each cost a round of testing and none is guessable from the
-native names. `conventions_spec` holds the last two as tests.
+`conventions_spec` now holds the last two as tests, along with the model name agreeing across
+all three files.
 
 ### `HOSE-010` — the hose should lie where it was walked, parked
 

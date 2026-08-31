@@ -106,9 +106,26 @@ dependencies {
     'oxmysql',
 }
 
+--- The hose nozzle is a **weapon**, not a prop, because a nozzle sprays and a prop cannot be
+--- fired. Being a weapon is also what gives the two-handed stance and the aiming.
+---
+--- `w_mi_nozzle` is ours: built from a CAD model by `tools/assets/nozzle/`, with the texture
+--- embedded in the drawable so there is no separate `.ytd` to keep in step. Nothing here is
+--- borrowed, and nothing borrowed can be -- escrowed assets refuse to load outside the
+--- resource that owns them.
+---
+--- **Both lines are required for each meta.** `data_file` tells the game what the file is;
+--- `files` is what actually ships it to the client. Declaring alone sends nothing, and the
+--- symptom is a weapon that never loads -- identical to a missing archetype. `conventions_spec`
+--- tests that every `data_file` also appears in `files`.
+data_file 'WEAPONINFO_FILE' 'data/weapons.meta'
+data_file 'WEAPON_METADATA_FILE' 'data/weaponarchetypes.meta'
+
 ui_page 'web/index.html'
 
 files {
+    'data/weapons.meta',
+    'data/weaponarchetypes.meta',
     'install/migrations/*.sql',
     'web/index.html',
     'web/sounds.js',

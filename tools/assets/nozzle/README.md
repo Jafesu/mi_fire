@@ -49,7 +49,7 @@ cannot even be resolved:
 
 Step 1 uses factory startup happily because it needs nothing but stock Blender.
 
-## The three things that were hard
+## The things that were hard
 
 **Orientation.** The source has the fog tip toward **+Y** and the bale handle toward **−X**.
 GTA wants the tip forward and the handle up. The mapping is `(x, y, z) -> (z, y, -x)` with a
@@ -70,34 +70,72 @@ triangles actually live.
 
 **No texture at all.** An STL has none, and a script is not going to hand-paint one. What it
 can do is bake **ambient occlusion** — the creases between the flutes, under the bale handle,
-inside the teeth — and tint it by a body colour. That contact shading is most of what makes a
-metal object read as solid, and it costs one bake.
+inside the teeth — which is most of what makes a metal object read as solid, and it costs one
+bake.
+
+**Material zones, because the nozzle is not one colour.** Black rubber bumper and handle grip,
+olive-drab anodized body, a polished ring. Two bakes — occlusion, and a flat colour pass — are
+multiplied together, so either can be retuned without redoing the other.
+
+Placing the zones needs both geometry *and* connectivity. The bale handle arrives as a single
+CAD island covering its olive arms and its black ribbed grip, so only a height threshold splits
+it; and the handle passes straight through the slice of barrel where the polished ring belongs,
+so a rule written in coordinates alone paints fragments of the handle chrome. Grouping faces
+into connected islands first removes the ambiguity. The positions came off a colour-coded
+render of the CAD parts, not from guesswork.
+
+**Sollumz will only embed DDS.** This is the one that wastes an afternoon. Hand it a PNG and it
+logs a warning, skips the texture, and **still reports a successful export** — the only visible
+symptom is a .ydr that did not grow. Nothing on this machine converts to DDS and Blender cannot
+write one, so `build_nozzle.py` writes it directly: uncompressed A8R8G8B8, thirty lines of
+header and a numpy array.
+
+Two traps sit next to it. An image made with `images.new` has source `GENERATED`, which stores
+the parameters it would be regenerated from and *not* the pixels — so saving the blend and
+reopening it in the export step hands back a blank image. And Sollumz prefers packed bytes over
+the file path, so packing a PNG wins over the DDS on disk and gets rejected. File-backed,
+unpacked, `.dds`.
 
 ## What comes out
 
 | File | What it is |
 |---|---|
 | `mi_nozzle.blend` | The working file. Open it to change anything by hand. |
-| `mi_nozzle_d.png` | 1024² baked diffuse. |
-| `mi_nozzle.ydr` | The drawable. `RSC7`, resource version 165 — a real RAGE container. |
+| `mi_nozzle_d.png` | Baked diffuse, for looking at. Not shipped. |
+| `mi_nozzle_d.dds` | The same map as uncompressed DDS. **This is the one that gets embedded.** |
+| `w_mi_nozzle.ydr` | The drawable. `RSC7`, resource version 165 — a real RAGE container. |
 
-## What is not done yet
+Copy the `.ydr` into `stream/`. The texture rides inside it, so nothing else needs shipping.
 
-The `.ydr` exists and is a valid resource. It is **not yet a working weapon in game.** Still
-needed, in order:
+## Wired up
 
-1. **The texture has to reach the game.** Either embedded in the drawable or shipped as a
-   `.ytd` beside it. An unembedded texture renders untextured, which looks like a broken model
-   rather than a missing file.
-2. **`weapons.meta`** — a `CWeaponInfo` naming the model and `DamageType FIRE_EXTINGUISHER`,
-   which is the type SmartHose gave its own nozzle and a fair signal it is what the game
-   expects for a sprayer.
-3. **`weaponarchetypes.meta`** — required here, because this *is* a new model. A weapon that
-   reuses a base game model needs no archetype; ours does.
-4. **Both declared with `data_file` and listed in `files`.** Declaring alone sends nothing to
-   the client and looks exactly like a missing archetype. `conventions_spec` tests this.
-5. **`MIFireHose.visuals.nozzleWeapon`** set to the new weapon name. That is the only line of
-   Lua that changes — everything else needed to hold, attach, and clean up a nozzle is already
-   written and is currently pointed at `WEAPON_FIREEXTINGUISHER`.
+All of it is in place:
 
-Until then the fallback stays, and the fallback is fine: a base game extinguisher that sprays.
+| Piece | Where |
+|---|---|
+| Model | `stream/w_mi_nozzle.ydr`, texture embedded |
+| Archetype | `data/weaponarchetypes.meta` — makes the model exist |
+| Weapon | `data/weapons.meta` — `WEAPON_MINOZZLE` |
+| Manifest | `data_file` **and** `files` for both metas |
+| Config | `MIFireHose.visuals.nozzleWeapon = 'WEAPON_MINOZZLE'` |
+
+`conventions_spec` asserts the model name agrees across all three files and that the config
+points at the right weapon — a mismatch there is invisible until someone picks up a line.
+
+The weapon's behaviour is inherited from the base game fire extinguisher
+(`AMMO_FIREEXTINGUISHER`, `FIRE_EXT_STRAFE`, `DamageType FIRE_EXTINGUISHER`). Those are
+Rockstar's identifiers, so the meta defines a new weapon without carrying anyone's content. It
+does no damage — water knocking a fire down is mi_fire's own simulation, applied server-side.
+
+**Not yet tested in game.** Everything above is verified on disk and by the test suite; none of
+it has been loaded by FiveM. Restart the resource and reconnect, then `/fire nozzle`.
+
+## Worth improving later
+
+- **The texture is uncompressed**, so it costs width x height x 4 bytes and every player
+  downloads it. 512 is 1 MB. A BC1 encoder would allow 1024 at 512 KB, and is maybe a hundred
+  lines of block packing — skipped because a wrong encoder looks like a texture bug rather than
+  an encoder bug, and there was no DDS reader here to check it against.
+- **The teeth on the bumper get chewed** by decimation at 4.4%. Raising `--tris` helps; so
+  would keeping the tip at full density and decimating the rest.
+- **No collision or LODs.** Neither matters for something attached to a hand.

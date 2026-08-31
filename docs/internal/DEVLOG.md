@@ -1646,3 +1646,65 @@ panel photographs.
 - `HOSE-010`, `HOSE-011`, `SCORCH-002` all unchanged.
 
 **Next:** the texture, then the two metas, then one line in `config/hose.lua`.
+
+---
+
+## 2026-08-31 (later) — the nozzle is ours, and the extinguisher is gone
+
+**Scope:** `ASSET-001`, finished on disk. Texture, metas, streaming, wiring.
+
+**Changed:**
+
+- `stream/w_mi_nozzle.ydr` — the nozzle, texture embedded.
+- `data/weapons.meta`, `data/weaponarchetypes.meta` — `WEAPON_MINOZZLE` and its archetype.
+- `fxmanifest.lua` — both metas declared with `data_file` and listed in `files`.
+- `config/hose.lua` — `nozzleWeapon = 'WEAPON_MINOZZLE'`. `WEAPON_FIREEXTINGUISHER` removed.
+- `tools/assets/nozzle/build_nozzle.py` — material zones, two-pass bake, a DDS writer.
+- `.gitignore` — `data/*.meta` no longer ignored; those files are ours now.
+- `conventions_spec` — five new assertions.
+
+**Decisions:**
+
+- **The weapon inherits the base game extinguisher's behaviour, not its model.**
+  `AMMO_FIREEXTINGUISHER`, `FIRE_EXT_STRAFE`, `DamageType FIRE_EXTINGUISHER`. Those are
+  Rockstar's identifiers, so a new weapon gets defined without carrying anyone else's content.
+  It does no damage: water knocking a fire down is this resource's own simulation.
+
+- **Material zones, from connected islands rather than coordinates.** The nozzle is black rubber
+  bumper and grip, olive body, polished ring. Two positional rules were wrong before the third
+  worked: the bale handle is a single CAD island covering both its olive arms and its black
+  grip, and it passes straight through the slice of barrel where the polished ring belongs, so
+  a coordinate rule painted fragments of the handle chrome. Zone positions came off a
+  colour-coded render of the CAD parts, not guesswork.
+
+- **The texture is written as DDS by hand.** Sollumz will only embed DDS -- it warns, skips, and
+  still reports a successful export for anything else. Uncompressed A8R8G8B8 rather than BC1: a
+  block compressor is a hundred lines of bit packing that could not be validated without a
+  reader on this machine, and being wrong there would look like a texture bug rather than an
+  encoder bug. 512px, so it costs 1 MB rather than 4.
+
+- **The fallback prop stays.** A client that has not reconnected since the metas were added will
+  not have them, and an empty hand reads as a broken hose system rather than a missing asset.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1021 passed, 0 failed** (was 1014).
+- The new cross-file assertions were **mutation tested**: renaming `<modelName>` in the
+  archetype fails two of them by name. A test that cannot fail is worth nothing.
+- Export runs clean with no Sollumz warnings; `UVMap 0` is the real unwrap renamed, not an empty
+  layer added beside it.
+- `w_mi_nozzle.ydr` is 361,270 bytes, magic `RSC7`, resource version 165. It grew from 163,160
+  when the texture began embedding, which is how the silent DDS-only rejection was caught.
+- **Not** verified in game. Nothing here has been loaded by FiveM.
+
+**Open:**
+
+- One in-game test: restart, **reconnect**, `/fire nozzle`. If the fallback prop appears, the
+  metas did not reach the client.
+- Attach offsets are untuned -- the nozzle will sit in the hand at whatever the current numbers
+  give until someone looks at it.
+- The bumper teeth get chewed by decimation at 4.4%.
+- `HOSE-010`, `HOSE-011`, `SCORCH-002` unchanged.
+
+**Next:** hold the nozzle in game and tune where it sits in the hand.
+

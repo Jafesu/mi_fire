@@ -2,7 +2,8 @@
 
 Run headless:
 
-    blender -b --python tools/assets/nozzle/build_nozzle.py -- --src <079.stl> --out <dir>
+    blender -b --factory-startup --python tools/assets/nozzle/build_nozzle.py \
+        -- --src <079.stl> --out <dir>
 
 The source is a CAD export: 183,404 triangles, millimetres, and no UVs or materials at all --
 an STL carries nothing but triangles. Roughly 96% of those triangles have to go, and
@@ -19,6 +20,7 @@ bounding box, and the chained version was wrong twice.
 import bpy
 import math
 import os
+import struct
 import sys
 from mathutils import Matrix, Vector
 
@@ -31,12 +33,114 @@ TARGET_TRIS = 8000
 # and decimation has nothing to collapse along.
 WELD_DISTANCE = 0.0001
 
-TEXTURE_SIZE = 1024
+# 512, not 1024. The texture is written uncompressed, so it costs width x height x 4 bytes
+# and every player downloads it: 512 is 1 MB, 1024 is 4 MB, for an object the size of a fist.
+# A BC1 encoder would give 1024 at 512 KB and is the obvious later improvement.
+TEXTURE_SIZE = 512
 AO_SAMPLES = 24
 
-# Anodized-aluminium body. The occlusion bake supplies the shading; this is only the colour
-# it gets multiplied by.
-BASE_COLOUR = (0.42, 0.44, 0.47)
+# Ambient occlusion goes fully black in a deep crease, which on a small object reads as a hole
+# rather than a shadow. Compressing it into this range keeps the contact shading while letting
+# the zone colour stay legible everywhere.
+AO_FLOOR = 0.45
+
+# --------------------------------------------------------------------------------------------
+# Material zones
+#
+# The nozzle is not one colour. It is a black rubber bumper and handle grip, an olive-drab
+# anodized body, and a polished band around the barrel. Colours are given in sRGB because that
+# is what a colour picker shows and what the reference render was matched against; Blender
+# works in linear, so they are converted on the way in. Setting linear values directly here is
+# the usual way this ends up looking washed out.
+ZONES = {
+    "rubber": (0.16, 0.16, 0.16),   # matte black bumper and grip
+    "olive":  (0.38, 0.38, 0.29),   # anodized body
+    "chrome": (0.85, 0.86, 0.88),   # polished band
+}
+
+# Where each zone lives, in metres, in final orientation (tip +Y, up +Z). These came off a
+# colour-coded render of the CAD parts (`zonemap`), not from guesswork -- the layout along the
+# barrel is, front to back: toothed tip, big drum, bale handle, mid-body, body, coupling stem.
+GRIP_MIN_Z = 0.100          # above this is the ribbed handle grip, below is its olive arm
+
+# The black bumper is two CAD parts, not one: a drum of radius 0.058 and the toothed tip of
+# radius 0.038 in front of it. An earlier threshold of 0.045 caught the drum and left the tip
+# olive, which is why this is 0.030 -- low enough for both, high enough to leave the bore alone.
+COLLAR_MIN_Y = 0.019
+COLLAR_MIN_RADIUS = 0.030
+
+# The polished ring. This is the flange at the base of the bumper -- a genuine disc in the CAD,
+# radius 0.027 out to 0.061, sitting at y 0.012 -- rather than a slice of arbitrary barrel.
+# Two earlier attempts cut a band through whatever happened to be at a chosen depth and caught
+# small fittings and the handle mount, which rendered as torn white fragments. Landing it on a
+# part that is actually a ring is what makes it read as one.
+CHROME_Y = (0.008, 0.016)
+CHROME_RADIUS = (0.026, 0.065)
+
+def linear_to_srgb_np(a):
+    import numpy as np
+    return np.where(a <= 0.0031308, a * 12.92,
+                    1.055 * np.power(np.clip(a, 0.0, None), 1.0 / 2.4) - 0.055)
+
+
+def write_dds(path, pixels, width, height):
+    """Write an uncompressed 32-bit DDS.
+
+    Sollumz will only embed DDS. It checks that the packed bytes begin with `DDS ` or that the
+    file ends in `.dds`, and warns and skips anything else -- so a PNG produces an export that
+    reports success and silently carries no texture at all, recognisable only by a .ydr that
+    did not grow. Nothing on this machine converts to DDS and Blender cannot write one, so it
+    is written here.
+
+    Uncompressed A8R8G8B8 rather than BC1, deliberately: a block compressor is a hundred lines
+    of bit packing that cannot be validated without a reader, and being wrong there would look
+    like a texture bug rather than an encoder bug. This is thirty lines that are either right
+    or obviously not.
+
+    Blender stores pixels bottom-up and linear; DDS wants top-down, and a diffuse map wants
+    sRGB. Both conversions happen here.
+    """
+    import numpy as np
+
+    a = np.array(pixels, dtype=np.float32).reshape(height, width, 4)[::-1]
+    srgb = linear_to_srgb_np(a[..., :3])
+
+    out = np.empty((height, width, 4), dtype=np.uint8)
+    out[..., 0] = np.clip(srgb[..., 2] * 255.0 + 0.5, 0, 255)   # B
+    out[..., 1] = np.clip(srgb[..., 1] * 255.0 + 0.5, 0, 255)   # G
+    out[..., 2] = np.clip(srgb[..., 0] * 255.0 + 0.5, 0, 255)   # R
+    out[..., 3] = np.clip(a[..., 3] * 255.0 + 0.5, 0, 255)      # A
+
+    header = struct.pack(
+        "<4sIIIIIII44sIIIIIIIIIIIII",
+        b"DDS ",
+        124,                 # header size
+        0x0000100F,          # caps | height | width | pitch | pixelformat
+        height, width,
+        width * 4,           # pitch
+        0,                   # depth
+        1,                   # mip levels
+        bytes(44),           # reserved
+        32,                  # pixel format size
+        0x00000041,          # DDPF_RGB | DDPF_ALPHAPIXELS
+        0,                   # fourCC -- zero, because this is uncompressed
+        32,                  # bits per pixel
+        0x00FF0000,          # red mask
+        0x0000FF00,          # green
+        0x000000FF,          # blue
+        0xFF000000,          # alpha
+        0x00001000,          # DDSCAPS_TEXTURE
+        0, 0, 0, 0,          # caps 2-4, reserved
+    )
+    assert len(header) == 128, "DDS header must be 128 bytes, got {}".format(len(header))
+
+    with open(path, "wb") as fh:
+        fh.write(header)
+        fh.write(out.tobytes())
+
+
+def srgb_to_linear(c):
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
 
 
 def parse_args():
@@ -60,11 +164,6 @@ def parse_args():
     return out
 
 
-def mesh_size(ob):
-    lo, hi = mesh_bounds(ob)
-    return tuple(round(hi[i] - lo[i], 3) for i in range(3))
-
-
 def mesh_bounds(ob):
     lo = Vector((1e30,) * 3)
     hi = Vector((-1e30,) * 3)
@@ -75,6 +174,11 @@ def mesh_bounds(ob):
     return lo, hi
 
 
+def mesh_size(ob):
+    lo, hi = mesh_bounds(ob)
+    return tuple(round(hi[i] - lo[i], 3) for i in range(3))
+
+
 def tri_count(ob):
     ob.data.calc_loop_triangles()
     return len(ob.data.loop_triangles)
@@ -82,6 +186,88 @@ def tri_count(ob):
 
 def step(msg):
     print("[build] " + msg, flush=True)
+
+
+def face_components(mesh):
+    """Group faces into connected islands.
+
+    Worth the code because a purely positional rule cannot get this right. The bale handle
+    passes straight through the slice of barrel where the polished ring belongs, so any rule
+    written in coordinates alone paints fragments of the handle chrome -- which is exactly what
+    the first attempt did. Knowing which faces belong to the handle removes the ambiguity.
+    """
+    import bmesh
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    bm.faces.ensure_lookup_table()
+
+    comp_of = [-1] * len(bm.faces)
+    comps = []
+    for face in bm.faces:
+        if comp_of[face.index] != -1:
+            continue
+        cid = len(comps)
+        stack = [face]
+        members = []
+        comp_of[face.index] = cid
+        while stack:
+            cur = stack.pop()
+            members.append(cur.index)
+            for edge in cur.edges:
+                for nb in edge.link_faces:
+                    if comp_of[nb.index] == -1:
+                        comp_of[nb.index] = cid
+                        stack.append(nb)
+        comps.append(members)
+    bm.free()
+    return comp_of, comps
+
+
+def classify_face(centre, is_handle):
+    """Which material zone a face belongs to.
+
+    The handle arrives from CAD as a single island covering both its olive arms and its black
+    ribbed grip, so no per-island rule can separate them -- but a height threshold can.
+    """
+    radius = math.hypot(centre.x, centre.z)
+
+    if is_handle:
+        return "rubber" if centre.z > GRIP_MIN_Z else "olive"
+
+    if centre.y > COLLAR_MIN_Y and radius > COLLAR_MIN_RADIUS:
+        return "rubber"
+    if (CHROME_Y[0] <= centre.y <= CHROME_Y[1]
+            and CHROME_RADIUS[0] <= radius <= CHROME_RADIUS[1]):
+        return "chrome"
+    return "olive"
+
+
+def build_zone_materials(ob, image):
+    """One material per zone, each with the bake target as its active image node."""
+    ob.data.materials.clear()
+    index_of = {}
+    for name, srgb in ZONES.items():
+        mat = bpy.data.materials.new("mi_nozzle_" + name)
+        mat.use_nodes = True
+        bsdf = mat.node_tree.nodes.get("Principled BSDF")
+        if bsdf is not None:
+            lin = tuple(srgb_to_linear(c) for c in srgb)
+            bsdf.inputs["Base Color"].default_value = (lin[0], lin[1], lin[2], 1.0)
+        tex = mat.node_tree.nodes.new("ShaderNodeTexImage")
+        tex.image = image
+        tex.name = "bake_target"
+        mat.node_tree.nodes.active = tex
+        index_of[name] = len(ob.data.materials)
+        ob.data.materials.append(mat)
+    return index_of
+
+
+def set_bake_target(ob, image):
+    for mat in ob.data.materials:
+        node = mat.node_tree.nodes.get("bake_target")
+        if node is not None:
+            node.image = image
+            mat.node_tree.nodes.active = node
 
 
 def main():
@@ -158,20 +344,36 @@ def main():
     bpy.ops.object.mode_set(mode="OBJECT")
     step("unwrapped; {} UV layer(s)".format(len(ob.data.uv_layers)))
 
-    # ---- bake ambient occlusion into a diffuse map --------------------------------------
-    # The model has no texture and will not get a hand-painted one from a script. What it can
-    # have is real contact shading -- creases between the flutes, under the bale handle,
-    # inside the teeth -- which is most of what makes a metal object read as solid.
-    img = bpy.data.images.new("mi_nozzle_d", TEXTURE_SIZE, TEXTURE_SIZE)
+    # ---- assign zones -------------------------------------------------------------------
+    # After decimation, because decimation changes which faces exist.
+    img_ao = bpy.data.images.new("mi_nozzle_ao", TEXTURE_SIZE, TEXTURE_SIZE)
+    img_col = bpy.data.images.new("mi_nozzle_col", TEXTURE_SIZE, TEXTURE_SIZE)
+    index_of = build_zone_materials(ob, img_ao)
 
-    mat = bpy.data.materials.new("mi_nozzle_bake")
-    mat.use_nodes = True
-    tex_node = mat.node_tree.nodes.new("ShaderNodeTexImage")
-    tex_node.image = img
-    mat.node_tree.nodes.active = tex_node
-    ob.data.materials.clear()
-    ob.data.materials.append(mat)
+    # The bale handle is the only island that reaches this high, which is what identifies it.
+    comp_of, comps = face_components(ob.data)
+    handle_comp = -1
+    best_z = GRIP_MIN_Z
+    for cid, members in enumerate(comps):
+        top = max(ob.data.polygons[i].center.z for i in members)
+        if top > best_z:
+            best_z = top
+            handle_comp = cid
+    step("{} islands; handle is #{} (reaches z {:.3f})".format(
+        len(comps), handle_comp, best_z))
 
+    tally = dict.fromkeys(ZONES, 0)
+    for poly in ob.data.polygons:
+        zone = classify_face(poly.center, comp_of[poly.index] == handle_comp)
+        poly.material_index = index_of[zone]
+        tally[zone] += 1
+    step("zones: " + ", ".join("{} {}".format(v, k) for k, v in tally.items()))
+
+    # ---- bake -----------------------------------------------------------------------------
+    # Two passes into two images, multiplied together. Ambient occlusion supplies the contact
+    # shading -- the creases between the flutes, under the bale handle, inside the teeth --
+    # which is most of what makes a metal object read as solid. The colour pass supplies the
+    # zones. Baking them separately means either can be retuned without redoing the other.
     scene = bpy.context.scene
     scene.render.engine = "CYCLES"
     try:
@@ -183,26 +385,69 @@ def main():
     scene.render.bake.use_selected_to_active = False
     scene.render.bake.margin = 8
 
-    step("baking ambient occlusion at {}px, {} samples".format(TEXTURE_SIZE, AO_SAMPLES))
+    step("baking occlusion at {}px, {} samples".format(TEXTURE_SIZE, AO_SAMPLES))
+    set_bake_target(ob, img_ao)
     bpy.ops.object.bake(type="AO")
 
-    # Tint the occlusion by the body colour. Straight AO is greyscale; this is what turns it
-    # into a usable diffuse map rather than a shading pass.
-    px = list(img.pixels)
-    r, g, b = BASE_COLOUR
-    for i in range(0, len(px), 4):
-        ao = px[i]
-        px[i] = ao * r
-        px[i + 1] = ao * g
-        px[i + 2] = ao * b
-        px[i + 3] = 1.0
-    img.pixels = px
+    step("baking zone colours")
+    set_bake_target(ob, img_col)
+    scene.render.bake.use_pass_direct = False
+    scene.render.bake.use_pass_indirect = False
+    scene.render.bake.use_pass_color = True
+    bpy.ops.object.bake(type="DIFFUSE")
 
-    tex_path = os.path.join(args["out"], "mi_nozzle_d.png")
-    img.filepath_raw = tex_path
+    ao = list(img_ao.pixels)
+    col = list(img_col.pixels)
+    out = [0.0] * len(col)
+    for i in range(0, len(col), 4):
+        shade = AO_FLOOR + (1.0 - AO_FLOOR) * ao[i]
+        out[i] = col[i] * shade
+        out[i + 1] = col[i + 1] * shade
+        out[i + 2] = col[i + 2] * shade
+        out[i + 3] = 1.0
+
+    img = bpy.data.images.new("mi_nozzle_d", TEXTURE_SIZE, TEXTURE_SIZE)
+    img.pixels = out
+
+    # The drawable wants one material, not three. The zones have done their job -- they are
+    # baked into the map now, and three shader materials would mean three draw calls for a
+    # thing the size of a fist.
+    for mat in list(ob.data.materials):
+        mat.node_tree.nodes.active = None
+    ob.data.materials.clear()
+    flat = bpy.data.materials.new("mi_nozzle_baked")
+    flat.use_nodes = True
+    tex = flat.node_tree.nodes.new("ShaderNodeTexImage")
+    tex.image = img
+    flat.node_tree.links.new(
+        flat.node_tree.nodes["Principled BSDF"].inputs["Base Color"], tex.outputs["Color"])
+    ob.data.materials.append(flat)
+    for poly in ob.data.polygons:
+        poly.material_index = 0
+
+    png_path = os.path.join(args["out"], "mi_nozzle_d.png")
+    img.filepath_raw = png_path
     img.file_format = "PNG"
     img.save()
-    step("wrote " + tex_path)
+    step("wrote " + png_path + " (preview)")
+
+    dds_path = os.path.join(args["out"], "mi_nozzle_d.dds")
+    write_dds(dds_path, out, TEXTURE_SIZE, TEXTURE_SIZE)
+    step("wrote {} ({:,} bytes)".format(dds_path, os.path.getsize(dds_path)))
+
+    # Point the image at the DDS, and do not pack it.
+    #
+    # Both halves matter. An image made with `images.new` has source GENERATED, which stores
+    # the parameters it would be regenerated from and not the pixels -- so reopening the blend
+    # in the export step handed back a blank image. And Sollumz prefers packed bytes over the
+    # file path, so packing a PNG here would win over the DDS and be rejected. File-backed,
+    # unpacked, .dds: the exporter reads the bytes straight off disk.
+    #
+    # It doubles as a check on the header. If the preview render still shows the texture,
+    # Blender parsed the DDS this script wrote.
+    img.source = "FILE"
+    img.filepath = dds_path
+    img.reload()
 
     # ---- save ---------------------------------------------------------------------------
     blend_path = os.path.join(args["out"], "mi_nozzle.blend")

@@ -25,6 +25,11 @@ import sys
 
 SOLLUMZ_MODULE = "bl_ext.repo_sollumz_org.sollumz"
 
+# Sollumz names the exported file after the drawable object, and the game finds the model by
+# the name in `data/weaponarchetypes.meta`. They have to agree, so the rename happens here
+# rather than being left to whatever the blend file was called.
+DRAWABLE_NAME = "w_mi_nozzle"
+
 # Diffuse and a spec map, which is what a metal object wants and what the AO bake feeds.
 # Ordered by preference: the first one this Sollumz build actually offers is used.
 SHADER_PREFERENCE = ("normal_spec.sps", "spec.sps", "default.sps")
@@ -85,7 +90,19 @@ def attach_diffuse(mat, image):
         step("WARNING: shader has no image node; texture not attached")
         return None
     target.image = image
-    step("diffuse -> node '{}'".format(target.name))
+
+    # The name the drawable refers to its texture by is read-only and derived: Sollumz takes
+    # the image's file name, lowercased. So it comes from what `build_nozzle.py` wrote, and the
+    # only thing that matters here is that it is not blank -- the exporter skips blank ones.
+
+    # Embed rather than ship a separate .ytd. One file instead of two, and no second name to
+    # keep in step with the archetype. `txdName` in the archetype still names the model, which
+    # is the convention whether or not the textures live inside the drawable.
+    try:
+        target.texture_properties.embedded = True
+        step("diffuse -> node '{}' (embedded)".format(target.name))
+    except AttributeError:
+        step("diffuse -> node '{}' (NOT embedded -- a .ytd will be needed)".format(target.name))
     return target
 
 
@@ -100,6 +117,8 @@ def main():
     ob = bpy.data.objects.get("mi_nozzle")
     if ob is None:
         raise SystemExit("mi_nozzle not in the blend file")
+    ob.name = DRAWABLE_NAME
+    ob.data.name = DRAWABLE_NAME
 
     image = bpy.data.images.get("mi_nozzle_d")
     if image is None:
@@ -110,13 +129,27 @@ def main():
     from bl_ext.repo_sollumz_org.sollumz.ydr.shader_materials import create_shader
     shader_name = pick_shader()
     mat = create_shader(shader_name)
-    mat.name = "mi_nozzle"
+    mat.name = DRAWABLE_NAME
     if image is not None:
         attach_diffuse(mat, image)
 
     ob.data.materials.clear()
     ob.data.materials.append(mat)
-    step("material assigned")
+
+    # RAGE shaders read a UV map named "UVMap 0" and a colour attribute named "Color 1".
+    # `create_shader` alone does not add them, because the interactive path does it in the
+    # operator afterwards -- which this script bypasses. Without it the export still succeeds
+    # and merely warns, and the nozzle arrives in game untextured.
+    #
+    # Sollumz's own helper is used rather than creating them here: it *renames* what the mesh
+    # already has, by order, before adding anything. Creating a "UVMap 0" directly would leave
+    # the real unwrap sitting on a layer named "UVMap" and export an empty one.
+    from bl_ext.repo_sollumz_org.sollumz.ydr.operators.materials import (
+        post_create_shader_update_object)
+    post_create_shader_update_object(ob, mat)
+    step("material assigned; uv maps {}, colour attrs {}".format(
+        [uv.name for uv in ob.data.uv_layers],
+        [c.name for c in ob.data.color_attributes]))
 
     bpy.ops.object.select_all(action="DESELECT")
     ob.select_set(True)

@@ -32,16 +32,16 @@ return function(t)
     t.describe('a port has to be a port')
 
     local good = { id = 'crosslay1', type = 'discharge', x = 1.1, y = 2.2, z = 0.9 }
-    t.equal(Apparatus.validatePort(good, types, 1), nil, 'a well formed port passes')
+    t.equal(Apparatus.validatePort(good, types, 1, MIFireApparatus.portShapes), nil, 'a well formed port passes')
 
-    t.ok(Apparatus.validatePort({ type = 'discharge', x = 0, y = 0, z = 0 }, types, 1),
+    t.ok(Apparatus.validatePort({ type = 'discharge', x = 0, y = 0, z = 0 }, types, 1, MIFireApparatus.portShapes),
         'one with no id is rejected')
 
-    t.ok(Apparatus.validatePort({ id = 'a', type = 'nonsense', x = 0, y = 0, z = 0 }, types, 1),
+    t.ok(Apparatus.validatePort({ id = 'a', type = 'nonsense', x = 0, y = 0, z = 0 }, types, 1, MIFireApparatus.portShapes),
         'one with an unknown type is rejected -- the panel binds to these, so a typo is a '
         .. 'control that silently does nothing')
 
-    t.ok(Apparatus.validatePort({ id = 'a', type = 'discharge', x = 0, y = 0 }, types, 1),
+    t.ok(Apparatus.validatePort({ id = 'a', type = 'discharge', x = 0, y = 0 }, types, 1, MIFireApparatus.portShapes),
         'one missing an axis is rejected')
 
     t.describe('and a world coordinate pasted in by mistake is caught')
@@ -49,7 +49,7 @@ return function(t)
     -- The failure this prevents: offsets are local to the vehicle, and a world coordinate
     -- looks exactly like a valid port until a hose connects to a point in the sky.
     local worldCoord = { id = 'oops', type = 'discharge', x = -1193.4, y = -1487.2, z = 4.4 }
-    local err = Apparatus.validatePort(worldCoord, types, 1)
+    local err = Apparatus.validatePort(worldCoord, types, 1, MIFireApparatus.portShapes)
 
     t.ok(err, 'a coordinate hundreds of metres from the vehicle origin is rejected')
     t.ok(err:find('local to the vehicle') ~= nil, 'and the message says why')
@@ -65,7 +65,7 @@ return function(t)
         },
     }
 
-    local errors = Apparatus.validate(dupes, types)
+    local errors = Apparatus.validate(dupes, types, MIFireApparatus.portShapes)
     t.equal(#errors, 1, 'exactly one complaint')
     t.ok(errors[1]:find('more than once') ~= nil,
         'because two ports sharing an id means a valve that opens the wrong outlet')
@@ -76,7 +76,7 @@ return function(t)
 
     for name, profile in pairs(MIFireApparatus.profiles) do
         local resolved = Apparatus.resolve(profile, MIFireApparatus.defaults)
-        local problems = Apparatus.validate(resolved, MIFireApparatus.portTypes)
+        local problems = Apparatus.validate(resolved, MIFireApparatus.portTypes, MIFireApparatus.portShapes)
 
         t.equal(#problems, 0,
             ('%s has no configuration errors%s'):format(name,
@@ -127,7 +127,7 @@ return function(t)
 
     t.describe('the config block the offset finder pastes is well formed')
 
-    local line = Apparatus.format(good)
+    local line = Apparatus.format(good, MIFireApparatus.portShapes)
 
     t.ok(line:find('id = "crosslay1"') ~= nil, 'it names the id')
     t.ok(line:find('type = "discharge"') ~= nil, 'and the type')
@@ -149,7 +149,7 @@ return function(t)
     t.equal(Apparatus.anchor(boned), 'bone', 'a port with a bone is bone-anchored')
     t.equal(Apparatus.anchor(good), 'offset', 'one without is offset-anchored')
 
-    t.equal(Apparatus.validatePort(boned, types, 1), nil,
+    t.equal(Apparatus.validatePort(boned, types, 1, MIFireApparatus.portShapes), nil,
         'and it needs no coordinates at all')
 
     t.describe('but a bone offset is a nudge, not a position')
@@ -158,111 +158,142 @@ return function(t)
     -- two metres from a bone means the wrong bone was picked and nobody noticed.
     local wrongBone = { id = 'ldh', type = 'discharge', bone = 'misc_e',
         x = 2.5, y = 0.0, z = 0.0 }
-    local boneErr = Apparatus.validatePort(wrongBone, types, 1)
+    local boneErr = Apparatus.validatePort(wrongBone, types, 1, MIFireApparatus.portShapes)
 
     t.ok(boneErr, 'a large offset from a bone is rejected')
     t.ok(boneErr:find('wrong one') ~= nil, 'and says the bone is probably wrong')
 
     t.describe('and it formats as a bone line')
 
-    local boneLine = Apparatus.format({ id = 'ldh', type = 'discharge', bone = 'misc_e' })
+    local boneLine = Apparatus.format({ id = 'ldh', type = 'discharge', bone = 'misc_e' },
+        MIFireApparatus.portShapes)
 
     t.ok(boneLine:find('bone = "misc_e"') ~= nil, 'it names the bone')
     t.ok(boneLine:find('x = 0.000') == nil,
         'and does not write zero offsets, which read as a measurement someone took')
 
     local nudged = Apparatus.format({ id = 'ldh', type = 'discharge', bone = 'misc_e',
-        x = 0.1, y = 0.0, z = 0.0 })
+        x = 0.1, y = 0.0, z = 0.0 }, MIFireApparatus.portShapes)
     t.ok(nudged:find('x = 0.100') ~= nil, 'but a real nudge is kept')
 
     -- -----------------------------------------------------------------------
 
-    t.describe('a port is a zone, not a point')
+    t.describe('some ports are areas and some are fittings')
 
-    -- Aiming at a single point to open a locker is precision for its own sake. A gear
-    -- compartment is a metre and a half of truck and should be targetable like one.
-    local reach = MIFireApparatus.portReach
+    -- The distinction is physical rather than a setting. A gear locker is a metre and a half of
+    -- compartment and making someone aim at one point to open it is precision for its own sake.
+    -- A discharge is a specific piece of brass you couple a specific line to, and being asked
+    -- which one is the interaction rather than an obstacle.
+    local shapes = MIFireApparatus.portShapes
+    local heights = MIFireApparatus.zoneHeight
 
-    local locker = { id = 'gear1', type = 'gear', x = -1.2, y = -2.0, z = 0.2 }
-    local outlet = { id = 'd1', type = 'discharge', x = -0.9, y = 0.2, z = -0.4 }
+    t.equal(Apparatus.shape({ type = 'gear' }, shapes), 'zone', 'a gear locker is an area')
+    t.equal(Apparatus.shape({ type = 'hosebed' }, shapes), 'zone', 'so is a hose bed')
+    t.equal(Apparatus.shape({ type = 'panel' }, shapes), 'zone', 'and the pump panel')
 
-    local _, lockerRadius = Apparatus.reach(locker, reach)
-    local _, outletRadius = Apparatus.reach(outlet, reach)
-
-    t.ok(lockerRadius > outletRadius,
-        'a compartment is more generous than an outlet -- connecting a line to the right '
-        .. 'discharge is the interaction, and six generous zones side by side means picking '
-        .. 'from a list instead of pointing at one')
-
-    t.describe('and it defaults by type without being declared')
-
-    t.near(lockerRadius, reach.gear, 0.001, 'a gear port gets the gear reach')
-    t.near(select(2, Apparatus.reach({ type = 'nonsense' }, reach)), reach.default, 0.001,
-        'and an unlisted type falls back to the default rather than to nothing')
-
-    t.describe('an explicit radius wins')
-
-    t.near(select(2, Apparatus.reach({ type = 'gear', radius = 0.4 }, reach)), 0.4, 0.001,
-        'a port that declares its own zone gets it')
+    t.equal(Apparatus.shape({ type = 'discharge' }, shapes), 'point', 'a discharge is a fitting')
+    t.equal(Apparatus.shape({ type = 'intake' }, shapes), 'point', 'so is an intake')
 
     -- -----------------------------------------------------------------------
 
-    t.describe('boxes are vehicle-aligned')
+    t.describe('an area is the footprint that was walked')
 
-    -- The shape that matters for a rig. Compartments run along the side, and a sphere large
-    -- enough to cover a long hose bed also covers half the crew cab.
-    local bed = {
-        id = 'hosebed1', type = 'hosebed', x = 0.0, y = -3.0, z = 0.9,
-        size = { x = 2.0, y = 3.0, z = 0.8 },
+    -- Corners rather than a centre and a size, because a size guesses at a shape nobody
+    -- measured -- and a compartment running along a chamfered corner is not a box.
+    local locker = {
+        id = 'gear1', type = 'gear',
+        corners = {
+            { x = -1.7, y = -3.0, z = 0.2 },
+            { x = -0.7, y = -3.0, z = 0.2 },
+            { x = -0.7, y = -1.2, z = 0.2 },
+            { x = -1.7, y = -1.2, z = 0.2 },
+        },
     }
 
-    t.equal(Apparatus.contains(bed, { x = 0.9, y = -4.0, z = 1.0 }, reach), true,
-        'a point inside the box is inside')
+    t.equal(Apparatus.contains(locker, { x = -1.2, y = -2.0, z = 0.2 }, shapes, heights), true,
+        'a point inside the footprint is inside')
 
-    t.equal(Apparatus.contains(bed, { x = 0.0, y = -1.0, z = 0.9 }, reach), false,
-        'and one beyond its length is not, even though it is close in the other two axes')
+    t.equal(Apparatus.contains(locker, { x = -1.2, y = 0.5, z = 0.2 }, shapes, heights), false,
+        'and one past the end of it is not, however close it is in the other axes')
 
-    t.equal(Apparatus.contains(bed, { x = 1.5, y = -3.0, z = 0.9 }, reach), false,
-        'nor is one beyond its width')
+    t.equal(Apparatus.contains(locker, { x = 0.5, y = -2.0, z = 0.2 }, shapes, heights), false,
+        'nor one on the far side of the rig')
 
-    t.describe('spheres still work for anything that is round')
+    t.describe('and it is not a rectangle unless you walked one')
 
-    t.equal(Apparatus.contains(outlet, { x = -0.9, y = 0.2, z = -0.4 }, reach), true,
-        'dead on the outlet')
-    t.equal(Apparatus.contains(outlet, { x = -0.9, y = 2.0, z = -0.4 }, reach), false,
-        'and a metre and a half away is not')
+    -- The crossing test takes any shape, which is the point of walking corners rather than
+    -- declaring a width and a depth.
+    local wedge = {
+        id = 'w', type = 'tool',
+        corners = {
+            { x = 0.0, y = 0.0, z = 0.0 },
+            { x = 2.0, y = 0.0, z = 0.0 },
+            { x = 0.0, y = 2.0, z = 0.0 },
+        },
+    }
+
+    t.equal(Apparatus.contains(wedge, { x = 0.3, y = 0.3, z = 0.0 }, shapes, heights), true,
+        'a point inside the triangle is inside')
+    t.equal(Apparatus.contains(wedge, { x = 1.6, y = 1.6, z = 0.0 }, shapes, heights), false,
+        'and one outside the hypotenuse is not -- which a bounding box would have got wrong')
+
+    t.describe('height comes from the type, centred on the walk')
+
+    -- Walk the corners at the height of the compartment opening and the zone lands around it,
+    -- rather than starting at your feet.
+    local floor, ceiling = Apparatus.zoneBounds(locker, heights)
+
+    t.ok(floor < 0.2 and ceiling > 0.2, 'the corners sit inside the height, not at its floor')
+    t.near(ceiling - floor, heights.gear, 0.001, 'and the height is the one for that type')
+
+    t.equal(Apparatus.contains(locker, { x = -1.2, y = -2.0, z = 5.0 }, shapes, heights), false,
+        'so a point well above the rig is outside')
 
     -- -----------------------------------------------------------------------
 
-    t.describe('a zone the size of the truck is rejected')
+    t.describe('a fitting is a point and stays tight')
 
-    -- Worse than no zone: every port on that side answers at once, and the player picks from
-    -- a list rather than pointing at the one they want.
-    local huge = Apparatus.validatePort(
-        { id = 'x', type = 'gear', x = 0, y = 0, z = 0, radius = 9.0 }, types, 1)
+    local outlet = { id = 'd1', type = 'discharge', x = -0.9, y = 0.2, z = -0.4 }
 
-    t.ok(huge, 'a nine metre radius is rejected')
-    t.ok(huge:find('covers most of the rig') ~= nil, 'and says why')
+    t.equal(Apparatus.contains(outlet, { x = -0.9, y = 0.2, z = -0.4 }, shapes, heights), true,
+        'dead on the outlet')
+    t.equal(Apparatus.contains(outlet, { x = -0.9, y = 1.4, z = -0.4 }, shapes, heights), false,
+        'and a metre away is not, because picking the right outlet is the interaction')
 
-    t.ok(Apparatus.validatePort(
-        { id = 'x', type = 'gear', x = 0, y = 0, z = 0, radius = -1 }, types, 1),
-        'so is a negative one')
+    -- -----------------------------------------------------------------------
 
-    t.ok(Apparatus.validatePort({ id = 'x', type = 'hosebed', x = 0, y = 0, z = 0,
-        size = { x = 20.0, y = 1.0, z = 1.0 } }, types, 1),
-        'and a box longer than the rig')
+    t.describe('an area without corners is rejected')
 
-    t.describe('but a hose diameter on a discharge is not a box')
+    local noCorners = Apparatus.validatePort(
+        { id = 'g', type = 'gear', x = 0, y = 0, z = 0 }, types, 1, shapes)
 
-    -- `size` is overloaded: a box on a compartment, a hose diameter on an outlet. Worth being
-    -- explicit about rather than silently reading 1.75 as a bounding box.
-    t.equal(Apparatus.validatePort(
-        { id = 'd', type = 'discharge', x = 0, y = 0, z = 0, size = 1.75 }, types, 1), nil,
-        'a discharge may carry a numeric size')
+    t.ok(noCorners, 'a gear locker with a position and no footprint fails')
+    t.ok(noCorners:find('corners') ~= nil, 'and says what it needs')
 
-    t.ok(Apparatus.validatePort(
-        { id = 'g', type = 'gear', x = 0, y = 0, z = 0, size = 1.75 }, types, 1),
-        'a compartment may not')
+    t.ok(Apparatus.validatePort({ id = 'g', type = 'gear',
+        corners = { { x = 0, y = 0, z = 0 }, { x = 1, y = 0, z = 0 } } }, types, 1, shapes),
+        'two corners is not a footprint')
+
+    t.equal(Apparatus.validatePort(locker, types, 1, shapes), nil,
+        'and a walked one passes')
+
+    t.describe('a fitting with corners instead of a position is rejected')
+
+    t.ok(Apparatus.validatePort({ id = 'd', type = 'discharge' }, types, 1, shapes),
+        'a discharge still needs somewhere to be')
+
+    -- -----------------------------------------------------------------------
+
+    t.describe('every shipped zone port has been walked')
+
+    for name, profile in pairs(MIFireApparatus.profiles) do
+        for _, port in ipairs(profile.ports or {}) do
+            if Apparatus.shape(port, shapes) == 'zone' then
+                t.ok(type(port.corners) == 'table' and #port.corners >= 3,
+                    ('%s: %s has a walked footprint'):format(name, port.id))
+            end
+        end
+    end
 
     -- -----------------------------------------------------------------------
 
@@ -276,9 +307,9 @@ return function(t)
         size = 1.75, preconnected = { feet = 200 },
     }
 
-    t.equal(Apparatus.validatePort(crosslay, types, 1), nil,
+    t.equal(Apparatus.validatePort(crosslay, types, 1, MIFireApparatus.portShapes), nil,
         'a preconnected crosslay is a valid discharge')
 
-    local formatted = Apparatus.format(crosslay)
+    local formatted = Apparatus.format(crosslay, shapes)
     t.ok(formatted:find('type = "discharge"') ~= nil, 'and it writes out as one')
 end

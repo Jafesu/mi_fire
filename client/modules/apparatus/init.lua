@@ -51,6 +51,14 @@ end
 ---@param port table
 ---@return vector3
 function ApparatusClient.portCoords(entity, port)
+    -- A zone's position is the middle of its footprint.
+    if Apparatus.shape(port, MIFireApparatus.portShapes) == 'zone'
+        and type(port.corners) == 'table' and #port.corners > 0 then
+
+        local centre = Apparatus.centre(port, MIFireApparatus.portShapes)
+        return GetOffsetFromEntityInWorldCoords(entity, centre.x, centre.y, centre.z)
+    end
+
     if Apparatus.anchor(port) == 'bone' then
         local index = GetEntityBoneIndexByName(entity, port.bone)
 
@@ -103,33 +111,43 @@ function ApparatusClient.atPort(entity, coords, portType, radius)
     if #ports == 0 then return true end
     if not coords then return true end
 
-    -- Converted once, then tested against every port. A box has to be checked in vehicle
-    -- space anyway, and doing the conversion here rather than per-port keeps it to one call.
+    -- Converted once, then tested against every port. A walked footprint has to be checked in
+    -- vehicle space anyway, and doing the conversion here keeps it to one call.
     local point = GetOffsetFromEntityGivenWorldCoords(entity, coords.x, coords.y, coords.z)
     local local_ = { x = point.x, y = point.y, z = point.z }
+
+    local unauthored = 0
 
     for i = 1, #ports do
         local port = ports[i]
 
         -- A bone-anchored port has no meaningful vehicle-space coordinate of its own, so it
         -- is measured in world space against its resolved position instead.
-        if Apparatus.anchor(port) == 'bone' then
+        if MIFire.Apparatus.anchor(port) == 'bone' then
             local world = ApparatusClient.portCoords(entity, port)
-            local _, r = Apparatus.reach(port, MIFireApparatus.portReach)
+            if #(coords - world) <= (radius or MIFireApparatus.pointReach or 0.55) then
+                return true
+            end
 
-            if #(coords - world) <= (radius or r) then return true end
+        elseif MIFire.Apparatus.shape(port, MIFireApparatus.portShapes) == 'zone'
+            and type(port.corners) ~= 'table' then
+            -- A compartment whose corners have not been walked yet. Counted rather than
+            -- answered, so a half-authored rig falls back to the whole vehicle for that type
+            -- instead of losing the interaction entirely.
+            unauthored = unauthored + 1
 
-        elseif radius then
-            -- An explicit radius from the caller overrides the port's own zone.
+        elseif radius and MIFire.Apparatus.shape(port, MIFireApparatus.portShapes) == 'point' then
             local dx, dy, dz = local_.x - port.x, local_.y - port.y, local_.z - port.z
             if (dx * dx + dy * dy + dz * dz) <= radius * radius then return true end
 
-        elseif Apparatus.contains(port, local_, MIFireApparatus.portReach) then
+        elseif MIFire.Apparatus.contains(port, local_,
+            MIFireApparatus.portShapes, MIFireApparatus.zoneHeight) then
             return true
         end
     end
 
-    return false
+    -- Every port of this type is a zone nobody has walked yet.
+    return unauthored == #ports and unauthored > 0
 end
 
 --- The nearest port of a type, for anything that needs the position rather than a yes or no.

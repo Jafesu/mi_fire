@@ -76,74 +76,17 @@ end
 -- Placing one port
 -- ---------------------------------------------------------------------------
 
-local function placePort(vehicle)
-    local typeInput = lib.inputDialog('New port', {
-        {
-            type = 'select',
-            label = 'Type',
-            options = (function()
-                local options = {}
-                for _, name in ipairs(TYPE_ORDER) do
-                    options[#options + 1] = { value = name, label = name }
-                end
-                return options
-            end)(),
-            required = true,
-            --- Defaults to whatever was placed last. A rig has six discharges and one of
-            --- most other things, so re-picking "discharge" every time is the single most
-            --- repeated action in authoring a truck.
-            default = session.lastType or 'discharge',
-        },
-    })
-
-    if not typeInput then return end
-    local portType = typeInput[1]
-    session.lastType = portType
-
-    local idInput = lib.inputDialog('New port', {
-        {
-            type = 'input',
-            label = 'Port id',
-            description = 'Used by the pump panel to bind a control to this outlet',
-            default = suggestId(portType),
-            required = true,
-        },
-        {
-            type = 'input',
-            label = 'Label',
-            description = 'Shown to players. Optional.',
-            default = '',
-        },
-        {
-            type = 'number',
-            label = 'Hose size, inches',
-            description = 'Discharges only. 1.75, 2.5, 3 or 5.',
-            default = portType == 'discharge' and 1.75 or nil,
-        },
-        {
-            type = 'number',
-            label = 'Zone radius, metres',
-            description = 'How close you have to aim. Blank uses the sensible default for '
-                .. 'this type -- generous for compartments, tight for outlets.',
-            default = MIFireApparatus.portReach[portType],
-            min = 0.2,
-            max = 6.0,
-        },
-    })
-
-    if not idInput then return end
-
-    local id, label, size, zone = idInput[1], idInput[2], idInput[3], idInput[4]
-
-    for _, port in ipairs(session.ports) do
-        if port.id == id then
-            return lib.notify({
-                description = ('There is already a port called "%s"'):format(id),
-                type = 'error',
-            })
-        end
-    end
-
+--- Place a fitting: one point, and that is the whole of it.
+---
+--- A discharge or an intake is a specific piece of brass you couple a specific line to. Being
+--- asked which one is the interaction rather than an obstacle, so these stay tight and stay
+--- points.
+---@param vehicle integer
+---@param portType string
+---@param id string
+---@param label string
+---@param size number|nil
+local function placeFitting(vehicle, portType, id, label, size)
     Placement.start({
         label = ('Placing %s "%s"'):format(portType, id),
         parent = vehicle,
@@ -162,16 +105,12 @@ local function placePort(vehicle)
                 heading = result.relativeHeading or 0.0,
                 label = (label ~= '' and label) or nil,
                 size = size,
-                -- Only written when it differs from the type's default, so a config full of
-                -- ports does not repeat the same number ten times.
-                radius = (zone and zone ~= MIFireApparatus.portReach[portType]) and zone or nil,
             }
 
             lib.notify({
-                title = 'Port placed',
-                description = ('%s "%s" at %.2f, %.2f, %.2f -- %d on this rig')
-                    :format(portType, id, result.offset.x, result.offset.y, result.offset.z,
-                        #session.ports),
+                title = 'Fitting placed',
+                description = ('%s "%s" -- %d port(s) on this rig')
+                    :format(portType, id, #session.ports),
                 type = 'success',
             })
 
@@ -179,6 +118,169 @@ local function placePort(vehicle)
         end,
         onCancel = function() OffsetFinder.menu(vehicle) end,
     })
+end
+
+--- Walk the corners of a compartment.
+---
+--- A gear locker, a hose bed, a bottle rack and a pump panel are places on the rig rather than
+--- points on it, and a centre plus a size is a poor way to describe one -- it guesses at a
+--- shape nobody measured, and a compartment along a chamfered corner is not a box.
+---
+--- So the corners get walked. Points around the opening, in order, and the footprint is
+--- whatever shape they make. Height comes from the type, centred on the average height of the
+--- corners -- walk them at roughly the height of the opening and the zone lands around it.
+---@param vehicle integer
+---@param portType string
+---@param id string
+---@param label string
+---@param wanted integer How many corners to collect.
+---@param collected table|nil Corners so far.
+local function walkCorners(vehicle, portType, id, label, wanted, collected)
+    collected = collected or {}
+
+    local index = #collected + 1
+
+    Placement.start({
+        label = ('%s "%s" -- corner %d of %d'):format(portType, id, index, wanted),
+        parent = vehicle,
+        maxDistance = 12.0,
+        onConfirm = function(result)
+            if not result.offset then
+                return lib.notify({ description = 'Lost the vehicle', type = 'error' })
+            end
+
+            collected[#collected + 1] = {
+                x = result.offset.x,
+                y = result.offset.y,
+                z = result.offset.z,
+            }
+
+            if #collected < wanted then
+                lib.notify({
+                    description = ('Corner %d placed. %d to go.')
+                        :format(#collected, wanted - #collected),
+                    type = 'inform',
+                })
+
+                return walkCorners(vehicle, portType, id, label, wanted, collected)
+            end
+
+            session.ports[#session.ports + 1] = {
+                id = id,
+                type = portType,
+                corners = collected,
+                label = (label ~= '' and label) or nil,
+            }
+
+            lib.notify({
+                title = 'Compartment placed',
+                description = ('%s "%s" with %d corners -- %d port(s) on this rig')
+                    :format(portType, id, #collected, #session.ports),
+                type = 'success',
+            })
+
+            OffsetFinder.menu(vehicle)
+        end,
+        onCancel = function()
+            -- Cancelling partway keeps nothing. A three-cornered gear locker is not a useful
+            -- half-result, and silently keeping one would produce a zone nobody meant.
+            if #collected > 0 then
+                lib.notify({
+                    description = ('Discarded %d corner(s)'):format(#collected),
+                    type = 'inform',
+                })
+            end
+
+            OffsetFinder.menu(vehicle)
+        end,
+    })
+end
+
+local function placePort(vehicle)
+    local typeInput = lib.inputDialog('New port', {
+        {
+            type = 'select',
+            label = 'Type',
+            options = (function()
+                local options = {}
+                for _, name in ipairs(TYPE_ORDER) do
+                    local shape = MIFireApparatus.portShapes[name] == 'zone'
+                        and 'area' or 'fitting'
+                    options[#options + 1] = {
+                        value = name,
+                        label = ('%s (%s)'):format(name, shape),
+                    }
+                end
+                return options
+            end)(),
+            required = true,
+            --- Defaults to whatever was placed last. A rig has six discharges and one of most
+            --- other things, so re-picking "discharge" every time is the single most repeated
+            --- action in authoring a truck.
+            default = session.lastType or 'discharge',
+        },
+    })
+
+    if not typeInput then return end
+    local portType = typeInput[1]
+    session.lastType = portType
+
+    local isZone = MIFireApparatus.portShapes[portType] == 'zone'
+
+    local fields = {
+        {
+            type = 'input',
+            label = 'Port id',
+            description = 'Used by the pump panel to bind a control to this outlet',
+            default = suggestId(portType),
+            required = true,
+        },
+        {
+            type = 'input',
+            label = 'Label',
+            description = 'Shown to players. Worth setting on a fitting, since several sit '
+                .. 'close together and the label is what tells them apart.',
+            default = '',
+        },
+    }
+
+    if isZone then
+        fields[#fields + 1] = {
+            type = 'number',
+            label = 'Corners',
+            description = 'How many points to walk around the compartment. Four is usual.',
+            default = 4,
+            min = 3,
+            max = 8,
+        }
+    else
+        fields[#fields + 1] = {
+            type = 'number',
+            label = 'Hose size, inches',
+            description = 'Discharges and intakes. 1.75, 2.5, 3 or 5.',
+            default = portType == 'discharge' and 1.75 or nil,
+        }
+    end
+
+    local input = lib.inputDialog('New port', fields)
+    if not input then return end
+
+    local id, label = input[1], input[2]
+
+    for _, port in ipairs(session.ports) do
+        if port.id == id then
+            return lib.notify({
+                description = ('There is already a port called "%s"'):format(id),
+                type = 'error',
+            })
+        end
+    end
+
+    if isZone then
+        walkCorners(vehicle, portType, id, label, math.floor(input[3] or 4))
+    else
+        placeFitting(vehicle, portType, id, label, input[3])
+    end
 end
 
 -- ---------------------------------------------------------------------------
@@ -331,7 +433,7 @@ local function buildBlock()
     }
 
     for _, port in ipairs(session.ports) do
-        lines[#lines + 1] = Apparatus.format(port)
+        lines[#lines + 1] = Apparatus.format(port, MIFireApparatus.portShapes)
     end
 
     lines[#lines + 1] = '        },'
@@ -448,6 +550,42 @@ function OffsetFinder.reviewMenu(vehicle)
     lib.showContext('mi_fire_offset_review')
 end
 
+--- Draw one port: a dot for a fitting, an outline for a compartment.
+---@param vehicle integer
+---@param port table
+---@param r integer
+---@param g integer
+---@param b integer
+function OffsetFinder.drawPort(vehicle, port, r, g, b)
+    local corners = port.corners
+
+    if type(corners) == 'table' and #corners > 1 then
+        -- The footprint, edge by edge. A compartment drawn as a dot at its centre tells you
+        -- nothing about whether the walk was any good.
+        for i = 1, #corners do
+            local a = corners[i]
+            local nextCorner = corners[(i % #corners) + 1]
+
+            local from = GetOffsetFromEntityInWorldCoords(vehicle, a.x, a.y, a.z)
+            local to = GetOffsetFromEntityInWorldCoords(vehicle,
+                nextCorner.x, nextCorner.y, nextCorner.z)
+
+            DrawLine(from.x, from.y, from.z, to.x, to.y, to.z, r, g, b, 220)
+
+            DrawMarker(28, from.x, from.y, from.z, 0, 0, 0, 0, 0, 0,
+                0.04, 0.04, 0.04, r, g, b, 200, false, false, 2, false, nil, nil, false)
+        end
+
+        return
+    end
+
+    local world = GetOffsetFromEntityInWorldCoords(vehicle,
+        port.x or 0.0, port.y or 0.0, port.z or 0.0)
+
+    DrawMarker(28, world.x, world.y, world.z, 0, 0, 0, 0, 0, 0,
+        0.07, 0.07, 0.07, r, g, b, 200, false, false, 2, false, nil, nil, false)
+end
+
 --- Draw everything already configured for this model, plus what has been placed this session.
 ---
 --- The point is to see the gaps. A rig with four discharges in the config and six on the model
@@ -471,17 +609,13 @@ function OffsetFinder.preview(vehicle)
             Wait(0)
 
             for _, port in ipairs(existing) do
-                local world = GetOffsetFromEntityInWorldCoords(vehicle, port.x, port.y, port.z)
-                DrawMarker(28, world.x, world.y, world.z, 0, 0, 0, 0, 0, 0,
-                    0.07, 0.07, 0.07, 255, 190, 60, 200, false, false, 2, false, nil, nil, false)
+                OffsetFinder.drawPort(vehicle, port, 255, 190, 60)
             end
 
             -- Placed this session in a different colour, so "already had" and "just added"
             -- are distinguishable at a glance.
             for _, port in ipairs(session.ports) do
-                local world = GetOffsetFromEntityInWorldCoords(vehicle, port.x, port.y, port.z)
-                DrawMarker(28, world.x, world.y, world.z, 0, 0, 0, 0, 0, 0,
-                    0.07, 0.07, 0.07, 80, 230, 120, 200, false, false, 2, false, nil, nil, false)
+                OffsetFinder.drawPort(vehicle, port, 80, 230, 120)
             end
         end
     end)

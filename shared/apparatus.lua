@@ -89,50 +89,113 @@ function Apparatus.anchor(port)
     return 'offset'
 end
 
---- How big is this port's interaction zone, and what shape?
----
---- Returns a box when one is declared and a radius otherwise, so callers handle two shapes
---- rather than every type of port having to declare one.
+--- Is this port an area or a fitting?
 ---@param port table
----@param reach table `MIFireApparatus.portReach`
----@return table|nil box `{ x, y, z }` half-extents, vehicle-aligned
----@return number radius Used when there is no box.
-function Apparatus.reach(port, reach)
-    if type(port.size) == 'table' then
-        return {
-            x = (tonumber(port.size.x) or 1.0) * 0.5,
-            y = (tonumber(port.size.y) or 1.0) * 0.5,
-            z = (tonumber(port.size.z) or 1.0) * 0.5,
-        }, 0.0
-    end
-
-    if tonumber(port.radius) then return nil, tonumber(port.radius) end
-
-    return nil, tonumber(reach and reach[port.type]) or tonumber(reach and reach.default) or 1.2
+---@param shapes table `MIFireApparatus.portShapes`
+---@return string 'zone' | 'point'
+function Apparatus.shape(port, shapes)
+    return (shapes and shapes[port.type]) == 'zone' and 'zone' or 'point'
 end
 
---- Is a point inside this port's zone?
+--- The height of a zone and where its floor sits.
 ---
---- Takes the point already converted to **vehicle-local** space, which is what makes a box
---- work: compartments run along the side of a rig, and a box aligned to the truck stays
---- correct however it is parked. A sphere big enough to cover a long hose bed would also
---- cover half the crew cab.
+--- The four corners give the footprint; the height is centred on their average, so someone who
+--- walks the corners at roughly the height of the compartment opening gets a zone around it
+--- rather than one starting at their feet.
+---@param port table
+---@param heights table `MIFireApparatus.zoneHeight`
+---@return number floor
+---@return number ceiling
+function Apparatus.zoneBounds(port, heights)
+    local corners = port.corners or {}
+    local sum, count = 0.0, 0
+
+    for i = 1, #corners do
+        sum = sum + (tonumber(corners[i].z) or 0.0)
+        count = count + 1
+    end
+
+    local centre = count > 0 and (sum / count) or 0.0
+    local height = tonumber(port.height)
+        or tonumber(heights and heights[port.type])
+        or tonumber(heights and heights.default)
+        or 1.6
+
+    return centre - height * 0.5, centre + height * 0.5
+end
+
+--- Is a point inside this port?
+---
+--- Takes the point already converted to **vehicle-local** space, which is what makes a walked
+--- footprint work: a compartment stays where it is however the truck is parked, and a world
+--- coordinate would not.
+---
+--- Zone ports use a crossing test against their four corners, so the footprint can be any
+--- quadrilateral rather than a rectangle -- a rig is not axis-aligned in its own details, and a
+--- compartment that runs along a chamfered corner is a real thing.
 ---@param port table
 ---@param localPoint table `{ x, y, z }` in vehicle space
----@param reach table `MIFireApparatus.portReach`
+---@param shapes table `MIFireApparatus.portShapes`
+---@param heights table `MIFireApparatus.zoneHeight`
 ---@return boolean
-function Apparatus.contains(port, localPoint, reach)
-    local box, radius = Apparatus.reach(port, reach)
+function Apparatus.contains(port, localPoint, shapes, heights)
+    if Apparatus.shape(port, shapes) == 'zone' then
+        local corners = port.corners
+
+        -- A zone with no corners has not been authored yet. Answering false would hide the
+        -- interaction entirely; the caller falls back to the whole vehicle instead.
+        if type(corners) ~= 'table' or #corners < 3 then return false end
+
+        local floor, ceiling = Apparatus.zoneBounds(port, heights)
+        if localPoint.z < floor or localPoint.z > ceiling then return false end
+
+        -- Crossing number, in the x/y plane.
+        local inside = false
+        local count = #corners
+
+        for i = 1, count do
+            local a = corners[i]
+            local b = corners[(i % count) + 1]
+
+            if ((a.y > localPoint.y) ~= (b.y > localPoint.y))
+                and (localPoint.x < (b.x - a.x) * (localPoint.y - a.y)
+                    / ((b.y - a.y) ~= 0 and (b.y - a.y) or 1e-9) + a.x) then
+                inside = not inside
+            end
+        end
+
+        return inside
+    end
+
+    local reach = tonumber(port.radius) or 0.55
 
     local dx = localPoint.x - (port.x or 0.0)
     local dy = localPoint.y - (port.y or 0.0)
     local dz = localPoint.z - (port.z or 0.0)
 
-    if box then
-        return math.abs(dx) <= box.x and math.abs(dy) <= box.y and math.abs(dz) <= box.z
+    return (dx * dx + dy * dy + dz * dz) <= reach * reach
+end
+
+--- The middle of a port, for anything that needs a position rather than a test.
+---@param port table
+---@param shapes table
+---@return table `{ x, y, z }`
+function Apparatus.centre(port, shapes)
+    if Apparatus.shape(port, shapes) == 'zone' and type(port.corners) == 'table'
+        and #port.corners > 0 then
+
+        local x, y, z, count = 0.0, 0.0, 0.0, 0
+
+        for i = 1, #port.corners do
+            local corner = port.corners[i]
+            x, y, z = x + corner.x, y + corner.y, z + corner.z
+            count = count + 1
+        end
+
+        return { x = x / count, y = y / count, z = z / count }
     end
 
-    return (dx * dx + dy * dy + dz * dz) <= radius * radius
+    return { x = port.x or 0.0, y = port.y or 0.0, z = port.z or 0.0 }
 end
 
 --- Check one port for the things that are wrong regardless of context.
@@ -140,7 +203,7 @@ end
 ---@param portTypes table `MIFireApparatus.portTypes`
 ---@param index integer For the message.
 ---@return string|nil error
-function Apparatus.validatePort(port, portTypes, index)
+function Apparatus.validatePort(port, portTypes, index, shapes)
     if type(port) ~= 'table' then
         return ('port %d is not a table'):format(index)
     end
@@ -155,9 +218,41 @@ function Apparatus.validatePort(port, portTypes, index)
     end
 
     local bone = Apparatus.anchor(port) == 'bone'
+    local zone = Apparatus.shape(port, shapes) == 'zone'
 
-    -- A bone-anchored port needs no coordinates at all; anything it does carry is a fine
-    -- offset from the bone and is optional.
+    -- --- Areas -------------------------------------------------------------------------
+
+    if zone and not bone then
+        if type(port.corners) ~= 'table' then
+            return ('port "%s" is a %s, which is an area rather than a fitting, and needs '
+                .. 'corners -- walk them with /fireoffset'):format(port.id, port.type)
+        end
+
+        if #port.corners < 3 then
+            return ('port "%s" has %d corner(s); a footprint needs at least three')
+                :format(port.id, #port.corners)
+        end
+
+        for corner_index, corner in ipairs(port.corners) do
+            for _, axis in ipairs({ 'x', 'y', 'z' }) do
+                if type(corner[axis]) ~= 'number' then
+                    return ('port "%s" corner %d has no %s')
+                        :format(port.id, corner_index, axis)
+                end
+            end
+
+            if math.abs(corner.x) > 20.0 or math.abs(corner.y) > 20.0
+                or math.abs(corner.z) > 20.0 then
+                return ('port "%s" corner %d is off the rig -- corners are local to the '
+                    .. 'vehicle, in metres'):format(port.id, corner_index)
+            end
+        end
+
+        return nil
+    end
+
+    -- --- Fittings ----------------------------------------------------------------------
+
     for _, axis in ipairs({ 'x', 'y', 'z' }) do
         if type(port[axis]) ~= 'number' then
             if not bone then
@@ -170,11 +265,8 @@ function Apparatus.validatePort(port, portTypes, index)
     -- An offset this far from the vehicle origin is not a port on the truck, it is a typo or
     -- a world coordinate pasted in by mistake. Both are worth catching at boot rather than
     -- discovering when a hose connects to a point in the sky.
-    -- A bone nudge should be centimetres, not metres. 1.5m allows for a bone at a panel
-    -- centre with the port at its edge, and rejects anything that means the wrong bone was
-    -- picked -- which is the mistake this catches, since a wrong bone still resolves to a
-    -- real point on the truck and looks fine until a hose connects a metre off.
     local reach = bone and 1.5 or 20.0
+
     if math.abs(port.x) > reach or math.abs(port.y) > reach or math.abs(port.z) > reach then
         local worst = math.max(math.abs(port.x), math.abs(port.y), math.abs(port.z))
 
@@ -189,45 +281,6 @@ function Apparatus.validatePort(port, portTypes, index)
             .. 'this.'):format(port.id, worst)
     end
 
-    if port.radius ~= nil then
-        local r = tonumber(port.radius)
-
-        if not r or r <= 0 then
-            return ('port "%s" has a radius of %s'):format(port.id, tostring(port.radius))
-        end
-
-        if r > 6.0 then
-            return ('port "%s" has a %.1fm radius, which covers most of the rig -- a zone '
-                .. 'that large means every port on that side answers at once and the player '
-                .. 'picks from a list instead of pointing at one'):format(port.id, r)
-        end
-    end
-
-    if port.size ~= nil then
-        if type(port.size) ~= 'table' then
-            -- `size` is also the hose diameter on a discharge, which is a number. That
-            -- overload is deliberate and worth being explicit about rather than silently
-            -- treating 1.75 as a box.
-            if port.type ~= 'discharge' and port.type ~= 'intake' then
-                return ('port "%s" has a size that is neither a box nor a hose diameter')
-                    :format(port.id)
-            end
-        else
-            for _, axis in ipairs({ 'x', 'y', 'z' }) do
-                local value = tonumber(port.size[axis])
-
-                if not value or value <= 0 then
-                    return ('port "%s" has a box with no %s'):format(port.id, axis)
-                end
-
-                if value > 12.0 then
-                    return ('port "%s" has a %.1fm box on %s, which is longer than the rig')
-                        :format(port.id, value, axis)
-                end
-            end
-        end
-    end
-
     return nil
 end
 
@@ -235,12 +288,12 @@ end
 ---@param profile table
 ---@param portTypes table
 ---@return string[] errors
-function Apparatus.validate(profile, portTypes)
+function Apparatus.validate(profile, portTypes, shapes)
     local errors = {}
     local seen = {}
 
     for index, port in ipairs(profile.ports or {}) do
-        local err = Apparatus.validatePort(port, portTypes, index)
+        local err = Apparatus.validatePort(port, portTypes, index, shapes)
 
         if err then
             errors[#errors + 1] = err
@@ -276,9 +329,9 @@ end
 --- entries both reading "Connect a line" is the failure; "Rear (purple)" and "Crosslay
 --- (white)" is a menu.
 ---@param profile table
----@param reach table `MIFireApparatus.portReach`
+---@param reach number `MIFireApparatus.pointReach`
 ---@return string[] warnings
-function Apparatus.warnings(profile, reach)
+function Apparatus.warnings(profile, reach, shapes)
     local warnings = {}
     local ports = profile.ports or {}
 
@@ -288,18 +341,21 @@ function Apparatus.warnings(profile, reach)
 
             -- Only same-type ports compete: a discharge and a gear locker offering at once is
             -- two different questions, not an ambiguous one.
+            -- Only fittings compete. Two compartments overlapping is a compartment with two
+            -- things in it, which is ordinary; two discharges overlapping is an ambiguous
+            -- choice between two pieces of brass.
             if a.type == b.type
-                and Apparatus.anchor(a) == 'offset' and Apparatus.anchor(b) == 'offset' then
+                and Apparatus.anchor(a) == 'offset' and Apparatus.anchor(b) == 'offset'
+                and Apparatus.shape(a, shapes) == 'point' then
 
                 local dx = (a.x or 0) - (b.x or 0)
                 local dy = (a.y or 0) - (b.y or 0)
                 local dz = (a.z or 0) - (b.z or 0)
                 local distance = math.sqrt(dx * dx + dy * dy + dz * dz)
 
-                local _, ra = Apparatus.reach(a, reach)
-                local _, rb = Apparatus.reach(b, reach)
+                local combined = (tonumber(a.radius) or reach) + (tonumber(b.radius) or reach)
 
-                if distance < ra + rb and (not a.label or not b.label) then
+                if distance < combined and (not a.label or not b.label) then
                     warnings[#warnings + 1] = ('ports "%s" and "%s" are %.2fm apart and their '
                         .. 'zones overlap, so both will offer at once -- give them labels or '
                         .. 'the player sees two identical options')
@@ -316,7 +372,8 @@ function Apparatus.warnings(profile, reach)
         -- side of the centreline is off the rig. Not an error, because a deck gun or an
         -- outrigger legitimately reaches -- but it is far more often an aim ray that went past
         -- the truck and hit the ground behind it, and that is worth saying out loud.
-        if Apparatus.anchor(port) == 'offset' and math.abs(port.x or 0) > 2.0 then
+        if Apparatus.anchor(port) == 'offset' and Apparatus.shape(port, shapes) == 'point'
+            and math.abs(port.x or 0) > 2.0 then
             warnings[#warnings + 1] = ('port "%s" is %.1fm from the centreline, which is off '
                 .. 'the side of the rig -- most likely the aim went past the truck')
                 :format(port.id, math.abs(port.x))
@@ -342,10 +399,7 @@ end
 --- and so it can be tested without the game.
 ---@param port table
 ---@return string
-function Apparatus.format(port)
-    -- A bone-anchored port leads with the bone, because that is the interesting part and the
-    -- offsets after it are a nudge. Zero offsets are dropped entirely rather than written as
-    -- `x = 0.000`, which reads as a measurement someone took.
+function Apparatus.format(port, shapes)
     if Apparatus.anchor(port) == 'bone' then
         local nudge = ''
 
@@ -358,17 +412,34 @@ function Apparatus.format(port)
             :format(port.id, port.type, port.bone, nudge)
     end
 
-    local zone = ''
+    if Apparatus.shape(port, shapes) == 'zone' and type(port.corners) == 'table' then
+        local lines = {
+            ('        { id = %q, type = %q,'):format(port.id, port.type),
+        }
 
-    if type(port.size) == 'table' then
-        zone = (', size = { x = %.2f, y = %.2f, z = %.2f }')
-            :format(port.size.x, port.size.y, port.size.z)
-    elseif tonumber(port.radius) then
-        zone = (', radius = %.2f'):format(port.radius)
+        if port.label then
+            lines[#lines + 1] = ('          label = %q,'):format(port.label)
+        end
+
+        lines[#lines + 1] = '          corners = {'
+
+        for i = 1, #port.corners do
+            local corner = port.corners[i]
+            lines[#lines + 1] = ('            { x = %.3f, y = %.3f, z = %.3f },')
+                :format(corner.x, corner.y, corner.z)
+        end
+
+        lines[#lines + 1] = '          } },'
+
+        return table.concat(lines, '\n')
     end
 
+    local extra = ''
+    if tonumber(port.size) then extra = extra .. (', size = %s'):format(port.size) end
+    if port.label then extra = extra .. (', label = %q'):format(port.label) end
+
     return ('        { id = %q, type = %q, x = %.3f, y = %.3f, z = %.3f, heading = %.1f%s },')
-        :format(port.id, port.type, port.x, port.y, port.z, port.heading or 0.0, zone)
+        :format(port.id, port.type, port.x, port.y, port.z, port.heading or 0.0, extra)
 end
 
 MIFire.Apparatus = Apparatus

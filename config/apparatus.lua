@@ -81,38 +81,50 @@ MIFireApparatus.portTypes = {
     tool        = true,   -- general compartment
 }
 
---- How big a port's interaction zone is, per type, when it does not say.
+--- Which port types are an area, and which are a single fitting.
 ---
---- A port is a point, but almost nothing you interact with on a fire truck is. A gear locker
---- is a metre and a half of compartment; a hose bed runs most of the length of the rig. Making
---- someone aim at a single point to open a locker is precision for its own sake, and it reads
---- as a script rather than as a truck.
+--- The distinction is physical rather than a setting. A gear locker, a hose bed, a bottle rack
+--- and a pump panel are **places on the rig** -- a metre and a half of compartment, or most of
+--- its length -- and making someone aim at one point to open a locker is precision for its own
+--- sake. A discharge or an intake is a **fitting**: a specific piece of brass you couple a
+--- specific line to, and being asked which one is the interaction rather than an obstacle.
 ---
---- Two shapes, per port:
----
----   `radius = 1.8`                  a sphere
----   `size = { x = 2.4, y = 0.8, z = 1.2 }`   a box, **aligned to the vehicle**
----
---- The box is usually what you want: compartments run along the side of a rig, and a sphere
---- big enough to cover a long hose bed also covers half the crew cab. Boxes are checked in
---- vehicle-local space, so they stay correct however the truck is parked.
----
---- Discharges and intakes are deliberately tighter than compartments. Connecting a line to
---- the right outlet is the interaction, and a generous zone on six adjacent discharges means
---- picking from a list of six identical options instead of pointing at one.
-MIFireApparatus.portReach = {
-    discharge   = 0.55,
-    intake      = 0.55,
-    deckgun     = 0.9,
-    panel       = 1.4,
-    hosebed     = 1.8,
-    gear        = 1.5,
-    scba_rack   = 1.3,
-    ladder_rack = 1.8,
-    tool        = 1.5,
+--- So zone ports carry `corners` -- four points walked around the compartment -- and point
+--- ports carry a position and nothing else.
+MIFireApparatus.portShapes = {
+    gear        = 'zone',
+    tool        = 'zone',
+    hosebed     = 'zone',
+    scba_rack   = 'zone',
+    ladder_rack = 'zone',
+    panel       = 'zone',
 
-    --- Anything not listed.
-    default     = 1.2,
+    --- Fittings. You point at the one you want.
+    discharge   = 'point',
+    intake      = 'point',
+    deckgun     = 'point',
+}
+
+--- How close counts, for a point port. One number, because a fitting is a fitting.
+---
+--- Deliberately tight. The outlets on a real rig are inches apart, and a generous radius on six
+--- adjacent discharges means picking from a list of six identical options instead of pointing
+--- at the one you want.
+MIFireApparatus.pointReach = 0.55
+
+--- How tall a zone is, in metres, when its corners do not imply one.
+---
+--- The corners give the footprint; this gives the height, centred on the average height of the
+--- four points. Walk the corners at roughly the height of the compartment opening and the zone
+--- lands around it.
+MIFireApparatus.zoneHeight = {
+    gear        = 1.8,
+    tool        = 1.8,
+    hosebed     = 1.6,
+    scba_rack   = 1.6,
+    ladder_rack = 1.4,
+    panel       = 1.8,
+    default     = 1.6,
 }
 
 --- Defaults merged under every profile, so a new rig only declares what differs.
@@ -167,21 +179,51 @@ MIFireApparatus.profiles = {
         ports = {
             --- A hose bed runs most of the width of the rig, so it is a box rather than a
             --- sphere. Boxes are vehicle-aligned, so this stays correct however it is parked.
-            { id = "hosebed1", type = "hosebed", x = -0.086, y = -4.142, z = 0.853, heading = 180.0,
-              size = { x = 2.4, y = 1.6, z = 1.2 } },
-            { id = "pumppanel", type = "panel", x = -0.902, y = 0.186, z = -0.328, heading = 105.0,
-              size = { x = 1.0, y = 1.8, z = 1.6 } },
+            { id = "hosebed1", type = "hosebed",
+              corners = {
+                { x = -1.286, y = -4.942, z = 0.853 },
+                { x = 1.114, y = -4.942, z = 0.853 },
+                { x = 1.114, y = -3.342, z = 0.853 },
+                { x = -1.286, y = -3.342, z = 0.853 },
+              } },
+            { id = "pumppanel", type = "panel",
+              corners = {
+                { x = -1.402, y = -0.714, z = -0.328 },
+                { x = -0.402, y = -0.714, z = -0.328 },
+                { x = -0.402, y = 1.086, z = -0.328 },
+                { x = -1.402, y = 1.086, z = -0.328 },
+              } },
             --- Gear and tools share one compartment, so they share a box. Two options on
             --- one locker is correct -- it is one locker.
-            { id = "gear1", type = "gear", x = -1.238, y = -2.054, z = 0.159, heading = 90.0,
-              size = { x = 1.0, y = 1.8, z = 1.6 } },
-            { id = "toolcompartment", type = "tool", x = -1.238, y = -2.054, z = 0.159, heading = 90.0,
-              size = { x = 1.0, y = 1.8, z = 1.6 } },
-            { id = "scba_rack1", type = "scba_rack", x = -1.238, y = -3.709, z = 0.221, heading = 90.0,
-              size = { x = 1.0, y = 1.4, z = 1.4 } },
+            { id = "gear1", type = "gear",
+              corners = {
+                { x = -1.738, y = -2.954, z = 0.159 },
+                { x = -0.738, y = -2.954, z = 0.159 },
+                { x = -0.738, y = -1.154, z = 0.159 },
+                { x = -1.738, y = -1.154, z = 0.159 },
+              } },
+            { id = "toolcompartment", type = "tool",
+              corners = {
+                { x = -1.738, y = -2.954, z = 0.159 },
+                { x = -0.738, y = -2.954, z = 0.159 },
+                { x = -0.738, y = -1.154, z = 0.159 },
+                { x = -1.738, y = -1.154, z = 0.159 },
+              } },
+            { id = "scba_rack1", type = "scba_rack",
+              corners = {
+                { x = -1.738, y = -4.409, z = 0.221 },
+                { x = -0.738, y = -4.409, z = 0.221 },
+                { x = -0.738, y = -3.009, z = 0.221 },
+                { x = -1.738, y = -3.009, z = 0.221 },
+              } },
             --- Ladders run nearly the length of the rig.
-            { id = "ladder_rack", type = "ladder_rack", x = 0.934, y = -2.446, z = 0.467, heading = 270.0,
-              size = { x = 1.0, y = 4.0, z = 1.2 } },
+            { id = "ladder_rack", type = "ladder_rack",
+              corners = {
+                { x = 0.434, y = -4.446, z = 0.467 },
+                { x = 1.434, y = -4.446, z = 0.467 },
+                { x = 1.434, y = -0.446, z = 0.467 },
+                { x = 0.434, y = -0.446, z = 0.467 },
+              } },
             --- The outlets are inches apart on a real rig, so these zones overlap and
             --- ox_target offers several at once. That is correct rather than a problem, but
             --- only while every option says which outlet it is -- two entries both reading
@@ -206,16 +248,6 @@ MIFireApparatus.profiles = {
             --- against the rig if it carries something else.
             { id = "rear_crosslay_white", type = "discharge", x = -0.120, y = -4.469, z = -0.209, heading = 180.0,
               label = "Crosslay (white)", size = 1.75, preconnected = { feet = 200 } },
-            --- RENAMED from "gear1", which was already taken -- a duplicate id fails the boot
-            --- check, because the pump panel binds controls by id and two ports sharing one
-            --- means a valve that opens the wrong outlet.
-            ---
-            --- **This offset looks wrong and is worth re-measuring.** x is metres to the right
-            --- of the vehicle centreline, and an engine is about 2.5m wide, so anything on the
-            --- rig sits within roughly +/-1.3. At 5.8 this is about four and a half metres past
-            --- the side of the truck -- most likely the aim ray went past the rig and hit the
-            --- ground or a wall behind it.
-            { id = "gear2", type = "gear", x = 5.841, y = -2.605, z = -0.238, heading = 64.4 },
 
         },
     },

@@ -35,41 +35,41 @@ local warnedAboutDecal = false
 -- Drawing
 -- ---------------------------------------------------------------------------
 
+--- Two renderers, because the good one does not work everywhere.
+---
+--- `AddDecal` is the right mechanism: projected, conforms to whatever it lands on, and costs
+--- nothing per frame. On the build this was developed against it accepts five type IDs,
+--- returns real non-zero handles for every one, and **draws nothing** -- tested at four
+--- metres across in flat white at full opacity with a marker overhead, indoors and out. The
+--- native is not refusing; something upstream of this resource is eating the result.
+---
+--- So the default is a flat dark marker disc, which uses the same mechanism as every
+--- checkpoint in the game and therefore cannot quietly fail. It costs a draw call per visible
+--- mark and does not conform to a slope, which is why it is not the first choice -- only the
+--- one that works. `/fire decals sweep` tells a server owner in a minute which they have.
+
 ---@param id string
 ---@param mark table
-local function draw(id, mark)
+local function drawDecal(id, mark)
     if drawn[id] then return end
 
     local fade = Scorch.fade(mark.markedAt, GetCloudTimeAsInt(), MIFireScorch)
     local colour = MIFireScorch.colour
     local alpha = (colour.alpha or 0.85) * (1.0 - fade * 0.6)
 
-    -- Projected straight down onto whatever is under the mark, so it takes the shape of the
-    -- ground rather than floating at the height the node happened to die at.
-    -- Project onto whatever is actually under the mark. A node can die at head height on a
-    -- staircase, and a decal placed at that z projects onto nothing.
     local z = mark.coords.z
     local found, groundZ = GetGroundZFor_3dCoord(
         mark.coords.x, mark.coords.y, mark.coords.z + 2.0, false)
     if found then z = groundZ end
 
-    -- Timeout was -1.0 here, meaning "permanent". That is not obviously accepted -- the
-    -- parameter is milliseconds and a negative one may simply be rejected, which returns 0
-    -- exactly like a bad type ID does. A very large positive value asks for the same thing
-    -- without relying on a convention nothing here has confirmed. The server removes marks
-    -- when they are cleaned or age out, so this only has to outlast the lifetime.
     local timeout = math.max(600000.0, (MIFireScorch.lifetimeMinutes or 180) * 60000.0)
-
-    -- Colour convention is unconfirmed on this build: the parameters are named as
-    -- coefficients but a good deal of working code passes 0-255. `/fire decals` reports
-    -- which this build accepts; `colourScale` applies the answer.
     local scale = MIFireScorch.colourScale or 1.0
 
     local handle = AddDecal(
         MIFireScorch.decal,
         mark.coords.x, mark.coords.y, z + 0.35,
         0.0, 0.0, -1.0,
-        1.0, 0.0, 0.0,
+        0.0, 1.0, 0.0,
         mark.size, mark.size,
         (colour.r or 0.16) * scale, (colour.g or 0.15) * scale, (colour.b or 0.14) * scale,
         alpha * scale,
@@ -83,13 +83,38 @@ local function draw(id, mark)
 
     if not warnedAboutDecal then
         warnedAboutDecal = true
-        Util.warn('AddDecal returned 0 for type %s -- no burn marks will appear. '
-            .. 'Run "/fire decals sweep" to find a type this build accepts, then set '
-            .. 'MIFireScorch.decal in config/scorch.lua. If the sweep accepts nothing at '
-            .. 'all, the native is refusing outright rather than rejecting the type, and '
-            .. 'MIFireScorch.enabled should go false until that is understood.',
-            tostring(MIFireScorch.decal))
+        Util.warn('AddDecal returned 0 for type %s. Set MIFireScorch.renderer = "marker" '
+            .. 'in config/scorch.lua, or run "/fire decals sweep" to find a type this build '
+            .. 'accepts.', tostring(MIFireScorch.decal))
     end
+end
+
+--- The marker disc, drawn per frame.
+---@param mark table
+local function drawMarker(mark)
+    local colour = MIFireScorch.markerColour
+    local fade = Scorch.fade(mark.markedAt, GetCloudTimeAsInt(), MIFireScorch)
+
+    -- Ages toward transparent rather than blinking out, so a scene that has not been cleaned
+    -- still reads as older than one that just burned.
+    local alpha = math.floor((colour.alpha or 115) * (1.0 - fade * 0.65))
+    if alpha <= 2 then return end
+
+    local z = mark.coords.z
+    local found, groundZ = GetGroundZFor_3dCoord(
+        mark.coords.x, mark.coords.y, mark.coords.z + 2.0, false)
+    if found then z = groundZ end
+
+    -- Type 1 is a vertical cylinder; flattened it is a disc lying on the ground. The last
+    -- argument draws it onto whatever is underneath rather than leaving it hanging in the
+    -- air over a kerb.
+    DrawMarker(1,
+        mark.coords.x, mark.coords.y, z + (MIFireScorch.markerLift or 0.03),
+        0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0,
+        mark.size, mark.size, MIFireScorch.markerHeight or 0.04,
+        colour.r or 20, colour.g or 18, colour.b or 16, alpha,
+        false, false, 2, false, nil, nil, true)
 end
 
 ---@param id string
@@ -175,10 +200,13 @@ end)
 -- Render loop
 -- ---------------------------------------------------------------------------
 
---- Draw the nearest marks and take down the rest.
+--- Keep the nearest marks drawn and the rest not.
 ---
---- Decals are cheap but not free, and a long shift on a busy server can leave a lot of them,
---- so this is a nearest-N with a distance cut rather than "draw everything the server knows".
+--- Split in two: a slow thread decides *which* marks are near enough to matter, and a fast
+--- one draws them. Sorting every mark by distance at frame rate is how a fireground becomes a
+--- frame rate problem, and it does not need doing more than twice a second.
+local visible = {}
+
 CreateThread(function()
     while not MIFire.ready do Wait(250) end
 
@@ -189,7 +217,9 @@ CreateThread(function()
     local reach = MIFireScorch.drawDistance or 90.0
 
     while true do
-        Wait(2000)
+        Wait(500)
+
+        local nearby = {}
 
         if MIFireScorch.enabled and next(marks) ~= nil then
             local here = GetEntityCoords(cache.ped)
@@ -211,12 +241,34 @@ CreateThread(function()
 
             for i = 1, #candidates do
                 local entry = candidates[i]
+
                 if i <= maximum then
-                    draw(entry.id, entry.mark)
+                    nearby[#nearby + 1] = entry.mark
                     addCleanupTarget(entry.id, entry.mark)
+
+                    if MIFireScorch.renderer == 'decal' then
+                        drawDecal(entry.id, entry.mark)
+                    end
                 elseif drawn[entry.id] then
                     undraw(entry.id)
                 end
+            end
+        end
+
+        visible = nearby
+    end
+end)
+
+--- The per-frame half. Only runs at all when the marker renderer is selected and there is
+--- something in range, so a decal server and an empty street both cost nothing.
+CreateThread(function()
+    while true do
+        if MIFireScorch.renderer ~= 'marker' or #visible == 0 then
+            Wait(500)
+        else
+            Wait(0)
+            for i = 1, #visible do
+                drawMarker(visible[i])
             end
         end
     end

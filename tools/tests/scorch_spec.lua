@@ -78,4 +78,30 @@ return function(t)
     t.ok(#MIFireScorch.decalCandidates > 0,
         'there are candidates for "/fire decals" to lay out, since the decal type is the '
         .. 'one visual constant here that could not be verified against anything on disk')
+
+    -- -----------------------------------------------------------------------
+
+    t.describe('the renderer is one that exists')
+
+    -- `decal` is the better mechanism and does not work on every build: on the one this was
+    -- developed against, AddDecal accepts five type IDs, hands back real non-zero handles for
+    -- all of them, and draws nothing. So the default is the mechanism that cannot quietly
+    -- fail, and this asserts nobody has typo'd it into a third value that silently draws
+    -- neither.
+    t.ok(MIFireScorch.renderer == 'marker' or MIFireScorch.renderer == 'decal',
+        'renderer is "marker" or "decal"')
+
+    t.describe('and the marker is dark enough to read as scorching')
+
+    local marker = MIFireScorch.markerColour
+
+    t.ok(marker.r < 60 and marker.g < 60 and marker.b < 60,
+        'a scorch is the absence of colour, not a colour of its own')
+
+    t.ok(marker.alpha > 0 and marker.alpha < 200,
+        'and it is not opaque -- a flat unlit disc at full alpha reads as a hole in the '
+        .. 'floor rather than as a burn')
+
+    t.ok((MIFireScorch.markerHeight or 0) > 0 and (MIFireScorch.markerHeight or 0) < 0.5,
+        'the disc lies flat rather than standing up as a cylinder')
 end

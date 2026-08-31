@@ -185,19 +185,11 @@ flammable-liquid fire smoked white while it was still small.
 
 ## 9. Burn marks
 
-**Do this first, before anything else in this section.**
-
-- [ ] `/fire decals` — a row of candidates appears ahead of you, numbered, each labelled
-      *placed* or *REJECTED by the game*.
-- [ ] Note which ones you can actually see. Some may be "placed" and still invisible.
-- [ ] Set the one that looks most like scorching as `MIFireScorch.decal` in
-      `config/scorch.lua`, restart, and carry on.
-
-*This step exists because the decal type is the one visual constant in the resource that
-could not be verified against anything already running on this machine. If burn marks never
-appear, this is the cause, and F8 will carry a warning naming it.*
-
-Then:
+Marks are drawn as **flat dark discs**, not decals. Decals are the better mechanism and this
+build does not render them: `AddDecal` accepts five type IDs, hands back real non-zero
+handles for every one, and draws nothing — tested at four metres across in flat white at full
+opacity with a marker overhead, indoors and out. The decal path is still in the resource
+behind `MIFireScorch.renderer = 'decal'` for servers where it works.
 
 - [ ] `/fire here`, let it burn out on its own. A mark is left where it was.
 - [ ] `/fire here` again and put it out **immediately**. That mark should be noticeably

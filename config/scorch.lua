@@ -25,7 +25,26 @@ MIFireScorch = {}
 --- Master switch.
 MIFireScorch.enabled = true
 
---- Decal type used for a burn mark.
+--- How a mark is drawn.
+---
+---   `marker`  A flat dark disc laid on the ground, drawn per frame. Works everywhere,
+---             because it uses the same mechanism every checkpoint and objective marker in
+---             the game uses. Costs a draw call per visible mark.
+---
+---   `decal`   A real projected decal. Cheaper, conforms to whatever it lands on, and is
+---             what you actually want -- **if your build renders them**.
+---
+--- Default is `marker`, on evidence rather than preference. On the build this was developed
+--- against, `AddDecal` accepts five type IDs (1010, 1015, 1017, 1020, 1030), returns real
+--- non-zero handles for all of them, and draws nothing at all -- tested at four metres
+--- across in flat white at full opacity with a marker overhead, indoors and out. Something
+--- upstream of this resource is eating them.
+---
+--- The decal path is kept because it is the better mechanism where it works, and
+--- `/fire decals sweep` will tell you within a minute whether yours is such a build.
+MIFireScorch.renderer = 'marker'
+
+--- Decal type used for a burn mark, when `renderer` is `decal`.
 ---
 --- Confirm with `/fire decals` before trusting it. If burn marks do not appear, this is the
 --- first thing to change and the command exists to tell you what to change it to.
@@ -55,9 +74,21 @@ MIFireScorch.size = {
     fullSizeAfterSeconds = 120.0,
 }
 
---- Colour multipliers, 0-1. Left dark and desaturated: a scorch is absence of colour rather
---- than a colour of its own, and tinting it warm reads as paint.
+--- Colour multipliers, 0-1, for the `decal` renderer. Left dark and desaturated: a scorch is
+--- absence of colour rather than a colour of its own, and tinting it warm reads as paint.
 MIFireScorch.colour = { r = 0.16, g = 0.15, b = 0.14, alpha = 0.85 }
+
+--- The `marker` renderer, 0-255.
+---
+--- Near-black at moderate alpha. A marker is a flat unlit disc, so anything above about 140
+--- alpha stops reading as scorching and starts reading as a hole in the floor -- which is the
+--- main risk with this mechanism and the first thing to turn down if it looks wrong.
+MIFireScorch.markerColour = { r = 20, g = 18, b = 16, alpha = 115 }
+
+--- Height of the disc, and how far above the ground it sits. Low enough to lie flat, high
+--- enough not to z-fight with the surface it is on.
+MIFireScorch.markerHeight = 0.04
+MIFireScorch.markerLift = 0.03
 
 --- How long a mark lasts if nobody cleans it.
 ---

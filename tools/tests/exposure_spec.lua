@@ -302,6 +302,12 @@ return function(t)
         return elapsed
     end
 
+    -- Rolling is meant to pay. It was reported as working "just barely", which is another
+    -- way of saying the correct action barely beat doing nothing -- so the margin is
+    -- asserted rather than left to feel.
+    local rollScale = cfg.ignition.rollingDamageMultiplier or 1.0
+    t.ok(rollScale < 1.0, 'rolling reduces what the fire is doing to you')
+
     for _, name in ipairs({ 'wildland', 'structural', 'proximity' }) do
         local tier = MIFireGear.tiers[name]
         local roll = tier.selfExtinguish
@@ -320,6 +326,14 @@ return function(t)
         local inside = secondsOnceAlight(tier, true)
         t.ok(inside < clear,
             ('%s: staying in the fire to roll is worse than backing out of it'):format(name))
+
+        -- And the worst realistic case -- rolling without getting clear first -- still has
+        -- to leave enough time to finish. This is the one the player actually does, because
+        -- catching fire is a surprise and backing out costs seconds they do not know they
+        -- have.
+        t.ok(inside * (1.0 / rollScale) > roll,
+            ('%s: rolling without backing out first still completes (%.1fs against a %.1fs '
+                .. 'roll)'):format(name, inside * (1.0 / rollScale), roll))
     end
 
     t.describe('every tier eventually dies')

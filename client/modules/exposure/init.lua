@@ -35,6 +35,10 @@ local rolling = false
 --- Declared here because the exposure event below ignites the player, and the flames it
 --- starts are defined further down. A plain `local function` there would leave this call
 --- site resolving to a nil global instead.
+--- Verified in production on this server: qbx_medical plays it for last stand.
+local ROLL_DICT = 'combat@damage@writhe'
+local ROLL_CLIP = 'writhe_loop'
+
 local startBurning, stopBurning
 
 RegisterNetEvent('mi_fire:client:exposure', function(payload)
@@ -290,6 +294,17 @@ end
 --- Takes the tier's `selfExtinguish` time, which is longer in an encapsulating hazmat suit
 --- because you cannot roll effectively in one. A partner with a charged line is faster,
 --- which is the point of having a partner.
+--- Actually stop, drop and roll.
+---
+--- Three beats, because a progress bar with a standing animation is not the action being
+--- described: you go **down**, you **roll**, and you get **up**. The drop is a short
+--- ragdoll so the ped genuinely falls rather than teleporting to the floor, the roll is a
+--- ground animation with the ped turning over continuously underneath it, and the server is
+--- told you are prone for as long as it lasts.
+---
+--- `combat@damage@writhe` is the dictionary qbx_medical uses for last stand, so it is
+--- verified rather than picked off a list -- the same rule the particle names follow, and
+--- for the same reason: a wrong name plays nothing and reports nothing.
 local function stopDropRoll()
     if rolling or not current.burning then return end
     rolling = true
@@ -298,16 +313,52 @@ local function stopDropRoll()
     local tier = MIFireGear.tiers[tierName or MIFireGear.defaultTier] or MIFireGear.tiers.none
     local seconds = tier.selfExtinguish or 5.0
 
+    local ped = cache.ped
+
+    -- Rolling smothers the flame and puts you under the worst of it. The server halves the
+    -- damage while this is true, which is what makes the action worth taking rather than a
+    -- delay before dying anyway.
+    TriggerServerEvent('mi_fire:server:rolling', true)
+
+    -- Drop. Short, so it reads as going down rather than as losing control.
+    SetPedToRagdoll(ped, 700, 700, 0, false, false, false)
+    Wait(600)
+
+    RequestAnimDict(ROLL_DICT)
+    local waited = 0
+    while not HasAnimDictLoaded(ROLL_DICT) and waited < 2000 do
+        Wait(50)
+        waited = waited + 50
+    end
+
+    -- Turn over, continuously, for as long as the roll lasts. This is the part that makes it
+    -- look like rolling rather than lying still with a progress bar over it.
+    local spinning = true
+    CreateThread(function()
+        local heading = GetEntityHeading(ped)
+        while spinning do
+            heading = (heading + 9.0) % 360.0
+            SetEntityHeading(ped, heading)
+            Wait(20)
+        end
+    end)
+
     local finished = lib.progressBar({
         duration = math.floor(seconds * 1000),
         label = 'Stop, drop and roll',
         useWhileDead = false,
         canCancel = true,
         disable = { move = true, car = true, combat = true },
-        anim = { dict = 'move_m@injured', clip = 'idle', flag = 9 },
+        anim = HasAnimDictLoaded(ROLL_DICT)
+            and { dict = ROLL_DICT, clip = ROLL_CLIP, flag = 9 }
+            or nil,
     })
 
+    spinning = false
+    ClearPedTasks(ped)
+
     rolling = false
+    TriggerServerEvent('mi_fire:server:rolling', false)
 
     if finished then
         TriggerServerEvent('mi_fire:server:selfExtinguish')

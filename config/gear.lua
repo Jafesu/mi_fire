@@ -373,6 +373,17 @@ MIFireGear.exposure = {
         --- someone alight forever.
         maximumBurnSeconds = 45.0,
 
+        --- Damage multiplier while stopping, dropping and rolling.
+        ---
+        --- Rolling smothers the flame and puts you under the worst of it, and both are real:
+        --- prone is below the fire, and the ground is what puts a burning coat out. Without
+        --- this the roll is only a delay before dying anyway -- it was reported as working
+        --- but "just barely", which is another way of saying the correct action did not pay.
+        ---
+        --- Applies to flame, burn and gear degradation together, so rolling also stops the
+        --- coat being eaten while you do it.
+        rollingDamageMultiplier = 0.4,
+
         --- The flames on a burning player.
         ---
         --- Drawn by us rather than with `StartEntityFire`, which looks right but brings

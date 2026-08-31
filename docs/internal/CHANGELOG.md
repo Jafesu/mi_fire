@@ -13,6 +13,13 @@ Versions follow [Semantic Versioning](https://semver.org).
   engine fire underneath it, which ignited and killed players on the engine's own schedule
   — full structural turnout gave about seven seconds instead of a minute. Fires still light
   the scene; the light is drawn directly now.
+- Stop, drop and roll is a real action: you drop, you roll on the ground, and you get up.
+  Rolling also cuts what the fire is doing to you, so taking the correct action pays rather
+  than merely delaying the same outcome.
+- Standing in a fire no longer charges you twice for the same heat. Radiant heat is what
+  reaches you near a fire; the flame already accounts for standing in one. In full turnout
+  that was the difference between dying at forty seconds having never caught fire, and the
+  minute the gear is rated for.
 - Catching fire is survivable if you act at once. The engine's own ped fire was applying
   damage on top of the resource's, killing a firefighter in about two seconds against a
   four second roll — so stop, drop and roll could not be performed by anyone.

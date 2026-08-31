@@ -96,12 +96,22 @@ model's numbers.
 
 - [x] Full turnout in a fire lasts about a minute rather than seven seconds, and ignition
       takes ~46 seconds rather than two.
-- [ ] Stand in a fire in turnout until you ignite (~46 seconds).
-- [ ] **The flames should look right.** They are a particle on your spine now, not the engine
-      effect. If nothing is drawn, check F8 for a `burn particle` warning.
-- [ ] **Get clear of the fire first**, then hold **X**. Three seconds, and you should live.
-- [ ] Try it again **without leaving the flame**. Markedly worse — getting out first should
-      roughly double your window.
+- [x] Stand in a fire in turnout until you ignite (~46 seconds).
+- [x] Hold **X**. It completes. *Confirmed, but "just barely" — that is now fixed twice
+      over: heat is no longer double-charged, and rolling itself cuts the damage to 40%.*
+
+**The roll is a real action now, not a progress bar.**
+
+- [ ] Hold **X**. You should visibly **drop** — a short ragdoll, not a snap to the floor.
+- [ ] You should then be **on the ground turning over**, not standing still.
+- [ ] You get up when it finishes.
+- [ ] It should no longer feel marginal. Rolling without backing out of the flame first now
+      leaves roughly 36 seconds against a 3 second roll.
+- [ ] **The flames should look right** while you burn. They are a particle on your spine now,
+      not the engine effect. If nothing is drawn, check F8 for a `burn particle` warning.
+- [ ] Getting clear of the flame first should still be **noticeably** better than rolling
+      inside it.
+- [ ] Cancel the roll partway. You should stand up, still alight, and be able to start again.
 - [ ] Second player: target you while you are alight and **Put them out**. Faster than
       rolling. *Never tested.*
 

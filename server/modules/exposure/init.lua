@@ -141,6 +141,12 @@ local function tickPlayer(source, dt)
     local payload = { }
     local damage = 0.0
 
+    -- Prone and smothering. Reduces flame, burn and gear degradation together, so the roll
+    -- is worth performing rather than a pause before the same outcome.
+    local rollingScale = player.rolling
+        and (cfg.ignition.rollingDamageMultiplier or 1.0)
+        or 1.0
+
     -- --- Flame -----------------------------------------------------------
 
     if sample.flameIntensity > 0 then
@@ -150,10 +156,10 @@ local function tickPlayer(source, dt)
             * MIFire.GearMatch.protectionMultiplier(
                 gearEntry.coverage or 1.0, MIFireGear.coverage)
         damage = damage + Exposure.flameDamage(sample.flameIntensity,
-            { fireResist = resist }, cfg.flame) * dt
+            { fireResist = resist }, cfg.flame) * dt * rollingScale
 
         -- Burn through the gear.
-        local worn = Exposure.gearDegradation(sample.flameIntensity, tier) * dt
+        local worn = Exposure.gearDegradation(sample.flameIntensity, tier) * dt * rollingScale
         if worn > 0 then
             gearEntry.integrity = math.max(0.0, gearEntry.integrity - worn)
 
@@ -210,6 +216,7 @@ local function tickPlayer(source, dt)
     if player.burning then
         damage = damage + cfg.ignition.burnDamagePerTick * (1000.0 / cfg.flame.tickMs)
             * dt * (1.0 - Exposure.effectiveFireResist(gearEntry.integrity, tier))
+            * rollingScale
 
         -- Stops on its own eventually, so a disconnect mid-burn does not leave someone
         -- permanently alight.
@@ -397,6 +404,15 @@ end)
 
 AddEventHandler('playerDropped', function()
     tracked[source] = nil
+end)
+
+--- Told by the client, because only it knows the progress bar is still running. Worth no
+--- validation beyond a boolean: the most a forged report achieves is taking less fire
+--- damage while standing still, which is what rolling is.
+RegisterNetEvent('mi_fire:server:rolling', function(active)
+    local source = source
+    local player = tracked[source]
+    if player then player.rolling = active == true end
 end)
 
 exports('IsBurning', function(source) return ExposureServer.isBurning(source) end)

@@ -265,4 +265,37 @@ return function(t)
             t.ok(checked > 0, 'and there is at least one tier to check')
         end
     end
+
+    -- -----------------------------------------------------------------------
+
+    t.describe('a booster reel is not an attack line')
+
+    -- The "REEL" discharge on the panel. Permanently plumbed hard rubber on a fixed reel:
+    -- pulled and rewound rather than pulled and repacked, which makes it the fastest line on
+    -- the truck and the most tempting. Pulling the red line on a room and contents fire is a
+    -- real and recurring mistake, and the numbers are why.
+    --
+    -- Nothing special-cases it. The coefficients are the published ones and the consequence
+    -- falls out of them, which is the correct way for a lesson to arrive.
+    local boosterFL = H.frictionLoss(1.0, 60, 200)
+    local crosslayFL = H.frictionLoss(1.75, 60, 200)
+
+    t.ok(boosterFL > crosslayFL * 5,
+        ('200ft of 1 inch booster at 60 gpm loses %.0f psi against %.0f for the same flow in '
+            .. 'a 1.75 inch crosslay'):format(boosterFL, crosslayFL))
+
+    t.describe('and it gets worse the harder you push it')
+
+    -- Friction loss goes with the square of flow, so asking a booster line for attack-line
+    -- flow is not merely inefficient, it is impossible.
+    local at150 = H.frictionLoss(1.0, 150, 200)
+
+    t.ok(at150 > 400,
+        ('asking 150 gpm of it -- an ordinary crosslay flow -- costs %.0f psi of friction '
+            .. 'alone, past what the pump will make'):format(at150))
+
+    t.describe('three quarter inch is worse still')
+
+    t.ok(H.frictionLoss(0.75, 60, 200) > boosterFL * 3,
+        'which is why the smaller reel is for washing down and nothing else')
 end

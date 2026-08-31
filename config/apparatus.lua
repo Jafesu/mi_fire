@@ -42,9 +42,32 @@ MIFireApparatus.portTypes = {
     ---     { id = 'crosslay1', type = 'discharge', x = ..., y = ..., z = ...,
     ---       size = 1.75, preconnected = { feet = 200 } }
     ---
-    --- Its own type would mean the pump panel, the hydraulics and the hose system each having
-    --- to know that two names mean one thing. On the real rig it is the same plumbing, with a
-    --- gauge and a valve on the panel exactly like the rear bed.
+    --- **A booster reel** -- the "REEL" discharge on the panel, also called a red line -- is
+    --- the same idea with two differences that matter:
+    ---
+    ---     { id = 'reel', type = 'discharge', x = ..., y = ..., z = ...,
+    ---       size = 1.0, preconnected = { feet = 200, reel = true } }
+    ---
+    --- It is permanently plumbed hard rubber hose on a fixed reel, so it is pulled and
+    --- **rewound** rather than pulled and repacked -- one person, seconds, no reloading the
+    --- bed afterwards. That convenience is the entire appeal and the entire danger.
+    ---
+    --- At three quarters or one inch it flows a fraction of what a crosslay does, and the
+    --- friction loss is brutal: `shared/hydraulics.lua` carries the real coefficients, 1100
+    --- for 0.75 inch and 150 for 1 inch, against 15.5 for a 1.75 inch crosslay. Two hundred
+    --- feet of booster line at any useful flow eats more pressure than the line is worth.
+    ---
+    --- So it is right for a rubbish fire, a car fire, a grass fire, or washing a scene down,
+    --- and **badly wrong for anything in a structure**. Pulling the red line on a room and
+    --- contents fire is a real and recurring mistake, and it should be one here too: nothing
+    --- special-cases it, the flow is simply too small to knock the fire down, and the crew
+    --- finds out while the fire keeps growing. That falls out of the hydraulics rather than
+    --- being scripted, which is the correct way for a lesson to arrive.
+    ---
+    --- A crosslay or a reel having its own port type would mean the pump panel, the hydraulics
+    --- and the hose system each having to know that several names mean one thing. On the real
+    --- rig it is all the same plumbing, with a gauge and a valve on the panel exactly like the
+    --- rear bed.
     discharge   = true,
     --- Water in: a hydrant supply line, a draft from open water, or another rig's discharge
     --- filling this one's tank. All three arrive the same way, so they are one type.

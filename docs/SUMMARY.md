@@ -11,6 +11,7 @@
 
 * [SCBA and air](guides/scba-and-air.md)
 * [Reading smoke](guides/reading-smoke.md)
+* [Working the pump](guides/pump-operations-explained.md)
 
 ## Configuration
 

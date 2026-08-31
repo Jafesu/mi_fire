@@ -21,6 +21,7 @@ Start with [Installation](getting-started/installation.md).
 
 * [SCBA and air](guides/scba-and-air.md)
 * [Reading smoke](guides/reading-smoke.md)
+* [Working the pump](guides/pump-operations-explained.md)
 
 Remaining guides are written as their feature ships, so this section fills in over time. Each one is
 written as a training manual rather than an API reference: short numbered steps, what you

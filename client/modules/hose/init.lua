@@ -82,29 +82,51 @@ local function ensureTextures()
     return texturesLoaded
 end
 
---- The nozzle in someone's hands.
+--- The nozzle, as a weapon.
 ---
---- Off by default, and that is deliberate. There is no vanilla prop that looks like a nozzle:
---- `prop_fire_hosereel_l1` is the reel itself, and in hand it reads as a firefighter carrying a
---- large flat coil of something. Better nothing in the hand than the wrong thing in it.
----
---- Set `MIFireHose.visuals.nozzleProp` if you have an addon prop worth using.
+--- A weapon rather than a prop, because a nozzle sprays and a prop cannot. It also gives the
+--- two-handed grip and the aiming stance, which is what holding a charged line looks like.
+---@param ped integer
+---@return boolean given
+local function giveNozzle(ped)
+    local name = MIFireHose.visuals.nozzleWeapon
+
+    if name then
+        local hash = joaat(name)
+
+        if IsWeaponValid(hash) then
+            GiveWeaponToPed(ped, hash, 1, false, true)
+            SetCurrentPedWeapon(ped, hash, true)
+            return true
+        end
+
+        Util.warn('nozzle weapon "%s" is not registered. A weapon needs its archetype and '
+            .. 'info metas declared with `data_file` in fxmanifest.lua -- the model alone is '
+            .. 'inert, which is why it stays unknown however many times a client reconnects.',
+            name)
+    end
+
+    return false
+end
+
+---@param ped integer
+local function takeNozzleAway(ped)
+    local name = MIFireHose.visuals.nozzleWeapon
+
+    if name then
+        local hash = joaat(name)
+        if HasPedGotWeapon(ped, hash, false) then RemoveWeaponFromPed(ped, hash) end
+    end
+end
+
+--- A prop, for a server that has no weapon registered.
 ---@param ped integer
 ---@return integer|nil
-local function attachNozzle(ped)
+local function attachNozzleProp(ped)
     local name = MIFireHose.visuals.nozzleProp
     if not name or name == '' then return nil end
 
     local model = joaat(name)
-
-    -- `IsModelInCdimage` is asked but not obeyed.
-    --
-    -- It answers about the game's own archetypes, and a streamed asset can be perfectly
-    -- loadable while reporting false there -- which it did, and the check then refused to even
-    -- try. Worth recording in the message, because it distinguishes "the client has never
-    -- heard of this" from "the client has it and it would not load", but the load is attempted
-    -- either way and the load is what decides.
-    local known = IsModelInCdimage(model) or IsModelValid(model)
 
     RequestModel(model)
 
@@ -115,20 +137,7 @@ local function attachNozzle(ped)
     end
 
     if not HasModelLoaded(model) then
-        if known then
-            Util.warn('nozzle prop "%s" is a known model but would not load in five seconds',
-                name)
-        else
-            -- Almost always this: the client is holding the asset list it was given when it
-            -- connected. Adding files to `stream/` and restarting the resource does not send
-            -- them to somebody already in the server. **Reconnect** -- F8, then `reconnect` --
-            -- rather than restarting the game, which is slower and does the same thing.
-            Util.warn('nozzle prop "%s" is unknown to this client. Reconnect (F8 -> '
-                .. '"reconnect") -- a client keeps the asset list it was given when it joined, '
-                .. 'so a server-side refresh does not reach it. If it survives a reconnect, '
-                .. 'the model is not being streamed at all.', name)
-        end
-
+        Util.warn('nozzle prop "%s" would not load', name)
         return nil
     end
 
@@ -295,16 +304,23 @@ end
 --- a crew walking an uncoupled line out from the bed had nothing in their hands the whole way,
 --- which is exactly the part of the job where they are carrying a nozzle.
 local heldNozzle = nil
+local heldWeapon = false
 
 local function reconcileNozzle()
     local line = mine and lines[mine]
     local holding = line ~= nil and line.nozzleHolder == GetPlayerServerId(PlayerId())
 
-    if holding and not heldNozzle then
-        heldNozzle = attachNozzle(cache.ped)
+    if holding and not heldWeapon and not heldNozzle then
+        heldWeapon = giveNozzle(cache.ped)
 
-    elseif not holding and heldNozzle then
-        if DoesEntityExist(heldNozzle) then DeleteEntity(heldNozzle) end
+        -- Only if the weapon is unavailable. A prop is the consolation prize.
+        if not heldWeapon then heldNozzle = attachNozzleProp(cache.ped) end
+
+    elseif not holding and (heldWeapon or heldNozzle) then
+        if heldWeapon then takeNozzleAway(cache.ped) end
+        if heldNozzle and DoesEntityExist(heldNozzle) then DeleteEntity(heldNozzle) end
+
+        heldWeapon = false
         heldNozzle = nil
     end
 end
@@ -1052,8 +1068,10 @@ RegisterNetEvent('mi_fire:client:clearHoseProps', function()
     for id in pairs(drawn) do undraw(id) end
 
     if heldNozzle and DoesEntityExist(heldNozzle) then DeleteEntity(heldNozzle) end
+    if heldWeapon then takeNozzleAway(cache.ped) end
 
     heldNozzle = nil
+    heldWeapon = false
     drawn = {}
     lines = {}
     mine = nil
@@ -1062,8 +1080,10 @@ end)
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= GetCurrentResourceName() then return end
 
-    -- An attached prop outlives the resource otherwise, and there is nothing left to remove it.
+    -- A prop or a weapon outlives the resource otherwise, and there is nothing left to take
+    -- it away. A firefighter stuck holding a hose nozzle after a restart is a support ticket.
     if heldNozzle and DoesEntityExist(heldNozzle) then DeleteEntity(heldNozzle) end
+    if heldWeapon then takeNozzleAway(cache.ped) end
 end)
 
 --- The pump panel, until Phase 4's NUI replaces it.

@@ -275,33 +275,31 @@ MIFireHose.visuals = {
     slack = 0.35,
 
     --- Props. Base game, all four confirmed present in resources on this machine.
-    --- The prop in a firefighter's hands.
+    --- The nozzle in a firefighter's hands, as a **weapon**.
     ---
-    --- **`w_am_hose` was the wrong answer and is worth recording as such.** It is SmartHose's
-    --- nozzle and it is not a prop -- it is a *weapon archetype*, defined in a
-    --- `weaponarchetypes.meta` and registered through four `data_file` declarations. Copying
-    --- the `.ydr` gives the game a mesh with no archetype to hang it on, so it stays unknown
-    --- to every client however many times anyone reconnects.
+    --- A weapon rather than a prop, because a nozzle sprays. A prop can be held and cannot be
+    --- fired, and the stance is wrong besides -- a weapon gives the two-handed grip and the
+    --- aiming that holding a charged line actually looks like.
     ---
-    --- Making it work would mean copying four meta files and registering a custom weapon into
-    --- the game's weapon tables, which is a considerably larger borrow than a model, would
-    --- collide with SmartHose if it were ever enabled, and -- the deciding point -- would
-    --- build this around a weapon when the replacement will be a prop. That is a pipeline to
-    --- throw away.
+    --- `WEAPON_HOSE` is SmartHose's, borrowed for development along with the four meta files
+    --- that define it. The model alone is inert: a weapon needs an archetype, which is why
+    --- copying just the `.ydr` left it unknown to every client however many times anyone
+    --- reconnected. The metas are declared in `fxmanifest.lua` and gitignored with the model.
     ---
-    --- So: a base game prop, or nothing. `/fire nozzle` tries the candidates in turn and
-    --- attaches each for two seconds, which is the quickest way to find one that does not look
-    --- absurd.
-    nozzleProp = 'hei_prop_heist_hose_01',
+    --- **Replace before release.** Its replacement has to be a weapon too, which is a larger
+    --- job than a prop -- see `ASSET-001`.
+    nozzleWeapon = 'WEAPON_HOSE',
 
-    --- Models borrowed from another resource for development.
-    ---
-    --- Listed so the boot check can say so out loud every time the server starts. A borrowed
-    --- asset that nobody is reminded about is one that ships.
-    --- Models borrowed from another resource. Nothing is, currently -- `w_am_hose` turned out
-    --- to be a weapon rather than a prop and was abandoned. Kept because the boot check and
-    --- `conventions_spec` both read it, so the next borrow is declared rather than quiet.
-    borrowed = {},
+    --- Fallback for a server without the weapon registered. Nothing is a legitimate answer
+    --- here: better an empty hand than a firefighter carrying a hose reel.
+    nozzleProp = nil,
+
+    --- Borrowed from another resource, for development only. Read by the boot check, which
+    --- names each one and its owner on every server start, and by `conventions_spec`, which
+    --- fails if something is used that is neither base game nor declared here.
+    borrowed = {
+        WEAPON_HOSE = 'SmartHose',
+    },
     couplingProp = 'prop_fire_hosebox_01',
     reelProp = 'prop_fire_hosereel',
 

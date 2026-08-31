@@ -112,19 +112,25 @@ MIFireApparatus.portShapes = {
 --- at the one you want.
 MIFireApparatus.pointReach = 0.55
 
---- How tall a zone is, in metres, when its corners do not imply one.
+--- How deep a zone is on whichever axis was walked flat, in metres.
 ---
---- The corners give the footprint; this gives the height, centred on the average height of the
---- four points. Walk the corners at roughly the height of the compartment opening and the zone
---- lands around it.
-MIFireApparatus.zoneHeight = {
-    gear        = 1.8,
-    tool        = 1.8,
-    hosebed     = 1.6,
-    scba_rack   = 1.6,
-    ladder_rack = 1.4,
-    panel       = 1.8,
-    default     = 1.6,
+--- Corners are walked around an *opening*, not around a footprint. A gear locker is a door in
+--- the side of a rig, so its four corners come back with the same `x`. A hose bed is walked
+--- around its rim, so they come back with the same `z`. Both are natural and both are right,
+--- and neither leaves a box on its own -- so whichever axis comes back flat gets this much
+--- depth, centred on where it was walked.
+---
+--- A locker therefore gets a metre of reach into the rig, and a hose bed gets a metre and a
+--- half of height around its rim. Override per port with `depth`.
+MIFireApparatus.zoneDepth = {
+    gear        = 1.0,
+    tool        = 1.0,
+    hosebed     = 1.5,
+    scba_rack   = 1.0,
+    ladder_rack = 1.0,
+    panel       = 1.0,
+
+    default     = 1.0,
 }
 
 --- Defaults merged under every profile, so a new rig only declares what differs.

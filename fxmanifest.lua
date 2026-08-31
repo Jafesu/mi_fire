@@ -106,6 +106,24 @@ dependencies {
     'oxmysql',
 }
 
+--- The hose nozzle is a **weapon**, not a prop.
+---
+--- That is deliberate: a weapon gives the right two-handed stance and aiming, and it is what a
+--- nozzle that sprays water has to be. A prop cannot be fired.
+---
+--- `w_am_hose` and these four metas are borrowed from SmartHose for development. The mesh
+--- alone is inert -- a weapon needs an archetype, so the `.ydr` is useless without
+--- `weaponarchetypes.meta`, which is why copying only the model left it unknown to every
+--- client no matter how many times anyone reconnected.
+---
+--- **Both the metas and the model are gitignored.** A clone gets the declarations and none of
+--- the art, so the resource still starts -- FiveM warns about a missing data file rather than
+--- refusing -- and shipping somebody else's weapon cannot happen by accident. See `ASSET-001`.
+data_file 'WEAPONINFO_FILE' 'data/weapons.meta'
+data_file 'WEAPON_METADATA_FILE' 'data/weaponarchetypes.meta'
+data_file 'WEAPON_ANIMATIONS_FILE' 'data/weaponanimations.meta'
+data_file 'PED_PERSONALITY_FILE' 'data/pedpersonality.meta'
+
 ui_page 'web/index.html'
 
 files {

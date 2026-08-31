@@ -14,24 +14,18 @@ Streamed assets for mi_fire.
 > If a model survives both, it is not being streamed at all — check the filename matches the
 > model name exactly, and that both the `.ydr` and its `.ytd` are present.
 
-**Nothing is in here right now.**
+**Borrowed, and not in the repository.**
 
-`w_am_hose.ydr` and `.ytd` were copied from **SmartHose** and then removed, because they do not
-work on their own and the reason is worth keeping.
+`w_am_hose.ydr` / `.ytd` are SmartHose's hose nozzle, and they do not work alone — see
+`../data/`, which holds the four meta files that define the weapon, and `fxmanifest.lua`, which
+declares them. All of it is gitignored.
 
-`w_am_hose` is not a prop. It is a **weapon archetype**, defined in SmartHose's
-`weaponarchetypes.meta` and registered through four `data_file` declarations in its manifest.
-Copying the `.ydr` gives the game a mesh with no archetype to hang it on, so it stays unknown to
-every client no matter how many times anyone refreshes or reconnects — which is exactly what
-happened, twice, before anyone read the other manifest.
+**The nozzle is a weapon, not a prop**, because a nozzle sprays and a prop cannot be fired. That
+also means the `.ydr` on its own is inert: a weapon needs an archetype, so copying just the model
+leaves it unknown to every client however many times anyone refreshes or reconnects. That was
+diagnosed twice as a streaming problem before anyone read the other manifest.
 
-Making it work would mean copying four meta files and registering a custom weapon into the
-game's weapon tables. Larger borrow, a collision with SmartHose if it were ever enabled, and —
-the deciding point — it would build the nozzle around a weapon when the replacement will be a
-prop. That is a pipeline to throw away.
-
-The nozzle is a base game prop instead. `/fire nozzle` tries the candidates in turn and attaches
-each for two seconds, which is the quickest way to find one that does not look absurd.
+Replace before release. See `ASSET-001` in `docs/internal/TASKS.md`.
 
 ## `rope.ytd` — tested, global, removed
 

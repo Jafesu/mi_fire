@@ -29,3 +29,4 @@ scratch/
 # by reflex. A clone should get the code and none of somebody else's art.
 # See ASSET-001 in docs/internal/TASKS.md.
 stream/w_am_hose.*
+data/*.meta

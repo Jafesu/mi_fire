@@ -188,7 +188,6 @@ return function(t)
     -- A discharge is a specific piece of brass you couple a specific line to, and being asked
     -- which one is the interaction rather than an obstacle.
     local shapes = MIFireApparatus.portShapes
-    local heights = MIFireApparatus.zoneHeight
 
     t.equal(Apparatus.shape({ type = 'gear' }, shapes), 'zone', 'a gear locker is an area')
     t.equal(Apparatus.shape({ type = 'hosebed' }, shapes), 'zone', 'so is a hose bed')
@@ -199,58 +198,84 @@ return function(t)
 
     -- -----------------------------------------------------------------------
 
-    t.describe('an area is the footprint that was walked')
+    t.describe('an area is the box around what was walked')
 
-    -- Corners rather than a centre and a size, because a size guesses at a shape nobody
-    -- measured -- and a compartment running along a chamfered corner is not a box.
+    -- Corners are walked around an **opening**, not around a footprint, and the difference
+    -- cost a round of testing. A gear locker is a door in the side of a rig, so all four
+    -- corners come back with the same x -- a flat vertical rectangle. A hose bed is walked
+    -- around its rim, so all four come back with the same z. Both are the natural thing to do.
+    --
+    -- The first version tested a point against the corners in the x/y plane. That works for
+    -- the bed and is meaningless for the locker: a shape with no width has no area, so nothing
+    -- is ever inside it, and every compartment on the side of the truck silently answered no
+    -- while looking perfectly well authored.
+    local depths = MIFireApparatus.zoneDepth
+
+    --- A locker door: flat in x, which is how one is actually walked.
     local locker = {
         id = 'gear1', type = 'gear',
         corners = {
-            { x = -1.7, y = -3.0, z = 0.2 },
-            { x = -0.7, y = -3.0, z = 0.2 },
-            { x = -0.7, y = -1.2, z = 0.2 },
-            { x = -1.7, y = -1.2, z = 0.2 },
+            { x = -1.24, y = -3.0, z = -0.4 },
+            { x = -1.24, y = -1.2, z = -0.4 },
+            { x = -1.24, y = -1.2, z = 0.9 },
+            { x = -1.24, y = -3.0, z = 0.9 },
         },
     }
 
-    t.equal(Apparatus.contains(locker, { x = -1.2, y = -2.0, z = 0.2 }, shapes, heights), true,
-        'a point inside the footprint is inside')
+    t.equal(Apparatus.contains(locker, Apparatus.centre(locker, shapes), shapes, depths), true,
+        'the middle of a walked opening is inside it, which the plane test could never say')
 
-    t.equal(Apparatus.contains(locker, { x = -1.2, y = 0.5, z = 0.2 }, shapes, heights), false,
-        'and one past the end of it is not, however close it is in the other axes')
+    t.equal(Apparatus.contains(locker, { x = -1.0, y = -2.0, z = 0.2 }, shapes, depths), true,
+        'and so is a point a little way into the rig from it -- the door has depth')
 
-    t.equal(Apparatus.contains(locker, { x = 0.5, y = -2.0, z = 0.2 }, shapes, heights), false,
-        'nor one on the far side of the rig')
+    t.equal(Apparatus.contains(locker, { x = -1.24, y = 0.5, z = 0.2 }, shapes, depths), false,
+        'past the end of the locker is not')
 
-    t.describe('and it is not a rectangle unless you walked one')
+    t.equal(Apparatus.contains(locker, { x = -1.24, y = -2.0, z = 3.0 }, shapes, depths), false,
+        'nor is well above it')
 
-    -- The crossing test takes any shape, which is the point of walking corners rather than
-    -- declaring a width and a depth.
-    local wedge = {
-        id = 'w', type = 'tool',
+    t.describe('and the flat axis is the one that gets depth')
+
+    local min, max = Apparatus.bounds(locker, depths)
+
+    t.near(max.x - min.x, depths.gear, 0.01, 'x was walked flat, so x is given the depth')
+    t.near(max.y - min.y, 1.8, 0.01, 'the walked width is left alone')
+    t.near(max.z - min.z, 1.3, 0.01, 'and so is the walked height')
+
+    t.describe('a bed walked around its rim works the same way')
+
+    -- The other orientation, and the reason this is a bounding box rather than a plane test in
+    -- any one chosen pair of axes.
+    local bed = {
+        id = 'hosebed1', type = 'hosebed',
         corners = {
-            { x = 0.0, y = 0.0, z = 0.0 },
-            { x = 2.0, y = 0.0, z = 0.0 },
-            { x = 0.0, y = 2.0, z = 0.0 },
+            { x = -0.9, y = -5.1, z = 0.95 },
+            { x = 0.9, y = -5.1, z = 0.95 },
+            { x = 0.9, y = -3.6, z = 0.95 },
+            { x = -0.9, y = -3.6, z = 0.95 },
         },
     }
 
-    t.equal(Apparatus.contains(wedge, { x = 0.3, y = 0.3, z = 0.0 }, shapes, heights), true,
-        'a point inside the triangle is inside')
-    t.equal(Apparatus.contains(wedge, { x = 1.6, y = 1.6, z = 0.0 }, shapes, heights), false,
-        'and one outside the hypotenuse is not -- which a bounding box would have got wrong')
+    t.equal(Apparatus.contains(bed, Apparatus.centre(bed, shapes), shapes, depths), true,
+        'the middle of the bed is in the bed')
 
-    t.describe('height comes from the type, centred on the walk')
+    local bedMin, bedMax = Apparatus.bounds(bed, depths)
+    t.near(bedMax.z - bedMin.z, depths.hosebed, 0.01,
+        'z was walked flat this time, so z is what gets the depth')
 
-    -- Walk the corners at the height of the compartment opening and the zone lands around it,
-    -- rather than starting at your feet.
-    local floor, ceiling = Apparatus.zoneBounds(locker, heights)
+    t.describe('and every shipped compartment contains its own middle')
 
-    t.ok(floor < 0.2 and ceiling > 0.2, 'the corners sit inside the height, not at its floor')
-    t.near(ceiling - floor, heights.gear, 0.001, 'and the height is the one for that type')
-
-    t.equal(Apparatus.contains(locker, { x = -1.2, y = -2.0, z = 5.0 }, shapes, heights), false,
-        'so a point well above the rig is outside')
+    -- The check that would have caught it. A port whose centre is not inside itself is not a
+    -- port anybody can use, and it says nothing about that in the config.
+    for name, profile in pairs(MIFireApparatus.profiles) do
+        for _, port in ipairs(profile.ports or {}) do
+            if Apparatus.shape(port, shapes) == 'zone' and type(port.corners) == 'table' then
+                t.equal(Apparatus.contains(port,
+                    Apparatus.centre(port, shapes), shapes, depths), true,
+                    ('%s: %s contains its own centre'):format(name, port.id))
+            end
+        end
+    end
 
     -- -----------------------------------------------------------------------
 
@@ -258,9 +283,9 @@ return function(t)
 
     local outlet = { id = 'd1', type = 'discharge', x = -0.9, y = 0.2, z = -0.4 }
 
-    t.equal(Apparatus.contains(outlet, { x = -0.9, y = 0.2, z = -0.4 }, shapes, heights), true,
+    t.equal(Apparatus.contains(outlet, { x = -0.9, y = 0.2, z = -0.4 }, shapes, depths), true,
         'dead on the outlet')
-    t.equal(Apparatus.contains(outlet, { x = -0.9, y = 1.4, z = -0.4 }, shapes, heights), false,
+    t.equal(Apparatus.contains(outlet, { x = -0.9, y = 1.4, z = -0.4 }, shapes, depths), false,
         'and a metre away is not, because picking the right outlet is the interaction')
 
     -- -----------------------------------------------------------------------

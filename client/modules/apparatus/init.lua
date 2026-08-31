@@ -141,7 +141,7 @@ function ApparatusClient.atPort(entity, coords, portType, radius)
             if (dx * dx + dy * dy + dz * dz) <= radius * radius then return true end
 
         elseif MIFire.Apparatus.contains(port, local_,
-            MIFireApparatus.portShapes, MIFireApparatus.zoneHeight) then
+            MIFireApparatus.portShapes, MIFireApparatus.zoneDepth) then
             return true
         end
     end

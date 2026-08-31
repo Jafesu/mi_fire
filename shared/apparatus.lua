@@ -97,74 +97,87 @@ function Apparatus.shape(port, shapes)
     return (shapes and shapes[port.type]) == 'zone' and 'zone' or 'point'
 end
 
---- The height of a zone and where its floor sits.
+--- The box a set of corners describes.
 ---
---- The four corners give the footprint; the height is centred on their average, so someone who
---- walks the corners at roughly the height of the compartment opening gets a zone around it
---- rather than one starting at their feet.
+--- **Corners are walked around an opening, not around a footprint.** A gear locker is a door
+--- in the side of a rig, so all four corners come back with the same `x` -- a flat vertical
+--- rectangle. A hose bed is walked around its rim, so all four come back with the same `z` --
+--- a flat horizontal one. Both are the natural thing to do and both are correct.
+---
+--- The first version treated corners as a floor plan and tested a point against them in the
+--- x/y plane. That works for the hose bed and is meaningless for the locker: a shape with no
+--- width has no area, so nothing is ever inside it, and every compartment on the side of the
+--- truck silently answered no.
+---
+--- So: take the bounding box of whatever was walked, and give depth to whichever axis came
+--- back flat. A door gets depth into the rig, a rim gets height above and below it, and
+--- neither needs the person walking it to think about which they are drawing.
 ---@param port table
----@param heights table `MIFireApparatus.zoneHeight`
----@return number floor
----@return number ceiling
-function Apparatus.zoneBounds(port, heights)
+---@param depths table `MIFireApparatus.zoneDepth`
+---@return table min `{ x, y, z }`
+---@return table max
+function Apparatus.bounds(port, depths)
     local corners = port.corners or {}
-    local sum, count = 0.0, 0
+
+    local min = { x = math.huge, y = math.huge, z = math.huge }
+    local max = { x = -math.huge, y = -math.huge, z = -math.huge }
 
     for i = 1, #corners do
-        sum = sum + (tonumber(corners[i].z) or 0.0)
-        count = count + 1
+        local corner = corners[i]
+
+        for _, axis in ipairs({ 'x', 'y', 'z' }) do
+            local value = tonumber(corner[axis]) or 0.0
+            if value < min[axis] then min[axis] = value end
+            if value > max[axis] then max[axis] = value end
+        end
     end
 
-    local centre = count > 0 and (sum / count) or 0.0
-    local height = tonumber(port.height)
-        or tonumber(heights and heights[port.type])
-        or tonumber(heights and heights.default)
-        or 1.6
+    if #corners == 0 then
+        return { x = 0, y = 0, z = 0 }, { x = 0, y = 0, z = 0 }
+    end
 
-    return centre - height * 0.5, centre + height * 0.5
+    local depth = tonumber(port.depth)
+        or tonumber(depths and depths[port.type])
+        or tonumber(depths and depths.default)
+        or 1.0
+
+    -- Anything under this counts as flat and gets the depth. Nobody walks a perfect plane, so
+    -- a few centimetres of wobble must not stop an opening being recognised as one.
+    local flat = 0.35
+
+    for _, axis in ipairs({ 'x', 'y', 'z' }) do
+        if (max[axis] - min[axis]) < flat then
+            local centre = (max[axis] + min[axis]) * 0.5
+            min[axis] = centre - depth * 0.5
+            max[axis] = centre + depth * 0.5
+        end
+    end
+
+    return min, max
 end
 
 --- Is a point inside this port?
 ---
---- Takes the point already converted to **vehicle-local** space, which is what makes a walked
---- footprint work: a compartment stays where it is however the truck is parked, and a world
---- coordinate would not.
----
---- Zone ports use a crossing test against their four corners, so the footprint can be any
---- quadrilateral rather than a rectangle -- a rig is not axis-aligned in its own details, and a
---- compartment that runs along a chamfered corner is a real thing.
+--- Takes the point already converted to **vehicle-local** space, which is what keeps a
+--- compartment where it is however the truck is parked.
 ---@param port table
 ---@param localPoint table `{ x, y, z }` in vehicle space
 ---@param shapes table `MIFireApparatus.portShapes`
----@param heights table `MIFireApparatus.zoneHeight`
+---@param depths table `MIFireApparatus.zoneDepth`
 ---@return boolean
-function Apparatus.contains(port, localPoint, shapes, heights)
+function Apparatus.contains(port, localPoint, shapes, depths)
     if Apparatus.shape(port, shapes) == 'zone' then
         local corners = port.corners
 
-        -- A zone with no corners has not been authored yet. Answering false would hide the
-        -- interaction entirely; the caller falls back to the whole vehicle instead.
+        -- Not walked yet. Answering false would hide the interaction; the caller falls back
+        -- to the whole vehicle instead.
         if type(corners) ~= 'table' or #corners < 3 then return false end
 
-        local floor, ceiling = Apparatus.zoneBounds(port, heights)
-        if localPoint.z < floor or localPoint.z > ceiling then return false end
+        local min, max = Apparatus.bounds(port, depths)
 
-        -- Crossing number, in the x/y plane.
-        local inside = false
-        local count = #corners
-
-        for i = 1, count do
-            local a = corners[i]
-            local b = corners[(i % count) + 1]
-
-            if ((a.y > localPoint.y) ~= (b.y > localPoint.y))
-                and (localPoint.x < (b.x - a.x) * (localPoint.y - a.y)
-                    / ((b.y - a.y) ~= 0 and (b.y - a.y) or 1e-9) + a.x) then
-                inside = not inside
-            end
-        end
-
-        return inside
+        return localPoint.x >= min.x and localPoint.x <= max.x
+            and localPoint.y >= min.y and localPoint.y <= max.y
+            and localPoint.z >= min.z and localPoint.z <= max.z
     end
 
     local reach = tonumber(port.radius) or 0.55

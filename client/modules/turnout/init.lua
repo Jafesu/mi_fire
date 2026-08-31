@@ -509,8 +509,13 @@ local function diagnoseGear()
     return lines
 end
 
-RegisterNetEvent('mi_fire:client:diagnoseGear', function()
-    local lines = diagnoseGear()
+RegisterNetEvent('mi_fire:client:diagnoseGear', function(serverLines)
+    local lines = {}
+
+    for i = 1, #(serverLines or {}) do lines[#lines + 1] = serverLines[i] end
+    lines[#lines + 1] = '--- what the CLIENT sees ---'
+
+    for _, line in ipairs(diagnoseGear()) do lines[#lines + 1] = line end
     for i = 1, #lines do
         TriggerEvent('chat:addMessage', { args = { 'mi_fire', lines[i] } })
     end

@@ -61,14 +61,40 @@ MIFireClasses.base = {
 
     --- Also start a native GTA script fire under the particles.
     ---
-    --- Worth it: a script fire casts real light and heat haze, which particles do not, and
-    --- without it a night-time fire is a flat orange smudge that lights nothing. The engine
-    --- still owns whether the fire exists -- the script fire is decoration that gets removed
-    --- with the node.
+    --- **Off, and think hard before turning it on.** This was described here as
+    --- "decoration" and it is nothing of the kind. `StartScriptFire` creates a real engine
+    --- fire with its own behaviour: it sets peds alight within a second or two of contact
+    --- and burns them down on GTA's schedule, which knows nothing about turnout gear,
+    --- `fireResist`, integrity, or any other number in `config/gear.lua`.
     ---
-    --- GTA caps concurrent script fires (around 70), so this is skipped once the client is
-    --- already rendering a lot of them; particles carry on regardless.
-    scriptFire = true,
+    --- In play that meant a firefighter in full structural turnout ignited in about two
+    --- seconds and died in seven, while the HUD correctly showed the coat still at full
+    --- integrity -- because our model had barely touched it. Every survival figure in this
+    --- resource was being computed and then overruled by the engine.
+    ---
+    --- It is the same fault as `StartEntityFire`, which was removed from the burning-player
+    --- path for exactly this reason, and it is why BUILD.md carries the invariant: **the
+    --- resource owns its damage; no native applies it for us.**
+    ---
+    --- What it was actually wanted for -- light -- is now drawn directly with
+    --- `DrawLightWithRange`, which lights the scene without spawning something that kills
+    --- people.
+    ---
+    --- Turning this on hands fire damage back to the engine. The gear model still runs, so
+    --- players take both.
+    scriptFire = false,
+
+    --- Light cast by a fire, since particles emit none and a night fire without it is a
+    --- flat orange smudge. Drawn per frame at the node, tinted warm and scaled by intensity.
+    light = {
+        enabled = true,
+        --- Metres. Scaled up by node intensity.
+        range = 9.0,
+        intensity = 2.4,
+        r = 255, g = 138, b = 42,
+        --- Beyond this from the camera, do not bother.
+        drawDistance = 60.0,
+    },
 }
 
 --- Per-class overrides, merged onto `base` at load.

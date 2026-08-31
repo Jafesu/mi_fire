@@ -443,10 +443,37 @@ subcommands.gear = function(source)
     local down, why = MIFire.Medical.isDown(source)
     lines[#lines + 1] = ('down: %s%s'):format(tostring(down), why and (' (' .. why .. ')') or '')
 
-    replyList(source, lines)
+    -- What the exposure model is sampling where you are standing right now, and what each
+    -- channel is doing to you per second. This is the number that matters: "I died in seven
+    -- seconds" is only diagnosable against the per-channel breakdown.
+    local ped = GetPlayerPed(source)
+    if ped and ped ~= 0 and MIFire.ExposureServer then
+        local sample = MIFire.ExposureServer.sample(GetEntityCoords(ped), tier)
+        local ex = MIFireGear.exposure
 
-    TriggerClientEvent('mi_fire:client:diagnoseGear', source)
-    reply(source, 'client half printed to your chat and F8 console')
+        local resist = MIFire.Exposure.effectiveFireResist(entry.integrity or 0, tier)
+            * MIFire.GearMatch.protectionMultiplier(entry.coverage or 1.0, MIFireGear.coverage)
+
+        local flame = sample.flameIntensity > 0
+            and MIFire.Exposure.flameDamage(sample.flameIntensity, { fireResist = resist }, ex.flame)
+            or 0.0
+
+        lines[#lines + 1] = ('exposure here: flame intensity %.0f, smoke %.2f, heat build %.1f')
+            :format(sample.flameIntensity, sample.smokeDensity, sample.heatBuild)
+        lines[#lines + 1] = ('  effective resist %.3f  ->  flame %.2f hp/s')
+            :format(resist, flame)
+
+        if not scba.active and sample.smokeDensity > 0 then
+            lines[#lines + 1] = ('  smoke %.2f hp/s -- YOUR VALVE IS SHUT, so smoke is '
+                .. 'hurting you'):format((ex.smoke.damagePerTick or 0) * sample.smokeDensity)
+        end
+    end
+
+    -- Handed to the client rather than printed here, so both halves land in one F8 block.
+    -- Splitting them across the server console and the chat box is how the useful half
+    -- gets lost.
+    TriggerClientEvent('mi_fire:client:diagnoseGear', source, lines)
+    reply(source, 'gear diagnosis printed to your F8 console -- both halves')
 end
 
 --- `/fire perms` -- why you can or cannot use these commands.

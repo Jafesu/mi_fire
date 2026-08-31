@@ -361,4 +361,32 @@ return function(t)
 
     reset()
     os.time = realTime
+
+    -- -----------------------------------------------------------------------
+
+    t.describe('no class hands fire damage back to the engine')
+
+    -- The bug this exists to stop coming back: `StartScriptFire` creates a real GTA fire
+    -- that ignites and kills peds on the engine's schedule, knowing nothing about turnout
+    -- gear or any other number in config/gear.lua. It was on, described in a comment as
+    -- "decoration", and it meant a firefighter in full structural gear ignited in about two
+    -- seconds and died in seven while the HUD correctly showed the coat at full integrity.
+    --
+    -- Every survival figure this resource computes was being overruled by the engine, and
+    -- nothing in the test suite noticed because the arithmetic was all perfectly correct.
+    t.equal(MIFireClasses.base.scriptFire, false,
+        'the base visuals do not start a native script fire')
+
+    for name, class in pairs(MIFireClasses.classes) do
+        local visuals = class.visuals or {}
+        t.ok(visuals.scriptFire ~= true,
+            ('class %s does not re-enable the native script fire'):format(name))
+    end
+
+    t.describe('and fires still light the scene')
+
+    -- Because that is the only thing the script fire was actually wanted for, and dropping
+    -- it without a replacement would make every night fire a flat orange smudge.
+    t.ok(MIFireClasses.base.light ~= nil, 'there is a light configuration')
+    t.ok((MIFireClasses.base.light.range or 0) > 0, 'with a real range')
 end

@@ -110,7 +110,15 @@ function Render.start(node)
     local visuals = visualsFor(node)
     if not visuals or type(visuals.ptfx) ~= 'table' then return end
 
-    local entry = { layers = {}, scriptFire = nil, intensity = node.intensity or 0 }
+    local entry = {
+        layers = {},
+        scriptFire = nil,
+        intensity = node.intensity or 0,
+        -- Kept on the entry so the light thread does not have to resolve the class again
+        -- every frame for every node.
+        coords = node.coords,
+        light = visuals.light,
+    }
 
     for i = 1, #visuals.ptfx do
         local layer = visuals.ptfx[i]
@@ -137,7 +145,9 @@ function Render.start(node)
         end
     end
 
-    -- Light. Not the fire itself -- if this fails, the fire is still there and still works.
+    -- A real engine fire. Off by default: it is not decoration, it burns people on GTA's
+    -- schedule rather than ours, and it overruled the entire gear model when it was on.
+    -- See `config/fire_classes.lua`.
     if visuals.scriptFire and scriptFireCount < SCRIPT_FIRE_BUDGET then
         local fire = StartScriptFire(node.coords.x, node.coords.y, node.coords.z, 25, false)
         if fire and fire ~= 0 then
@@ -181,6 +191,7 @@ function Render.update(node)
     -- every node is how a fireground becomes a frame rate problem.
     if math.abs((node.intensity or 0) - entry.intensity) < 3.0 then return end
     entry.intensity = node.intensity or 0
+    entry.coords = node.coords
 
     for i = 1, #entry.layers do
         local layer = entry.layers[i]
@@ -192,6 +203,59 @@ function Render.update(node)
         end
     end
 end
+
+
+-- ---------------------------------------------------------------------------
+-- Light
+-- ---------------------------------------------------------------------------
+
+--- Fires cast light; particles do not.
+---
+--- This is what the script fire was wanted for, and it is the whole of what it was wanted
+--- for. Drawing the light directly gets the night-time look without spawning an engine
+--- fire that ignites and kills anyone who walks into it on a schedule this resource does
+--- not control.
+---
+--- Per frame, so it has to stay cheap: nothing is drawn unless a node is close enough to
+--- matter, and the whole thread idles when nothing is burning.
+CreateThread(function()
+    while true do
+        if next(live) == nil then
+            Wait(500)
+        else
+            Wait(0)
+
+            local camera = GetGameplayCamCoord()
+
+            for nodeId, entry in pairs(live) do
+                local light = entry.light
+
+                if light and light.enabled ~= false then
+                    local coords = entry.coords
+
+                    if coords then
+                        local dx, dy, dz =
+                            coords.x - camera.x, coords.y - camera.y, coords.z - camera.z
+                        local distSq = dx * dx + dy * dy + dz * dz
+                        local reach = light.drawDistance or 60.0
+
+                        if distSq <= reach * reach then
+                            -- Flicker, because a steady lamp does not read as fire. Cheap
+                            -- and frame-rate independent enough for what it is.
+                            local flicker = 0.85 + math.random() * 0.3
+                            local scale = 0.35 + (entry.intensity or 0) / 100.0 * 0.65
+
+                            DrawLightWithRange(coords.x, coords.y, coords.z,
+                                light.r or 255, light.g or 138, light.b or 42,
+                                (light.range or 9.0) * scale * flicker,
+                                (light.intensity or 2.4) * scale)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
 
 function Render.stopAll()
     for nodeId in pairs(live) do Render.stop(nodeId) end

@@ -19,19 +19,47 @@ client and the model is real. Two things were wrong and are now fixed, pending a
 - **The model origin was its centre.** For an equipped weapon the origin *is* the grip, so it
   hung out of the fist at an angle. `GRIP_ORIGIN` in `build_nozzle.py` moves it.
 
-The carrying stance is `weapons@heavy@minigun`, set with `SetPedMovementClipset` — a nozzle on a
-charged line is braced at the waist in both hands, which is the minigun pose. Set directly
-rather than shipped as a `weaponanimations.meta`, because that file replaces the game's whole
-animation set instead of merging: both resources on this machine that ship one carry a 13,000
-line copy of the vanilla data, and two of those cannot both be right.
+**The carrying stance is unsolved, and it is off.** A nozzle on a charged line is braced at the
+waist in both hands, which is the minigun shape. `weapons@heavy@minigun` looked like the answer —
+it is what the game's own `weaponanimations.meta` lists as the minigun motion clipset — and
+passing it to `SetPedMovementClipset` **T-posed the ped**. A movement clipset carries walk, run
+and idle clips; a weapon clipset does not, so there is nothing to stand in and the skeleton falls
+back to its bind pose. `HasAnimSetLoaded` returns true for both, so it cannot tell them apart.
 
-**`WEAPON_HOSE` in ox_inventory is SmartHose's, and it is stale.** `failed to equip
-WEAPON_HOSE` is that item trying to equip a weapon that no longer exists on the server; it has
-nothing to do with mi_fire. Our nozzle is not an inventory item on purpose — it comes from
-taking the nozzle on a line, so nobody walks around with one attached to nothing.
+`nozzleClipset` is therefore `nil`, and `/fire nozzlehold <clipset|off>` applies one live so a
+working name can be found by trying rather than reasoned about. Whatever wins goes in the config
+and the command stops mattering. Names beginning `move_` are movement clipsets.
 
-If `/fire nozzle` reports `gotAfter4s=false`, something *is* stripping the weapon, and the fix
-is one entry in `ox_inventory/data/weapons.lua` naming `WEAPON_MINOZZLE`.
+Still shipped as a native call rather than a `weaponanimations.meta`: that file replaces the
+game's whole animation set instead of merging, which is why both resources here that ship one
+carry a 13,000 line copy of the vanilla data.
+
+**ox_inventory strips it, and the fix is one line of server config.** Measured, not guessed:
+the weapon was equipped and gone again within seconds. The mechanism is `ox_inventory/client.lua`
+around line 1408 —
+
+```lua
+elseif client.weaponmismatch and not client.ignoreweapons[weaponHash] then
+    local weaponType = GetWeapontypeGroup(weaponHash)
+    if weaponType ~= 0 and weaponType ~= `GROUP_UNARMED` then
+        Weapon.Disarm(currentWeapon, true)
+```
+
+— any weapon the player did not equip *through the inventory* is disarmed unless it is in
+`ignoreweapons`. That list is the escape hatch for exactly this case, and it is a convar:
+
+```cfg
+setr inventory:ignoreweapons ["WEAPON_MINOZZLE"]
+```
+
+Their `init.lua` already hardcodes `ignoreweapons[`WEAPON_HOSE`] = true` for SmartHose, which is
+the same fix applied the messy way — a resource edit that a future ox_inventory update wipes.
+The convar survives updates.
+
+**`WEAPON_HOSE` is SmartHose's, and it is stale.** `failed to equip WEAPON_HOSE` is that item
+trying to equip a weapon that no longer exists on the server; nothing to do with mi_fire. Our
+nozzle is deliberately not an inventory item — it comes from taking the nozzle on a line, so
+nobody walks around with one attached to nothing.
 
 Five things that had to be right, each of which cost a round of testing:
 

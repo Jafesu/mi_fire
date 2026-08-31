@@ -1773,3 +1773,70 @@ archetype resolves, the model is real. Everything after this is placement and pl
 
 **Next:** hold a charged line and see where the nozzle actually sits.
 
+---
+
+## 2026-08-31 (fourth) — it was the inventory after all, and the stance T-posed
+
+**Scope:** second in-game run. Two failures, both now understood.
+
+**What the test reported:** the re-equip warning fired, meaning the weapon was put back four
+times and taken away four times. And pulling a hose T-posed the player.
+
+**Changed:**
+
+- `client/modules/hose/init.lua` — the stance is cleared whenever the weapon goes, and only
+  applied when it is genuinely in hand. `applyNozzleHold` takes an explicit clipset so the
+  tester and the real path share one function.
+- `config/hose.lua` — `nozzleClipset = nil`. It was `weapons@heavy@minigun`.
+- `server/modules/admin/init.lua`, `client/modules/hose/init.lua` — `/fire nozzlehold
+  <clipset|off>`, to find a stance live.
+
+**Decisions:**
+
+- **ox_inventory really does strip it — and the previous entry in this log, which said it does
+  not, was wrong in the other direction.** Both things were true at different times. Earlier the
+  weapon did not exist, which is why it vanished; now it exists and ox_inventory disarms it.
+  Correcting a wrong conclusion with another confident guess is how an afternoon disappears, so
+  this one was settled by reading `ox_inventory/client.lua` rather than by reasoning:
+
+  ```lua
+  elseif client.weaponmismatch and not client.ignoreweapons[weaponHash] then
+  ```
+
+  Any weapon the player did not equip through the inventory is disarmed unless listed in
+  `ignoreweapons`. The fix is `setr inventory:ignoreweapons ["WEAPON_MINOZZLE"]` in server.cfg --
+  a convar, so no resource gets edited and an ox_inventory update cannot wipe it. Their
+  `init.lua` already hardcodes `WEAPON_HOSE` the messy way, which is the same fix in the form
+  that does get wiped.
+
+- **A weapon clipset is not a movement clipset.** `weapons@heavy@minigun` is what
+  `weaponanimations.meta` lists as the minigun's motion clipset, which is exactly why it looked
+  safe. Passed to `SetPedMovementClipset` it T-poses: a movement clipset carries walk, run and
+  idle clips, a weapon clipset does not, and with nothing to stand in the skeleton falls back to
+  its bind pose. `HasAnimSetLoaded` answers true for both, so there is no check to write.
+
+- **So the stance is found by trying, not by reading.** `/fire nozzlehold` applies one live and
+  `off` undoes it. This is the third thing on this model that could not be reasoned out and had
+  to be looked at -- after the orientation and the grip -- which is starting to look less like
+  bad luck and more like the shape of the work.
+
+- **The two bugs fed each other.** The strip removed the weapon; the stance stayed applied to an
+  empty-handed ped. A T-pose was the visible result of both at once, which is why the stance is
+  now cleared in the same branch that notices the weapon has gone.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1027 passed, 0 failed** (was 1026).
+- The strip mechanism was read in `ox_inventory/client.lua`, not inferred.
+- **Not** retested in game.
+
+**Open:**
+
+- Retest after the convar: pull a line, confirm the nozzle stays and can be fired.
+- Find a stance with `/fire nozzlehold`. `move_ballistic_minigun` is the first candidate worth
+  trying, on the grounds that it at least begins `move_`.
+- `GRIP_ORIGIN` still unjudged -- nothing has stayed in a hand long enough to look at it.
+- `HOSE-010`, `HOSE-011`, `SCORCH-002` unchanged.
+
+**Next:** the convar, then a stance, then finally look at where the thing sits.
+

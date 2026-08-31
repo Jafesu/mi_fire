@@ -100,6 +100,8 @@ MIFireGear.tiers = {
                 pants  = 11,    -- no separate trousers -- the boots carry them
                 shoes  = 164,   -- bunker boots with trousers
                 arms   = 179,   -- gloves
+                bags = 0,     -- no backpack
+                decals = 0,    -- no decals
             },
             female = {
                 hat    = 251,
@@ -107,6 +109,8 @@ MIFireGear.tiers = {
                 pants  = 11,
                 shoes  = 164,
                 arms   = 179,
+                bags = 0,
+                decals = 0,
             },
         },
 

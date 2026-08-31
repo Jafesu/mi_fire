@@ -296,19 +296,22 @@ MIFireHose.visuals = {
     --- equipped and ox_inventory has nothing to strip.
     nozzleWeapon = 'WEAPON_MINOZZLE',
 
-    --- How a charged line is carried.
+    --- How a charged line is carried, as a **movement** clipset.
     ---
-    --- A nozzle is held at the waist in both hands, braced against the reaction of the stream.
-    --- That is the minigun stance, not a pistol one, and `weapons@heavy@minigun` is the
-    --- movement clipset the game already has for it.
+    --- A nozzle on a charged line is braced at the waist in both hands -- the minigun shape.
+    --- Getting the game to adopt it is the awkward part, and this is off until one is found
+    --- that works, because a wrong value here is a **T-pose**.
     ---
-    --- Set directly with `SetPedMovementClipset` rather than shipping a `weaponanimations.meta`.
-    --- That file **replaces** the game whole animation set rather than merging into it -- which
-    --- is why both resources on this machine that ship one carry a 13,000 line copy of the
-    --- vanilla data. Two of those cannot both be right, and ours would have been a third.
+    --- `weapons@heavy@minigun` looks like the obvious answer: it is what the game own
+    --- `weaponanimations.meta` lists as the minigun motion clipset. It T-poses. A movement
+    --- clipset carries walk, run and idle clips; a weapon clipset does not, so there is nothing
+    --- to stand in and the skeleton falls back to its bind pose. `HasAnimSetLoaded` returns
+    --- true for both, so it cannot be used to tell them apart.
     ---
-    --- Set to nil or '' to leave the stance to whatever the weapon itself implies.
-    nozzleClipset = 'weapons@heavy@minigun',
+    --- Find one with `/fire nozzlehold <clipset>`, which applies it live and can be undone with
+    --- `/fire nozzlehold off`. Then put the winner here. Names beginning `move_` are movement
+    --- clipsets; most other things are not.
+    nozzleClipset = nil,
 
     --- Only if the weapon fails to load, which means the metas did not reach the client.
     ---

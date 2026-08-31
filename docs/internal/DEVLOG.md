@@ -2448,3 +2448,60 @@ says so.
 - If it does, the particle is innocent and the suspects are the water event, the shape test in
   `aimPoint`, or the control handling.
 
+---
+
+## 2026-08-31 (sixteenth) — the crash dump, and what it rules out
+
+**Scope:** the dump turned up in `logs/CfxCrashDump_2026_08_31_23_31_42`, which is where the
+client drops one when it goes down with this resource open.
+
+**What it says:**
+
+```
+crash_hash   fivem.exe+16A275F
+legacy hash  vegan-chicken-football
+stack        GTA5_b3258.exe+16A275F, +16A2683, +91DC5E, +1028AF0, ...
+```
+
+Entirely native. **No script error from mi_fire, or from anything else, anywhere before it** --
+the last log line is 98 seconds earlier and unrelated. So nothing threw; the game walked into
+something and fell over.
+
+The session log also confirms `data/weaponanimations.meta` loading alongside the other two, which
+settles the last doubt about that file.
+
+**What it rules out, and what it does not:**
+
+- **The raycast is not it.** `aimPoint` uses `StartExpensiveSynchronousShapeTestLosProbe`, which
+  looked like a fair suspect on its name alone -- until `client/modules/placement/init.lua` turned
+  out to call the same native, the same way, and to have been exercised heavily by `/fireoffset`
+  and every port that has been placed. Proven in this codebase. Changing it would have been churn
+  dressed as a fix.
+
+- **A correction to yesterday's reasoning.** This was almost certainly the first time a line has
+  ever been charged, usable and flowing, so `aimPoint` is exactly as new in practice as the
+  particle is. It was wrong to treat one as established and the other as suspect.
+
+- **The particle is what remains.** It is the one genuinely new native in the path, and it was
+  attached to an object the game creates, destroys, and that `applyNozzleGrip` re-attaches on
+  every stance change.
+
+**Changed:**
+
+- A bone index of `-1` no longer reaches the particle native. `GetPedBoneIndex` answering -1 means
+  the bone is not on this ped, and handing that to a native is how the rope once anchored itself
+  to the middle of the map. What it does to a particle is not worth finding out on someone else's
+  session.
+- `logs/` is gitignored.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1094 passed, 0 failed**.
+- Read from the dump rather than guessed: the crash is native, unaccompanied, and the animation
+  meta loads.
+
+**Open:**
+
+- The bisect still has to be run. `/fire nozzlestream off` and pull the trigger: still crashing
+  means the particle is innocent and the answer is in the water event or the control handling.
+

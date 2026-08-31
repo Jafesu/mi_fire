@@ -895,6 +895,15 @@ local function startStream(ped)
     local grip = activeGrip() or {}
     local bone = GetPedBoneIndex(ped, BONES[grip.bone or 'right'] or BONES.right)
 
+    -- A bone index of -1 is `GetPedBoneIndex` saying the bone is not on this ped, and handing
+    -- that to a native is how the rope ended up anchored to the middle of the map. What it does
+    -- to a particle is not worth finding out on someone else's session.
+    if not bone or bone < 0 then
+        Util.warn('nozzle stream: bone "%s" is not on this ped, so there is nothing to attach '
+            .. 'the jet to. The water still flows.', tostring(grip.bone or 'right'))
+        return
+    end
+
     UseParticleFxAssetNextCall(cfg.asset)
 
     streamHandle = StartParticleFxLoopedOnEntityBone(cfg.name, ped,

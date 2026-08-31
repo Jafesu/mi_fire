@@ -34,3 +34,8 @@ stream/w_am_hose.*
 # They are ours now -- written from the schema, naming our own model -- so they are committed
 # like any other source file. They are also useless without stream/w_mi_nozzle.ydr, and the
 # resource will not load the weapon if any of the three disagree, which conventions_spec tests.
+
+# Crash dumps land here when the client goes down while this resource is being tested. They are
+# multi-megabyte and specific to one session, and the useful part -- the log and crashometry.json
+# -- gets read and written up rather than committed.
+logs/

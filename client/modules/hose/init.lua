@@ -68,12 +68,18 @@ end
 
 --- The nozzle in someone's hands.
 ---
---- A prop rather than a weapon, so it can be attached, aimed loosely and taken off a body
---- without touching the player's inventory.
+--- Off by default, and that is deliberate. There is no vanilla prop that looks like a nozzle:
+--- `prop_fire_hosereel_l1` is the reel itself, and in hand it reads as a firefighter carrying a
+--- large flat coil of something. Better nothing in the hand than the wrong thing in it.
+---
+--- Set `MIFireHose.visuals.nozzleProp` if you have an addon prop worth using.
 ---@param ped integer
 ---@return integer|nil
 local function attachNozzle(ped)
-    local model = joaat(MIFireHose.visuals.nozzleProp)
+    local name = MIFireHose.visuals.nozzleProp
+    if not name or name == '' then return nil end
+
+    local model = joaat(name)
 
     RequestModel(model)
     local waited = 0
@@ -83,7 +89,7 @@ local function attachNozzle(ped)
     end
 
     if not HasModelLoaded(model) then
-        Util.warn('nozzle prop "%s" would not load', MIFireHose.visuals.nozzleProp)
+        Util.warn('nozzle prop "%s" would not load', name)
         return nil
     end
 
@@ -95,24 +101,24 @@ local function attachNozzle(ped)
 
     SetModelAsNoLongerNeeded(model)
 
-    return MIFire.trackEntity and MIFire.trackEntity(prop) or prop
+    return prop
 end
 
 --- Where a line starts, in the world.
 ---@param line table
 ---@return vector3|nil
+---@return integer|nil vehicle
 local function sourceCoords(line)
     if not line.sourceNet then return nil end
+    if not NetworkDoesNetworkIdExist(line.sourceNet) then return nil end
 
-    local entity = NetworkDoesEntityExistWithNetworkId(line.sourceNet)
-        and NetToVeh(line.sourceNet) or 0
-
-    if entity == 0 or not DoesEntityExist(entity) then return nil end
+    local entity = NetToVeh(line.sourceNet)
+    if not entity or entity == 0 or not DoesEntityExist(entity) then return nil end
 
     local profile = apparatus().profile(entity)
     local port = profile and MIFire.Apparatus.port(profile, line.sourcePort)
 
-    if not port then return GetEntityCoords(entity) end
+    if not port then return GetEntityCoords(entity), entity end
 
     return apparatus().portCoords(entity, port), entity
 end
@@ -121,28 +127,30 @@ end
 ---@param line table
 local function draw(id, line)
     if drawn[id] then return end
+    if MIFireHose.visuals.enabled == false then return end
     if not ensureTextures() then return end
 
     local from, vehicle = sourceCoords(line)
     if not from then return end
 
-    -- The far end is whoever has the nozzle. A line nobody is holding still exists and is
-    -- still drawn -- a charged line lying loose is a real and instructive hazard, not a state
-    -- to hide.
     local holder = line.nozzleHolder and GetPlayerFromServerId(line.nozzleHolder)
     local holderPed = holder and holder ~= -1 and GetPlayerPed(holder) or nil
 
+    -- Nobody is holding it. A dropped line is real and worth drawing eventually, but it needs
+    -- a world position to hang from that nothing currently records, so it is skipped rather
+    -- than drawn somewhere wrong.
+    if not holderPed or not DoesEntityExist(holderPed) then return end
+
     local size = MIFireHose.sizes[line.diameter] or {}
-    local feet = Hose.lengthFeet(size, line.sections)
-    local maxLength = feet * 0.3048
+    local maxLength = Hose.lengthFeet(size, line.sections) * 0.3048
 
     local ropeType = line.diameter >= (MIFireHose.visuals.largeAbove or 2.5)
         and MIFireHose.visuals.ropeTypeLarge
         or MIFireHose.visuals.ropeType
 
     local rope = AddRope(from.x, from.y, from.z, 0.0, 0.0, 0.0,
-        maxLength, ropeType, maxLength, maxLength * 0.5, 1.0,
-        false, true, false, 1.0, false, 0)
+        maxLength, ropeType, maxLength, 0.0, 1.0,
+        false, false, false, 1.0, false, 0)
 
     if not rope or rope == 0 then
         Util.warn('AddRope failed for line %s', id)
@@ -151,26 +159,27 @@ local function draw(id, line)
 
     MIFire.trackRope(rope)
 
-    local entry = { rope = rope, vehicle = vehicle, nozzle = nil }
+    -- **The truck is never attached to the rope.**
+    --
+    -- `AttachEntitiesToRope` binds two entities and then makes the rope's length a physical
+    -- constraint between them. Attaching a fire engine to one end of that is how a fire engine
+    -- ends up airborne -- and it did, because the world coordinates it expects were being given
+    -- vehicle-local offsets and a literal 0,0,0, so the rope was trying to pull the rig to the
+    -- centre of the map. `ActivatePhysics` then let it.
+    --
+    -- Pinning a vertex sets where that end of the rope *is*, and applies force to nothing. The
+    -- pin is refreshed as the rig moves, so the hose still comes off the right outlet.
+    PinRopeVertex(rope, 0, from.x, from.y, from.z)
 
-    -- Only the person actually holding it gets a nozzle prop in hand; everyone else sees the
-    -- rope end at their ped, which is enough and costs nothing.
+    local hand = GetPedBoneCoords(holderPed, 57005, 0.0, 0.0, 0.0)
+    AttachRopeToEntity(rope, holderPed, hand.x, hand.y, hand.z, true)
+
+    local entry = { rope = rope, vehicle = vehicle, nozzle = nil, holder = holderPed }
+
     if line.nozzleHolder == GetPlayerServerId(PlayerId()) then
         entry.nozzle = attachNozzle(cache.ped)
     end
 
-    local farEnd = entry.nozzle or holderPed
-
-    if farEnd and DoesEntityExist(farEnd) and vehicle then
-        local offset = GetOffsetFromEntityGivenWorldCoords(vehicle, from.x, from.y, from.z)
-
-        AttachEntitiesToRope(rope, vehicle, farEnd,
-            offset.x, offset.y, offset.z,
-            0.0, 0.0, 0.0,
-            maxLength, false, false, nil, nil)
-    end
-
-    ActivatePhysics(rope)
     drawn[id] = entry
 end
 
@@ -184,6 +193,28 @@ local function undraw(id)
 
     drawn[id] = nil
 end
+
+--- Keep the rig end of each rope on its outlet.
+---
+--- The pin is a world position rather than an attachment, so it does not follow the truck on
+--- its own. Refreshing it costs one native per line and cannot move the vehicle, which is the
+--- entire reason it is done this way.
+CreateThread(function()
+    while true do
+        Wait(200)
+
+        for id, entry in pairs(drawn) do
+            local line = lines[id]
+
+            if not line or not entry.rope or not DoesRopeExist(entry.rope) then
+                undraw(id)
+            else
+                local from = sourceCoords(line)
+                if from then PinRopeVertex(entry.rope, 0, from.x, from.y, from.z) end
+            end
+        end
+    end
+end)
 
 -- ---------------------------------------------------------------------------
 -- Sync
@@ -368,17 +399,28 @@ CreateThread(function()
             canInteract = function(entity, _, coords)
                 if not apparatus().atPort(entity, coords, 'panel') then return false end
 
+                -- Only this rig's lines. Listing every line on the server meant a third engine
+                -- offered to charge two other engines' crosslays, which is both wrong and
+                -- dangerous -- a pump operator would be charging a line they cannot see.
+                local netId = VehToNet(entity)
+
                 for _, line in pairs(lines) do
-                    if line.state == 'connected' then return true end
+                    if line.sourceNet == netId
+                        and (line.state == 'connected' or line.state == 'charged') then
+                        return true
+                    end
                 end
 
                 return false
             end,
-            onSelect = function()
+            onSelect = function(data)
                 local options = {}
+                local netId = VehToNet(data.entity)
 
                 for id, line in pairs(lines) do
-                    if line.state == 'connected' then
+                    if line.sourceNet ~= netId then
+                        -- Belongs to another rig.
+                    elseif line.state == 'connected' then
                         options[#options + 1] = {
                             title = ('Charge %s'):format(line.sourcePort or id),
                             description = ('%s, %d length(s)')
@@ -489,6 +531,18 @@ CreateThread(function()
             TriggerServerEvent('mi_fire:server:cycleNozzlePattern')
         end,
     })
+end)
+
+--- Remove every rope and prop this client made, regardless of what the server thinks.
+---
+--- The escape hatch for a line that has gone wrong. It does not ask the server first, because
+--- the case it exists for is exactly the one where the two disagree.
+RegisterNetEvent('mi_fire:client:clearHoseProps', function()
+    for id in pairs(drawn) do undraw(id) end
+
+    drawn = {}
+    lines = {}
+    mine = nil
 end)
 
 exports('GetHoseLine', function() return mine and lines[mine] or nil end)

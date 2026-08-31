@@ -366,11 +366,13 @@ end
 ---@param lineId string
 ---@return boolean ok
 ---@return string|nil reason
-function HoseServer.stow(source, lineId)
+function HoseServer.stow(source, lineId, force)
     local line = lines[lineId]
     if not line then return false, 'that line is gone' end
 
-    if line.state == 'charged' then
+    -- An admin clearing up a line that has gone wrong is not a crew packing one away, and
+    -- refusing them because it is charged would leave the stuck state stuck.
+    if line.state == 'charged' and not force then
         return false, 'shut the line down before you pack it'
     end
 

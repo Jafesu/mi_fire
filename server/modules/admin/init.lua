@@ -512,6 +512,51 @@ subcommands.scorch = function(source, args)
         :format(count, MIFireScorch.lifetimeMinutes))
 end
 
+--- `/fire hose` -- what lines exist, and a way out when one is stuck.
+---
+--- Exists because the first in-game test left a player holding a prop attached to a line whose
+--- rope had gone wrong, with nothing in the world to target to get rid of it. A system that can
+--- strand someone needs a way to un-strand them that does not involve a server restart.
+subcommands.hose = function(source, args)
+    local action = args[2]
+
+    if action == 'clear' then
+        local count = 0
+        for id in pairs(MIFire.HoseServer.all()) do
+            MIFire.HoseServer.stow(source, id, true)
+            count = count + 1
+        end
+
+        TriggerClientEvent('mi_fire:client:clearHoseProps', -1)
+        return reply(source, ('cleared %d line(s)'):format(count), 'success')
+    end
+
+    if action == 'drop' then
+        MIFire.HoseServer.leaveCrew(source)
+        TriggerClientEvent('mi_fire:client:clearHoseProps', source)
+        return reply(source, 'dropped your line', 'success')
+    end
+
+    local lines = MIFire.HoseServer.all()
+    local rows = {}
+
+    for id, line in pairs(lines) do
+        local crew = 0
+        for _ in pairs(line.crew or {}) do crew = crew + 1 end
+
+        rows[#rows + 1] = ('%s  %s"  %s  %d/%d crew  %.0f gpm  rig %s')
+            :format(id, tostring(line.diameter), line.state, crew,
+                line.crewRequired or 1, line.gpm or 0, tostring(line.sourceNet))
+    end
+
+    if #rows == 0 then return reply(source, 'no lines out') end
+
+    rows[#rows + 1] = 'fire hose drop   -- put your own line down'
+    rows[#rows + 1] = 'fire hose clear  -- remove every line'
+
+    replyList(source, rows)
+end
+
 --- `/fire perms` -- why you can or cannot use these commands.
 ---
 --- Deliberately reachable by anyone: someone who cannot run the commands is exactly who
@@ -536,6 +581,7 @@ local USAGE = {
     'fire gear                            -- why the truck has no gear options',
     'fire decals [sweep]                  -- find a working burn-mark decal type',
     'fire scorch [clear]                  -- burn marks: count, or remove them all',
+    'fire hose [drop|clear]               -- lines out, and a way out of a stuck one',
     'fire sizeup [id]                     -- read the smoke',
     'fire vent <action> [id]              -- force_door | take_window | vertical_vent | close_up',
 }

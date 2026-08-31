@@ -236,6 +236,10 @@ MIFireHose.work = {
 --- are base game. Same rule as the particle pairs and the roll animation, for the same reason:
 --- a wrong name here fails silently.
 MIFireHose.visuals = {
+    --- Draw hose lines at all. Off turns the rope off and leaves the mechanic working, which
+    --- is worth having while the rendering is the least proven part of the system.
+    enabled = true,
+
     --- Rope type. 4 is the one a working hose resource uses; 7 is thicker, for LDH.
     ropeType = 4,
     ropeTypeLarge = 7,
@@ -248,7 +252,10 @@ MIFireHose.visuals = {
     slack = 0.18,
 
     --- Props. Base game, all four confirmed present in resources on this machine.
-    nozzleProp = 'prop_fire_hosereel_l1',
+    --- Nothing, by default. There is no vanilla prop that looks like a nozzle --
+    --- prop_fire_hosereel_l1 is the reel itself, and in hand it reads as a firefighter
+    --- carrying a large flat coil. Better nothing in the hand than the wrong thing.
+    nozzleProp = nil,
     couplingProp = 'prop_fire_hosebox_01',
     reelProp = 'prop_fire_hosereel',
 

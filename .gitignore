@@ -23,10 +23,10 @@ config/*.local.lua
 *.log
 scratch/
 
-# Borrowed assets, development only.
+# Borrowed assets.
 #
-# Nothing is borrowed at the moment, and the pattern stays so the next one cannot be committed
-# by reflex. A clone should get the code and none of somebody else's art.
-# See ASSET-001 in docs/internal/TASKS.md.
+# Nothing is borrowed and nothing can be: assets from an escrowed resource are encrypted and
+# make FiveM refuse to load this one. The patterns stay so a copy made in haste is not also
+# committed. See ASSET-001 in docs/internal/TASKS.md.
 stream/w_am_hose.*
 data/*.meta

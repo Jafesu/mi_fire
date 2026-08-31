@@ -1,34 +1,33 @@
-### `ASSET-001` — a nozzle weapon of our own
+### `ASSET-001` — a nozzle of our own
 
-`WEAPON_HOSE` and four meta files are borrowed from **SmartHose**, along with `w_am_hose.ydr`
-and its texture. All of it is gitignored: a clone gets the `data_file` declarations and none of
-the art, so the resource starts (FiveM warns about a missing data file rather than refusing) and
-shipping somebody else's weapon cannot happen by accident.
+The nozzle is a base game prop. Adequate, not right, and the replacement has to be **made**.
 
-**It has to be a weapon, not a prop.** A nozzle sprays, and a prop cannot be fired. A weapon
-also gives the two-handed grip and the aiming stance, which is what holding a charged line looks
-like. That makes the replacement a larger job than a model -- it needs an archetype in a
-`weaponarchetypes.meta`, an entry in `weapons.meta`, and the `data_file` lines to register both.
+**Nothing from SmartHose can be borrowed. This is settled, not open.** Copying the model and its
+four weapon metas made FiveM refuse to start the resource at all:
 
-**What cost four rounds of testing**, worth writing down because none of it is guessable:
+> Couldn't find asset key for encrypted resource mi_fire
 
-The `.ydr` alone is inert -- a weapon needs its archetype, so copying only the model left it
-unknown to every client no matter how many refreshes and reconnects it was given. That was twice
-diagnosed as a streaming problem.
+Their assets are escrow-encrypted and tied to their own asset key. Readable from disk and
+completely unusable anywhere else, which is exactly what escrow is for. Earlier notes in this
+repository said escrow covered the Lua and not the stream folder; that was wrong, and the error
+above is the proof. **Do not try again**, with these or with `Supply-Line`'s water pump.
 
-`IsWeaponValid` and `IsModelInCdimage` both answer about the base game, so a custom asset fails
-them while working perfectly. Using either as a gate refuses to try and then reports the asset as
-missing, which sends the search after the asset rather than the check.
+**The replacement wants to be a weapon, not a prop**, because a nozzle sprays and a prop cannot
+be fired. Everything needed to use one is already written and waiting on the asset:
 
-And it is **not given as a weapon**. Equipping one means ox_inventory owns it -- it syncs the
-hand to whatever is equipped from the inventory, so a weapon handed over directly is removed
-within the second. `CreateWeaponObject` makes a world object from the weapon hash instead:
-nothing is equipped, no inventory is involved, and the weapon archetype is exactly what it wants.
-SmartHose's own config said so in one line -- `HoseModel = WEAPON_HOSE` beside a timeout for
-"the hose model to be loaded" -- and reading it first would have saved all four rounds.
+- `MIFireHose.visuals.nozzleWeapon` takes the name; nothing else changes.
+- `CreateWeaponObject` makes a world object from the hash and attaches it to `SKEL_R_Hand`, so
+  nothing is ever equipped and no inventory strips it. That last part matters: ox_inventory owns
+  the ped's weapons and removes anything handed over with `GiveWeaponToPed` within a second.
+- A weapon asset loads like a model -- `RequestWeaponAsset`, then wait on
+  `HasWeaponAssetLoaded` -- and skipping that returns 0 in a way that looks exactly like a
+  missing archetype.
+- It needs a `weaponarchetypes.meta` and a `weapons.meta`, declared with `data_file` **and**
+  listed in `files`. Only declaring them sends nothing to the client, which also looks exactly
+  like a missing archetype.
 
-The boot check names every borrowed asset and its owner on each start, and `conventions_spec`
-fails if something is used that is neither base game nor declared in `visuals.borrowed`.
+Those four are written down because each cost a round of testing and none is guessable from the
+native names. `conventions_spec` holds the last two as tests.
 
 ### `HOSE-010` — the hose should lie where it was walked, parked
 

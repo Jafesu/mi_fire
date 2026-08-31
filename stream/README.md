@@ -1,50 +1,22 @@
 # stream
 
-Streamed assets for mi_fire.
+Streamed assets for mi_fire. **Empty, and deliberately so.**
 
-> **New files here need two things, and the second is the one people miss.**
->
-> On the server: `refresh`, then `ensure mi_fire`. The asset index is built on refresh;
-> restarting a resource that already exists reuses the index it had.
->
-> On the client: **reconnect**. A client keeps the asset list it was given when it joined, so a
-> server-side refresh does not reach anyone already in the server. F8 → `reconnect` is enough;
-> a full game restart is slower and does the same thing.
->
-> If a model survives both, it is not being streamed at all — check the filename matches the
-> model name exactly, and that both the `.ydr` and its `.ytd` are present.
+`w_am_hose.ydr` / `.ytd` were copied from **SmartHose** and removed again. They are
+escrow-encrypted, and putting them here made FiveM refuse to start this resource:
 
-**Borrowed, and not in the repository.**
+> Couldn't find asset key for encrypted resource mi_fire
 
-`w_am_hose.ydr` / `.ytd` are SmartHose's hose nozzle, and they do not work alone — see
-`../data/`, which holds the four meta files that define the weapon, and `fxmanifest.lua`, which
-declares them. All of it is gitignored.
+That is what escrow is for. The files are readable from disk and tied to their owner's asset
+key, so they are unusable anywhere else — including here. Earlier notes claimed escrow covered
+only the Lua and not the stream folder. That was wrong.
 
-**The nozzle is a weapon, not a prop**, because a nozzle sprays and a prop cannot be fired. That
-also means the `.ydr` on its own is inert: a weapon needs an archetype, so copying just the model
-leaves it unknown to every client however many times anyone refreshes or reconnects. That was
-diagnosed twice as a streaming problem before anyone read the other manifest.
-
-Replace before release. See `ASSET-001` in `docs/internal/TASKS.md`.
-
-## `rope.ytd` — tested, global, removed
-
-It was here to answer one question: does it retexture only the rope type SmartHose uses, or the
-whole dictionary?
-
-**Tested in game. Every rope changed**, including the rappel rescue line in `mi_utils`. So it is
-gone, and the question is settled — this is not a matter of finding the right file or the right
-rope type. GTA resolves rope textures through `ropedata.xml` against one shared dictionary and
-nothing scopes that.
-
-The hose uses rope type **6** instead, the thickest of the eight built-in types, which is as
-close to hose as is available without abandoning ropes. `/fire ropetypes` lays them all out if
-you want to see for yourself.
-
-Looking like actual hose waits for `HOSE-010`, which replaces the rope with a chain of our own
-segments and makes rope type irrelevant.
+**Do not copy assets out of an escrowed resource.** Not these, not `Supply-Line`'s water pump.
+The result is not a licensing argument, it is a resource that will not load.
 
 ---
 
-Replace the nozzle before release, and this too if it stays. See `ASSET-001` in
-`docs/internal/TASKS.md`.
+> **New files here need `refresh` on the server and a `reconnect` on the client.** The asset
+> index is built on refresh; a client keeps the list it was given when it joined.
+
+See `ASSET-001` in `docs/internal/TASKS.md`.

@@ -274,42 +274,36 @@ MIFireHose.visuals = {
     --- span gives a tow cable. Raise it for a lazier, more realistic lay.
     slack = 0.35,
 
-    --- Props. Base game, all four confirmed present in resources on this machine.
     --- The nozzle in a firefighter's hands.
     ---
-    --- A weapon hash, made into a world **object** with `CreateWeaponObject` and attached to
-    --- the hand. Three things went wrong before that landed and the distinction is the whole
-    --- of it:
+    --- **`WEAPON_HOSE` cannot be borrowed, and that is settled rather than open.** Copying
+    --- SmartHose's model and its four metas made FiveM refuse to start this resource at all:
     ---
-    ---   Giving the weapon equips it, and ox_inventory owns the ped's weapons -- it syncs the
-    ---   hand to whatever is equipped from the inventory, so a weapon handed over directly is
-    ---   removed again within the second.
+    ---     Couldn't find asset key for encrypted resource mi_fire
     ---
-    ---   `CreateObject` wants a plain model archetype, and this is a weapon archetype, so it
-    ---   returns nothing.
+    --- Their assets are escrow-encrypted and tied to their own key. Readable from disk and
+    --- completely unusable anywhere else, which is exactly what escrow is for. Earlier notes
+    --- in this repository claimed escrow covered the Lua and not the stream folder; that was
+    --- wrong, and the error above is the proof.
     ---
-    ---   `CreateWeaponObject` makes an object from a weapon hash. Nothing is equipped, so no
-    ---   inventory is involved, and the weapon archetype is exactly what it wants.
-    ---
-    --- The metas are still what define the archetype, which is why copying the `.ydr` alone
-    --- left it unknown however many times anyone reconnected.
-    ---
-    --- `WEAPON_HOSE` is SmartHose's, borrowed for development along with the four metas.
-    --- Declared in `fxmanifest.lua` and gitignored with the model. **Replace before release**
-    --- -- and the replacement is a weapon archetype, not a prop, which is a larger job. See
-    --- `ASSET-001`.
-    nozzleWeapon = 'WEAPON_HOSE',
+    --- So: a base game prop until one is modelled. `/fire nozzle` attaches each candidate for
+    --- a couple of seconds, which is the quickest way to pick the least wrong one.
+    nozzleProp = 'hei_prop_heist_hose_01',
 
-    --- Fallback for a server without the weapon registered. Nothing is a legitimate answer
-    --- here: better an empty hand than a firefighter carrying a hose reel.
-    nozzleProp = nil,
+    --- Set this once a nozzle of our own exists.
+    ---
+    --- **It wants to be a weapon**, because a nozzle sprays and a prop cannot be fired.
+    --- `CreateWeaponObject` makes a world object from the hash and attaches it, so nothing is
+    --- equipped and no inventory strips it -- which is the arrangement to build toward. It has
+    --- to be made rather than borrowed. See `ASSET-001`.
+    nozzleWeapon = nil,
 
-    --- Borrowed from another resource, for development only. Read by the boot check, which
-    --- names each one and its owner on every server start, and by `conventions_spec`, which
-    --- fails if something is used that is neither base game nor declared here.
-    borrowed = {
-        WEAPON_HOSE = 'SmartHose',
-    },
+    --- Nothing is borrowed, and nothing here can be: the assets on this machine that would
+    --- have suited are escrow-encrypted and refuse to load outside the resource that owns
+    --- them. Kept because the boot check and `conventions_spec` both read it, so the next
+    --- borrow has to be declared rather than slipping in quietly.
+    borrowed = {},
+
     couplingProp = 'prop_fire_hosebox_01',
     reelProp = 'prop_fire_hosereel',
 

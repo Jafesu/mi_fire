@@ -1,18 +1,20 @@
 # data
 
-Weapon metadata, declared with `data_file` in `fxmanifest.lua`.
+Game data files declared with `data_file` in `fxmanifest.lua`. **Empty.**
 
-**Borrowed and gitignored.** These four files come from **SmartHose** and define `WEAPON_HOSE`,
-the hose nozzle a firefighter holds. They are development only.
+Four weapon metas were copied here from **SmartHose** to define its hose nozzle, and removed
+again: they are escrow-encrypted and made FiveM refuse to start the resource.
 
-They matter more than they look. A weapon model is inert without its archetype, so
-`stream/w_am_hose.ydr` does nothing at all unless `weaponarchetypes.meta` is present *and*
-declared. Copying only the model leaves the weapon unknown to every client no matter how many
-times the server is refreshed or a player reconnects — which reads exactly like a streaming
-failure and is not one.
+> Couldn't find asset key for encrypted resource mi_fire
 
-A clone of this repository has the `data_file` declarations and none of these files. FiveM warns
-about a missing data file and starts anyway, so the resource runs and the nozzle is simply
-absent.
+Two things learned along the way are worth keeping, because a nozzle of our own will need both:
 
-Replace before release. See `ASSET-001` in `docs/internal/TASKS.md`.
+**A weapon model is inert without its archetype.** Copying a `.ydr` alone leaves the weapon
+unknown to every client no matter how many refreshes and reconnects it is given — which reads
+exactly like a streaming failure and is not one.
+
+**`data_file` declares; `files` ships.** A meta declared but not listed in `files` never reaches
+a client at all, which also reads exactly like a missing archetype. `conventions_spec` now pairs
+the two blocks so that gap fails the build.
+
+See `ASSET-001` in `docs/internal/TASKS.md`.

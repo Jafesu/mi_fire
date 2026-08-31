@@ -126,10 +126,9 @@ local function createNozzle(ped)
     end
 
     if not HasWeaponAssetLoaded(hash) then
-        Util.warn('nozzle "%s" would not load. Its weapon asset never became available, which '
-            .. 'means the archetype is genuinely absent: check data/weaponarchetypes.meta and '
-            .. 'data/weapons.meta are present and declared with `data_file` in fxmanifest.lua, '
-            .. 'then restart the resource and reconnect.', name)
+        Util.warn('nozzle weapon "%s" would not load. If it is a custom weapon, its '
+            .. 'weapons.meta must be declared with `data_file` **and** listed in `files` -- '
+            .. 'declaring alone sends nothing to the client. Falling back to a prop.', name)
         return nil
     end
 

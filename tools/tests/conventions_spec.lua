@@ -227,16 +227,21 @@ return function(t)
         local visuals = MIFireHose.visuals or {}
         local borrowed = visuals.borrowed or {}
 
+        -- Base game names this check recognises. Anything else has to be declared as
+        -- borrowed, which is the whole point -- a model or weapon that is neither is one
+        -- nobody has thought about.
         local ours = {
             prop_fire_hosereel = true,
             prop_fire_hosereel_l1 = true,
             prop_fire_hosebox_01 = true,
             hei_prop_heist_hose_01 = true,
+            WEAPON_FIREEXTINGUISHER = true,
         }
 
         for key, value in pairs(visuals) do
             if type(value) == 'string' and value:find('^[%w_]+$') and key ~= 'borrowed' then
                 local vanilla = ours[value] or value:find('^prop_') or value:find('^hei_')
+                    or value:find('^WEAPON_')
 
                 t.ok(vanilla ~= nil or borrowed[value] ~= nil,
                     ('%s = "%s" is either a base game model or declared as borrowed')

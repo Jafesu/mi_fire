@@ -276,32 +276,34 @@ MIFireHose.visuals = {
 
     --- The nozzle in a firefighter's hands.
     ---
-    --- **`WEAPON_HOSE` cannot be borrowed, and that is settled rather than open.** Copying
-    --- SmartHose's model and its four metas made FiveM refuse to start this resource at all:
+    --- `WEAPON_FIREEXTINGUISHER`, which is **base game**. Nothing is borrowed, nothing is
+    --- streamed, and it works on any server without a single asset shipped.
     ---
-    ---     Couldn't find asset key for encrypted resource mi_fire
+    --- It is not a hose nozzle. It is a thing held two-handed that sprays, with the animations
+    --- and the stance already right, and its `FIRE_EXTINGUISHER` damage type is the same one
+    --- SmartHose gave its own nozzle -- which is a fair signal that this is the shape the game
+    --- expects a nozzle to be.
     ---
-    --- Their assets are escrow-encrypted and tied to their own key. Readable from disk and
-    --- completely unusable anywhere else, which is exactly what escrow is for. Earlier notes
-    --- in this repository claimed escrow covered the Lua and not the stream folder; that was
-    --- wrong, and the error above is the proof.
+    --- Made into a world object with `CreateWeaponObject` rather than given, so nothing is
+    --- equipped and ox_inventory has nothing to strip.
+    nozzleWeapon = 'WEAPON_FIREEXTINGUISHER',
+
+    --- Swap in a nozzle of our own by changing the line above and nothing else.
     ---
-    --- So: a base game prop until one is modelled. `/fire nozzle` attaches each candidate for
-    --- a couple of seconds, which is the quickest way to pick the least wrong one.
+    --- The work is a mesh and a `weapons.meta` entry. The entry is small -- a `CWeaponInfo`
+    --- with a `Model` and `DamageType FIRE_EXTINGUISHER` -- and the mesh is the part that
+    --- needs modelling. If the mesh reuses a base game model there is no
+    --- `weaponarchetypes.meta` at all, because an archetype exists to declare a *new* model.
+    ---
+    --- See `ASSET-001` for the four things that have to be right, each of which cost a round
+    --- of testing to learn.
+
+    --- Used only if the weapon above fails, which on a stock server it will not.
     nozzleProp = 'hei_prop_heist_hose_01',
 
-    --- Set this once a nozzle of our own exists.
-    ---
-    --- **It wants to be a weapon**, because a nozzle sprays and a prop cannot be fired.
-    --- `CreateWeaponObject` makes a world object from the hash and attaches it, so nothing is
-    --- equipped and no inventory strips it -- which is the arrangement to build toward. It has
-    --- to be made rather than borrowed. See `ASSET-001`.
-    nozzleWeapon = nil,
-
-    --- Nothing is borrowed, and nothing here can be: the assets on this machine that would
-    --- have suited are escrow-encrypted and refuse to load outside the resource that owns
-    --- them. Kept because the boot check and `conventions_spec` both read it, so the next
-    --- borrow has to be declared rather than slipping in quietly.
+    --- Nothing is borrowed, and nothing from an escrowed resource can be: those assets are
+    --- encrypted and make FiveM refuse to load this one. Kept because the boot check and
+    --- `conventions_spec` both read it, so the next borrow has to be declared.
     borrowed = {},
 
     couplingProp = 'prop_fire_hosebox_01',

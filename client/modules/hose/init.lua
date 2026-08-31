@@ -394,7 +394,10 @@ CreateThread(function()
 
     while true do
         local line = mine and lines[mine]
+        -- `usable` is the pump's verdict: a line below a third of its rated nozzle pressure
+        -- is soft, and a soft line puts water on the floor rather than on the fire.
         local flowing = line and line.state == 'charged' and (line.gpm or 0) > 0
+            and line.usable ~= false
             and line.nozzleHolder == GetPlayerServerId(PlayerId())
 
         Wait(flowing and 500 or 1000)
@@ -503,60 +506,16 @@ CreateThread(function()
             end,
         },
         {
-            name = 'mi_fire:chargeLine',
-            icon = 'droplet',
-            label = 'Charge the line',
+            name = 'mi_fire:pumpPanel',
+            icon = 'gauge-high',
+            label = 'Pump panel',
             distance = 2.5,
             canInteract = function(entity, _, coords)
-                if not apparatus().atPort(entity, coords, 'panel') then return false end
-
-                -- Only this rig's lines. Listing every line on the server meant a third engine
-                -- offered to charge two other engines' crosslays, which is both wrong and
-                -- dangerous -- a pump operator would be charging a line they cannot see.
-                local netId = VehToNet(entity)
-
-                for _, line in pairs(lines) do
-                    if line.sourceNet == netId
-                        and (line.state == 'connected' or line.state == 'charged') then
-                        return true
-                    end
-                end
-
-                return false
+                if not apparatus().isApparatus(entity) then return false end
+                return apparatus().atPort(entity, coords, 'panel')
             end,
             onSelect = function(data)
-                local options = {}
-                local netId = VehToNet(data.entity)
-
-                for id, line in pairs(lines) do
-                    if line.sourceNet ~= netId then
-                        -- Belongs to another rig.
-                    elseif line.state == 'connected' then
-                        options[#options + 1] = {
-                            title = ('Charge %s'):format(line.sourcePort or id),
-                            description = ('%s, %d length(s)')
-                                :format((MIFireHose.sizes[line.diameter] or {}).label
-                                    or line.diameter, line.sections),
-                            icon = 'droplet',
-                            onSelect = function()
-                                TriggerServerEvent('mi_fire:server:chargeHose', id, true)
-                            end,
-                        }
-                    elseif line.state == 'charged' then
-                        options[#options + 1] = {
-                            title = ('Shut down %s'):format(line.sourcePort or id),
-                            icon = 'droplet-slash',
-                            onSelect = function()
-                                TriggerServerEvent('mi_fire:server:chargeHose', id, false)
-                            end,
-                        }
-                    end
-                end
-
-                lib.registerContext({
-                    id = 'mi_fire_charge', title = 'Lines', options = options,
-                })
-                lib.showContext('mi_fire_charge')
+                HoseClient.panel(data.entity)
             end,
         },
     })
@@ -666,11 +625,10 @@ CreateThread(function()
                 return lib.notify({ description = 'You are not on the nozzle', type = 'error' })
             end
 
-            local size = MIFireHose.sizes[line.diameter]
-            local wide = (line.gpm or 0) > 0
+            -- Open or shut, not a number of gallons. What comes out is the pump's answer.
+            local open = (line.bail or 0) > 0
 
-            TriggerServerEvent('mi_fire:server:setHoseFlow',
-                wide and 0.0 or (size and size.gpmRange[2] or 100.0))
+            TriggerServerEvent('mi_fire:server:setHoseBail', open and 0.0 or 1.0)
         end,
     })
 
@@ -740,6 +698,101 @@ RegisterNetEvent('mi_fire:client:clearHoseProps', function()
     lines = {}
     mine = nil
 end)
+
+--- The pump panel, until Phase 4's NUI replaces it.
+---
+--- A menu rather than a panel, deliberately: the real one is authored against the photographs
+--- in `docs/Reference/PumpPanels/` and is a project of its own. What this has to do first is
+--- prove the hydraulics are worth looking at -- that setting a pressure changes what a crew a
+--- hundred feet away is holding.
+---@param entity integer
+function HoseClient.panel(entity)
+    local netId = VehToNet(entity)
+    local profile = apparatus().profile(entity)
+    if not profile then return end
+
+    local options = {}
+
+    --- Every line this rig is feeding.
+    local fed = {}
+    for id, line in pairs(lines) do
+        if line.sourceNet == netId then fed[#fed + 1] = { id = id, line = line } end
+    end
+
+    for i = 1, #fed do
+        local id, line = fed[i].id, fed[i].line
+        local size = MIFireHose.sizes[line.diameter] or {}
+        local label = line.sourcePort or id
+
+        if line.state == 'connected' then
+            options[#options + 1] = {
+                title = ('Charge %s'):format(label),
+                description = ('%s, %d length(s) -- dry')
+                    :format(size.label or line.diameter, line.sections or 1),
+                icon = 'droplet',
+                onSelect = function()
+                    TriggerServerEvent('mi_fire:server:chargeHose', id, true)
+                end,
+            }
+
+        elseif line.state == 'charged' then
+            -- Everything a pump operator reads off a discharge gauge, in one line: what they
+            -- are sending, what is arriving at the tip, what it is flowing, and whether the
+            -- crew on the end has a working line or a soft one.
+            local losses = line.losses or {}
+
+            options[#options + 1] = {
+                title = ('%s -- %.0f gpm, %s'):format(label, line.gpm or 0,
+                    line.condition or 'no water'),
+                description = ('nozzle %.0f psi  ·  friction %.0f  ·  elevation %.0f')
+                    :format(line.nozzlePsi or 0, losses.friction or 0, losses.elevation or 0),
+                icon = 'gauge',
+                onSelect = function()
+                    local input = lib.inputDialog(('Discharge pressure -- %s'):format(label), {
+                        {
+                            type = 'slider',
+                            label = 'PSI',
+                            min = 0,
+                            max = math.floor(profile.maxDischargePsi or 250),
+                            default = math.floor(line.dischargePsi or 100),
+                            step = 5,
+                        },
+                    })
+
+                    if input then
+                        TriggerServerEvent('mi_fire:server:setDischarge',
+                            netId, line.sourcePort, input[1])
+                    end
+                end,
+            }
+
+            options[#options + 1] = {
+                title = ('Shut down %s'):format(label),
+                icon = 'droplet-slash',
+                onSelect = function()
+                    TriggerServerEvent('mi_fire:server:chargeHose', id, false)
+                end,
+            }
+        end
+    end
+
+    if #options == 0 then
+        options[#options + 1] = {
+            title = 'Nothing connected',
+            description = 'Pull a line and couple it before there is anything to charge',
+            icon = 'circle-info',
+            disabled = true,
+        }
+    end
+
+    lib.registerContext({
+        id = 'mi_fire_pump',
+        title = ('%s -- pump panel'):format(profile.label or 'Apparatus'),
+        options = options,
+    })
+
+    lib.showContext('mi_fire_pump')
+end
 
 exports('GetHoseLine', function() return mine and lines[mine] or nil end)
 exports('GetHoseLines', function() return lines end)

@@ -154,6 +154,7 @@ return function(t)
         'server/modules/smoke/init.lua',
         'server/modules/scorch/init.lua',
         'server/modules/hose/init.lua',
+        'server/modules/pump/init.lua',
         'server/modules/admin/init.lua',
         'server/api/exports.lua',
     }
@@ -241,7 +242,7 @@ return function(t)
         'Enums', 'Util', 'Hydraulics', 'Validate', 'FireClass', 'Suppression',
         'Framework', 'Dispatch', 'Inventory', 'DB', 'State', 'Permissions',
         'Fire', 'Spread', 'Admin', 'Turnout', 'Appearance', 'GearAppearance',
-        'Pass', 'PassServer', 'Exposure', 'ExposureServer', 'Medical', 'Smoke', 'SmokeServer', 'GearMatch', 'Integrity', 'Scorch', 'Apparatus', 'Hose', 'Pump', 'HoseServer',
+        'Pass', 'PassServer', 'Exposure', 'ExposureServer', 'Medical', 'Smoke', 'SmokeServer', 'GearMatch', 'Integrity', 'Scorch', 'Apparatus', 'Hose', 'Pump', 'PumpServer', 'HoseServer',
     }
     for _, name in ipairs(expected) do
         t.ok(type(MIFire) == 'table' and MIFire[name] ~= nil,

@@ -53,6 +53,12 @@ local function publicOf(line)
         nozzle = line.nozzle,
         pattern = line.pattern,
         gpm = line.gpm,
+        bail = line.bail,
+        nozzlePsi = line.nozzlePsi,
+        losses = line.losses,
+        condition = line.condition,
+        usable = line.usable,
+        dischargePsi = line.dischargePsi,
         sourceNet = line.sourceNet,
         sourcePort = line.sourcePort,
         nozzleHolder = line.nozzleHolder,
@@ -166,6 +172,7 @@ function HoseServer.pull(source, entity, portId)
         nozzle = size.nozzles and size.nozzles[1] or nil,
         pattern = nil,
         gpm = 0.0,
+        bail = 0.0,
         nozzleHolder = source,
         crew = { [source] = true },
         crewRequired = Hose.crewRequired(size),
@@ -340,6 +347,8 @@ function HoseServer.charge(lineId, charged)
     else
         line.state = line.sourceNet and 'connected' or 'stretching'
         line.gpm = 0.0
+        line.bail = 0.0
+        line.nozzlePsi = 0.0
     end
 
     sync(line)
@@ -349,29 +358,56 @@ function HoseServer.charge(lineId, charged)
 end
 
 --- Open or close the nozzle.
+---
+--- **A bail position, not a flow.** Before this, opening a nozzle asked for a number of gallons
+--- and was given it, which meant the pump was decoration -- a crew could stand at the end of
+--- four hundred feet of 1.75 inch and simply request 200 gpm.
+---
+--- Now the bail says how far open it is and `server/modules/pump/` decides what comes out,
+--- from the pressure the operator is sending and everything between the two. A crew that wants
+--- more water asks the pump for more pressure. That is the job.
 ---@param source integer
----@param gpm number Requested flow.
+---@param bail number 0 shut, 1 fully open.
 ---@return boolean ok
 ---@return string|nil reason
-function HoseServer.setFlow(source, gpm)
+function HoseServer.setBail(source, bail)
     local id = playerLine[source]
     local line = id and lines[id]
     if not line then return false, 'you are not on a line' end
     if line.nozzleHolder ~= source then return false, 'you are not on the nozzle' end
     if line.state ~= 'charged' then return false, 'that line has no water in it' end
 
-    local size = MIFireHose.sizes[line.diameter]
-    local ceiling = Hose.flowCeiling(size, crewCount(line), MIFireHose.underCrewed)
+    line.bail = math.max(0.0, math.min(1.0, tonumber(bail) or 0.0))
 
-    -- Asking for more than the crew can hold is not refused -- it is capped, and the reason
-    -- is said out loud. Being told "you cannot" teaches nothing; being told "you and one other
-    -- cannot hold this open past 179 gpm" teaches the whole system.
-    line.gpm = math.max(0.0, math.min(tonumber(gpm) or 0.0, ceiling))
-
+    -- Flow is not set here. The pump tick solves it within the second, and saying anything
+    -- about gallons at this point would be inventing a number the hydraulics have not agreed
+    -- to yet.
     sync(line)
-    return true, (line.gpm < (tonumber(gpm) or 0.0))
-        and ('%d on this line can hold %.0f gpm'):format(crewCount(line), ceiling)
-        or nil
+
+    return true
+end
+
+--- How many are on a line. Read by the pump when it decides what a crew can hold open.
+---@param line table
+---@return integer
+function HoseServer.crewOn(line)
+    local count = 0
+    for _ in pairs(line.crew or {}) do count = count + 1 end
+    return count
+end
+
+--- Tell everyone on a line something. Used by the pump for cavitation and low water.
+---@param line table
+---@param message string
+---@param kind string|nil
+function HoseServer.notify(line, message, kind)
+    notifyLine(line, message, kind)
+end
+
+--- Push a batch of lines after the pump has solved them.
+---@param batch table[]
+function HoseServer.syncAll(batch)
+    for i = 1, #batch do sync(batch[i]) end
 end
 
 -- ---------------------------------------------------------------------------
@@ -468,14 +504,12 @@ RegisterNetEvent('mi_fire:server:chargeHose', function(lineId, charged)
         ok and 'success' or 'error')
 end)
 
-RegisterNetEvent('mi_fire:server:setHoseFlow', function(gpm)
+RegisterNetEvent('mi_fire:server:setHoseBail', function(bail)
     local source = source
-    local ok, note = HoseServer.setFlow(source, tonumber(gpm) or 0.0)
+    local ok, why = HoseServer.setBail(source, tonumber(bail) or 0.0)
 
-    if ok and note then
-        TriggerClientEvent('mi_fire:client:notify', source, note, 'inform')
-    elseif not ok and note then
-        TriggerClientEvent('mi_fire:client:notify', source, note, 'error')
+    if not ok and why then
+        TriggerClientEvent('mi_fire:client:notify', source, why, 'error')
     end
 end)
 

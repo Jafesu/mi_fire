@@ -86,6 +86,7 @@ server_scripts {
     'server/modules/smoke/init.lua',
     'server/modules/scorch/init.lua',
     'server/modules/hose/init.lua',
+    'server/modules/pump/init.lua',
     'server/modules/admin/init.lua',
     'server/api/exports.lua',
 }

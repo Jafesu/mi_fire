@@ -65,12 +65,27 @@ Needs the `EengineHT`, which is the only rig with authored ports.
 - [ ] With an unconnected line, third-eye a discharge — **Connect the line here**.
 - [ ] Try connecting a 1.75″ line to a 2.5″ outlet. It should refuse and say the sizes.
 
-**Water.**
+**Water. The nozzle no longer chooses its own flow.**
 
-- [ ] Third-eye the **pump panel**. **Charge the line** appears, listing your connected lines.
-- [ ] Charge it with the pump **not engaged** — it should refuse.
-- [ ] Engage the pump, charge it. Press **G** to open the nozzle.
+- [ ] Third-eye the **pump panel**. **Pump panel** appears, listing this rig's lines only.
+- [ ] Charge a line with the pump **not engaged** — it should refuse.
+- [ ] Engage the pump, charge the line. Press **G** to open the bail.
+- [ ] **Nothing should come out.** No discharge pressure has been set, and a charged line with
+      a shut discharge is a dry line. That is correct.
+- [ ] Open the panel, select the line, set a **discharge pressure**. Water flows.
+- [ ] The panel entry should read the flow, the pressure at the nozzle, and the friction and
+      elevation losses. Those numbers are the whole point.
+- [ ] Set it to **40 psi**. The line should be called **soft** and put no water on the fire.
+- [ ] Raise it. Watch the flow climb.
 - [ ] Put it on a fire and confirm the fire goes down.
+
+**Then the things that were impossible before.**
+
+- [ ] Pull a **second** line off the same rig and charge it. The first should lose flow.
+- [ ] Raise the pressure and watch the first recover — that is what a governor is for.
+- [ ] Stretch a line **300ft+** and compare its flow to a short one at the same pressure.
+      Longer is less, and the operator has to pay for it.
+- [ ] Ask for more than the pump can make (two 2½″ wide open). Expect a cavitation warning.
 - [ ] Press **B** to change pattern on a fog nozzle. On a smooth bore it should tell you there
       is only one pattern, which is the point of a smooth bore.
 - [ ] Watch the tank drain. 750 gallons at 200 gpm is under four minutes.

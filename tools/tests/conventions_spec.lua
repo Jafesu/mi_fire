@@ -249,4 +249,92 @@ return function(t)
                 ('borrowed model "%s" names the resource it came from'):format(model))
         end
     end
+
+    -- -----------------------------------------------------------------------
+
+    t.describe('every event that is sent is listened for')
+
+    -- The check that would have caught deleting the hose sync handler. A block replacement
+    -- spanned it, the server carried on broadcasting `mi_fire:client:hoseLine` to nobody, and
+    -- the symptom was three unrelated-looking things -- no nozzle, no coupling, a rope that
+    -- never appeared -- none of which pointed at a missing listener.
+    --
+    -- Nothing about that is visible in review. It is exactly the shape of thing a test should
+    -- hold.
+    local serverFiles = {
+        'bridge/framework/init.lua',
+        'bridge/dispatch/init.lua',
+        'bridge/inventory/ox_inventory.lua',
+        'bridge/medical/init.lua',
+        'server/core/db.lua',
+        'server/core/state.lua',
+        'server/core/permissions.lua',
+        'server/modules/apparatus/init.lua',
+        'server/main.lua',
+        'server/modules/fire/init.lua',
+        'server/modules/fire/spread.lua',
+        'server/modules/turnout/appearance.lua',
+        'server/modules/turnout/init.lua',
+        'server/modules/scba/pass.lua',
+        'server/modules/exposure/init.lua',
+        'server/modules/smoke/init.lua',
+        'server/modules/scorch/init.lua',
+        'server/modules/hose/init.lua',
+        'server/modules/pump/init.lua',
+        'server/modules/admin/init.lua',
+        'server/api/exports.lua',
+    }
+
+    ---@param paths string[]
+    ---@param pattern string
+    ---@return table<string, string> name -> the file it was found in
+    local function collect(paths, pattern)
+        local found = {}
+
+        for _, path in ipairs(paths) do
+            local source = read(path)
+
+            if source then
+                for name in source:gmatch(pattern) do
+                    found[name] = found[name] or path
+                end
+            end
+        end
+
+        return found
+    end
+
+    do
+        local sent = collect(serverFiles, "TriggerClientEvent%s*%(%s*'([%w_:]+)'")
+        local heard = collect(clientFiles, "RegisterNetEvent%s*%(%s*'([%w_:]+)'")
+
+        for name, path in pairs(sent) do
+            t.ok(heard[name] ~= nil,
+                ('%s is sent from %s and something listens for it'):format(name, path))
+        end
+    end
+
+    t.describe('and the other way round')
+
+    do
+        local sent = collect(clientFiles, "TriggerServerEvent%s*%(%s*'([%w_:]+)'")
+        local heard = collect(serverFiles, "RegisterNetEvent%s*%(%s*'([%w_:]+)'")
+
+        for name, path in pairs(sent) do
+            t.ok(heard[name] ~= nil,
+                ('%s is sent from %s and something listens for it'):format(name, path))
+        end
+    end
+
+    t.describe('and every callback awaited is registered')
+
+    do
+        local awaited = collect(clientFiles, "lib%.callback%.await%s*%(%s*'([%w_:]+)'")
+        local registered = collect(serverFiles, "lib%.callback%.register%s*%(%s*'([%w_:]+)'")
+
+        for name, path in pairs(awaited) do
+            t.ok(registered[name] ~= nil,
+                ('%s is awaited from %s and something answers it'):format(name, path))
+        end
+    end
 end

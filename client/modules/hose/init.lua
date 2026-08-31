@@ -293,6 +293,44 @@ local function reconcileNozzle()
     end
 end
 
+-- ---------------------------------------------------------------------------
+-- Sync
+-- ---------------------------------------------------------------------------
+
+--- What the server says exists.
+---
+--- Tears down and records; it does not build. Putting a rope up is the reconcile loop's job,
+--- so a rope that fails to build or is torn down by a hiccup comes back on its own rather than
+--- waiting for the server to send another update.
+RegisterNetEvent('mi_fire:client:hoseLine', function(id, line)
+    if type(id) ~= 'string' then return end
+
+    if not line then
+        undraw(id)
+        lines[id] = nil
+        if mine == id then mine = nil end
+        return
+    end
+
+    local previous = lines[id]
+    lines[id] = line
+
+    if onCrew(line, GetPlayerServerId(PlayerId())) then
+        mine = id
+    elseif mine == id then
+        mine = nil
+    end
+
+    -- Only when something that changes the rope's *shape* changed. Rebuilding on every update
+    -- would tear the hose down once a second, since the pump syncs every charged line on its
+    -- tick.
+    if previous and (previous.sourceNet ~= line.sourceNet
+        or previous.nozzleHolder ~= line.nozzleHolder
+        or previous.sections ~= line.sections) then
+        undraw(id)
+    end
+end)
+
 --- Reconcile what is drawn against what should be, every frame.
 ---
 --- **Reconciling rather than reacting.** The rope used to be built in response to a sync event

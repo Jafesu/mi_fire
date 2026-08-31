@@ -15,6 +15,7 @@ local OffsetFinder = {}
 local Util = MIFire.Util
 local Placement = MIFire.Placement
 local Apparatus = MIFire.Apparatus
+local Scan = MIFire.Scan
 
 --- Ports authored this session, per vehicle. Cleared when you change rigs, because a port
 --- list is only meaningful against the truck it was measured on.
@@ -148,6 +149,139 @@ local function placePort(vehicle)
 end
 
 -- ---------------------------------------------------------------------------
+-- Placing on a bone
+-- ---------------------------------------------------------------------------
+
+--- Attach a port to a bone instead of measuring an offset.
+---
+--- Preferred wherever a bone exists. Nothing to measure, it survives the model being updated,
+--- and if the author put a bone at the hookup then that bone *is* the hookup -- more accurate
+--- than anything produced by nudging a marker around by hand.
+---@param vehicle integer
+local function placeOnBone(vehicle)
+    local bones = Scan.bones(vehicle)
+
+    if #bones == 0 then
+        return lib.notify({
+            description = 'No named bones found on this model. Measure an offset instead.',
+            type = 'error',
+        })
+    end
+
+    -- Sorted by how far out from the centreline they sit, so the attachment points an author
+    -- would have added for hookups cluster at the top rather than being buried among wheels.
+    table.sort(bones, function(a, b)
+        return math.abs(a.offset.x) > math.abs(b.offset.x)
+    end)
+
+    local options = {}
+
+    for _, bone in ipairs(bones) do
+        options[#options + 1] = {
+            title = bone.name,
+            description = ('x %.2f  y %.2f  z %.2f'):format(
+                bone.offset.x, bone.offset.y, bone.offset.z),
+            icon = 'bone',
+            onSelect = function()
+                local input = lib.inputDialog(('Port on "%s"'):format(bone.name), {
+                    {
+                        type = 'select',
+                        label = 'Type',
+                        options = (function()
+                            local out = {}
+                            for _, name in ipairs(TYPE_ORDER) do
+                                out[#out + 1] = { value = name, label = name }
+                            end
+                            return out
+                        end)(),
+                        required = true,
+                        default = 'discharge',
+                    },
+                    { type = 'input', label = 'Port id', required = true },
+                    { type = 'input', label = 'Label', default = '' },
+                })
+
+                if not input then return OffsetFinder.menu(vehicle) end
+
+                session.ports[#session.ports + 1] = {
+                    id = input[2],
+                    type = input[1],
+                    bone = bone.name,
+                    x = 0.0, y = 0.0, z = 0.0,
+                    label = (input[3] ~= '' and input[3]) or nil,
+                }
+
+                lib.notify({
+                    title = 'Port placed on bone',
+                    description = ('%s "%s" on %s'):format(input[1], input[2], bone.name),
+                    type = 'success',
+                })
+
+                OffsetFinder.menu(vehicle)
+            end,
+        }
+    end
+
+    options[#options + 1] = {
+        title = 'Back',
+        icon = 'arrow-left',
+        onSelect = function() OffsetFinder.menu(vehicle) end,
+    }
+
+    lib.registerContext({
+        id = 'mi_fire_offset_bones',
+        title = ('%d bone(s) -- pick one'):format(#bones),
+        options = options,
+    })
+
+    lib.showContext('mi_fire_offset_bones')
+end
+
+--- Light every bone up, so they can be identified by looking rather than by reading numbers.
+---@param vehicle integer
+local function showBones(vehicle)
+    local lines, bones = Scan.report(vehicle)
+
+    for i = 1, #lines do print('[mi_fire] ' .. lines[i]) end
+
+    lib.notify({
+        title = ('%d bone(s)'):format(#bones),
+        description = 'Listed in F8. Lit up on the rig for 30 seconds.',
+        type = 'inform',
+    })
+
+    CreateThread(function()
+        local until_ = GetGameTimer() + 30000
+
+        while GetGameTimer() < until_ and DoesEntityExist(vehicle) do
+            Wait(0)
+
+            for i = 1, #bones do
+                local world = GetWorldPositionOfEntityBone(vehicle, bones[i].index)
+
+                DrawMarker(28, world.x, world.y, world.z, 0, 0, 0, 0, 0, 0,
+                    0.05, 0.05, 0.05, 190, 120, 255, 200, false, false, 2, false, nil, nil, false)
+
+                -- Named in place. Thirty bone names in a list is unreadable; thirty labels
+                -- floating on the truck is a map.
+                local onScreen, sx, sy = GetScreenCoordFromWorldCoord(world.x, world.y, world.z)
+
+                if onScreen then
+                    SetTextFont(4)
+                    SetTextScale(0.24, 0.24)
+                    SetTextColour(200, 160, 255, 230)
+                    SetTextOutline()
+                    SetTextCentre(true)
+                    SetTextEntry('STRING')
+                    AddTextComponentString(bones[i].name)
+                    DrawText(sx, sy)
+                end
+            end
+        end
+    end)
+end
+
+-- ---------------------------------------------------------------------------
 -- Output
 -- ---------------------------------------------------------------------------
 
@@ -201,8 +335,20 @@ end
 function OffsetFinder.menu(vehicle)
     local options = {
         {
-            title = 'Place a port',
-            description = 'Aim where it goes, nudge it, confirm',
+            title = 'Attach a port to a bone',
+            description = 'No measuring, and it survives the model being updated. Try first.',
+            icon = 'bone',
+            onSelect = function() placeOnBone(vehicle) end,
+        },
+        {
+            title = 'Scan this rig',
+            description = 'Light up every bone, and list mod slots and extras in F8',
+            icon = 'magnifying-glass',
+            onSelect = function() showBones(vehicle) end,
+        },
+        {
+            title = 'Measure a port by hand',
+            description = 'Aim where it goes, nudge it, confirm. Use when no bone fits.',
             icon = 'crosshairs',
             onSelect = function() placePort(vehicle) end,
         },
@@ -312,10 +458,13 @@ end
 CreateThread(function()
     while not MIFire.ready do Wait(250) end
 
-    lib.addCommand('fireoffset', {
-        help = 'Author apparatus port offsets on the vehicle you are stood at',
-        restricted = false,
-    }, function()
+    --- `RegisterCommand`, not `lib.addCommand`.
+    ---
+    --- ox_lib's `addCommand` is **server-side only** -- calling it on a client raises
+    --- "No such export addCommand in resource ox_lib" and the command never registers, which
+    --- presents as the command silently doing nothing. `/fire` works precisely because it is
+    --- registered on the server. `passreset` and the SCBA valve already do it this way.
+    RegisterCommand('fireoffset', function()
         local vehicle = nearestVehicle()
 
         if not vehicle then
@@ -346,7 +495,10 @@ CreateThread(function()
         session.modelName = modelName
 
         OffsetFinder.menu(vehicle)
-    end)
+    end, false)
+
+    TriggerEvent('chat:addSuggestion', '/fireoffset',
+        'Author apparatus port offsets on the vehicle you are stood at')
 
     Util.debug('offsetfinder', '/fireoffset registered')
 end)

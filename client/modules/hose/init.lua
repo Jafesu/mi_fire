@@ -104,10 +104,26 @@ local function attachNozzle(ped)
     return prop
 end
 
+--- Which way a fitting points, in the world.
+---
+--- The port's heading is relative to the vehicle, so a rig parked at any angle still has its
+--- discharge pointing out of the side it is on. Used to lay the last few rope vertices along
+--- the outlet's axis, which is what makes the hose leave the coupling straight.
+---@param entity integer
+---@param port table|nil
+---@return vector3
+local function portAxis(entity, port)
+    if not port or not port.heading then return vector3(0.0, 0.0, 0.0) end
+
+    local heading = math.rad(GetEntityHeading(entity) + port.heading)
+    return vector3(-math.sin(heading), math.cos(heading), 0.0)
+end
+
 --- Where a line starts, in the world.
 ---@param line table
 ---@return vector3|nil
 ---@return integer|nil vehicle
+---@return table|nil port
 local function sourceCoords(line)
     if not line.sourceNet then return nil end
     if not NetworkDoesNetworkIdExist(line.sourceNet) then return nil end
@@ -118,9 +134,9 @@ local function sourceCoords(line)
     local profile = apparatus().profile(entity)
     local port = profile and MIFire.Apparatus.port(profile, line.sourcePort)
 
-    if not port then return GetEntityCoords(entity), entity end
+    if not port then return GetEntityCoords(entity), entity, nil end
 
-    return apparatus().portCoords(entity, port), entity
+    return apparatus().portCoords(entity, port), entity, port
 end
 
 ---@param id string
@@ -130,15 +146,14 @@ local function draw(id, line)
     if MIFireHose.visuals.enabled == false then return end
     if not ensureTextures() then return end
 
-    local from, vehicle = sourceCoords(line)
+    local from, vehicle, port = sourceCoords(line)
     if not from then return end
 
     local holder = line.nozzleHolder and GetPlayerFromServerId(line.nozzleHolder)
     local holderPed = holder and holder ~= -1 and GetPlayerPed(holder) or nil
 
     -- Nobody is holding it. A dropped line is real and worth drawing eventually, but it needs
-    -- a world position to hang from that nothing currently records, so it is skipped rather
-    -- than drawn somewhere wrong.
+    -- a world position to hang from that nothing currently records.
     if not holderPed or not DoesEntityExist(holderPed) then return end
 
     local size = MIFireHose.sizes[line.diameter] or {}
@@ -148,16 +163,12 @@ local function draw(id, line)
         and MIFireHose.visuals.ropeTypeLarge
         or MIFireHose.visuals.ropeType
 
-    -- Created at the length it needs right now rather than at its full 200ft. A rope holding
-    -- sixty metres of slack between two points five metres apart is a heap, not a hose. It
-    -- pays out as the crew walks away, up to the length actually on the bed -- which is what
-    -- running out of hose looks like.
-    local reach = #(from - GetEntityCoords(holderPed))
-    local slack = 1.0 + (MIFireHose.visuals.slack or 0.18)
-    local initial = math.min(maxLength, math.max(1.0, reach * slack))
+    -- Started short and paid out. A rope created at its full two hundred feet between two
+    -- points five metres apart is a heap; one created at exactly the span is a tow cable.
+    local initial = MIFireHose.visuals.initialLength or 12.0
 
     local rope = AddRope(from.x, from.y, from.z, 0.0, 0.0, 0.0,
-        maxLength, ropeType, initial, 0.5, 1.0,
+        maxLength, ropeType, math.min(initial, maxLength), 0.5, 1.0,
         false, true, false, 1.0, false, 0)
 
     if not rope or rope == 0 then
@@ -165,83 +176,49 @@ local function draw(id, line)
         return
     end
 
-    -- Claimed before the wait below, so two syncs arriving close together cannot both get
-    -- past the `drawn[id]` check and leave one rope orphaned with nothing tracking it.
+    -- Claimed before the wait below, so two syncs arriving close together cannot both get past
+    -- the guard and leave a rope orphaned with nothing tracking it.
     drawn[id] = { rope = rope, vehicle = vehicle, pending = true }
 
-    MIFire.trackRope(rope)
-
-    -- A rope has no vertices until it has been simulated once. Asking immediately returns
-    -- nothing useful, and a vertex count of zero would put the pin back on vertex 0 -- which is
-    -- the end the firefighter is attached to, and exactly the fight that made it flicker.
+    -- A rope has no vertices until it has been simulated once.
     local vertices = 0
     local waited = 0
 
-    while vertices < 2 and waited < 500 do
+    while vertices < 4 and waited < 500 do
         Wait(0)
         vertices = GetRopeVertexCount(rope) or 0
         waited = waited + 16
     end
 
-    if vertices < 2 then
+    if vertices < 4 then
         Util.warn('rope for line %s never simulated; not drawing it', id)
         if DoesRopeExist(rope) then DeleteRope(rope) end
         drawn[id] = nil
         return
     end
 
-    -- The wait gave the world a chance to change.
     if not lines[id] or not DoesEntityExist(holderPed) then
         if DoesRopeExist(rope) then DeleteRope(rope) end
         drawn[id] = nil
         return
     end
 
-    -- **The truck is never attached to the rope.**
-    --
-    -- `AttachEntitiesToRope` binds two entities and then makes the rope's length a physical
-    -- constraint between them. Attaching a fire engine to one end of that is how a fire engine
-    -- ends up airborne -- and it did, because the world coordinates it expects were being given
-    -- vehicle-local offsets and a literal 0,0,0, so the rope was trying to pull the rig to the
-    -- centre of the map. `ActivatePhysics` then let it.
-    --
-    -- Pinning a vertex sets where that end of the rope *is*, and applies force to nothing. The
-    -- pin is refreshed as the rig moves, so the hose still comes off the right outlet.
-    --
-    -- **Opposite ends.** `AttachRopeToEntity` attaches the rope's *start*, which is vertex 0 --
-    -- so pinning vertex 0 to the rig as well left both fighting over one point every frame, and
-    -- the rope flickered between the two answers. The rig gets the last vertex and the
-    -- firefighter gets the first.
-    local pin = vertices - 1
-
-    local hand = GetPedBoneCoords(holderPed, 57005, 0.0, 0.0, 0.0)
-    AttachRopeToEntity(rope, holderPed, hand.x, hand.y, hand.z, true)
-
-    PinRopeVertex(rope, pin, from.x, from.y, from.z)
-
-    -- Without this the rope is never simulated, and an unsimulated rope draws as a straight
-    -- taut line between its ends -- no sag, no weight, no hose.
-    --
-    -- It was taken out along with the vehicle attachment, on the assumption it was part of what
-    -- threw the engine across the map. It was not: the flinging came from binding the rig to
-    -- one end with nonsense coordinates. Nothing is attached to the pinned end now, so
-    -- simulating it can only move the rope.
+    -- Simulated, or it draws as a straight taut line between its ends.
     ActivatePhysics(rope)
 
-    local entry = {
+    drawn[id] = {
         rope = rope,
         vehicle = vehicle,
         nozzle = nil,
         holder = holderPed,
-        pin = pin,
-        pinnedAt = from,
-        length = initial,
+        vertices = vertices,
+        length = math.min(initial, maxLength),
+        maxLength = maxLength,
+        port = port,
     }
 
-    drawn[id] = entry
-
     if line.nozzleHolder == GetPlayerServerId(PlayerId()) then
-        entry.nozzle = attachNozzle(cache.ped)
+        drawn[id].nozzle = attachNozzle(cache.ped)
     end
 end
 
@@ -256,52 +233,77 @@ local function undraw(id)
     drawn[id] = nil
 end
 
---- Keep the rig end of each rope on its outlet.
+--- Hold both ends of every rope, every frame.
 ---
---- The pin is a world position rather than an attachment, so it does not follow the truck on
---- its own. Refreshing it costs one native per line and cannot move the vehicle, which is the
---- entire reason it is done this way.
+--- This is the shape the working hose resource on this machine uses, read rather than guessed
+--- at after three attempts at inventing it. Two things in it matter and neither is obvious:
+---
+--- **Neither end is attached to an entity.** `AttachRopeToEntity` and `AttachEntitiesToRope`
+--- both make the rope a physical constraint on whatever they bind, which is how a fire engine
+--- ends up airborne, and they hold their end rigidly enough that the rope has no freedom to
+--- hang. Pinning a vertex just says where that vertex is. Everything between the pins is left
+--- to the simulation, which is where the sag comes from.
+---
+--- **Three vertices are pinned at the rig, not one.** Pinning only the last gives a hose that
+--- leaves the coupling in whatever direction the physics fancies. Pinning the last three along
+--- the outlet's axis makes it exit the fitting straight, the way a coupled hose does.
+---
+--- Every frame, because a hand moves every frame and a rope pinned on a timer visibly lags
+--- behind it.
 CreateThread(function()
     while true do
-        Wait(200)
+        if next(drawn) == nil then
+            Wait(250)
+        else
+            Wait(0)
 
-        for id, entry in pairs(drawn) do
-            local line = lines[id]
+            for id, entry in pairs(drawn) do
+                local line = lines[id]
 
-            if entry.pending then
-                -- Still waiting for its first simulation. Pinning now would use vertex 0,
-                -- which is the end the firefighter is on.
+                if entry.pending then
+                    -- Still waiting for its first simulation.
 
-            elseif not line or not entry.rope or not DoesRopeExist(entry.rope) then
-                undraw(id)
-            else
-                local from = sourceCoords(line)
+                elseif not line or not entry.rope or not DoesRopeExist(entry.rope) then
+                    undraw(id)
 
-                -- Only when the rig has actually moved. Re-pinning an unmoved vertex is a
-                -- correction the rope does not need, and doing it on a timer is its own source
-                -- of jitter.
-                if from and (not entry.pinnedAt or #(from - entry.pinnedAt) > 0.05) then
-                    PinRopeVertex(entry.rope, entry.pin or 0, from.x, from.y, from.z)
-                    entry.pinnedAt = from
-                end
+                elseif not entry.holder or not DoesEntityExist(entry.holder) then
+                    undraw(id)
 
-                -- Pay the line out as the crew walks, and haul it back in as they return, so
-                -- there is always a little slack and never a heap. Capped at what is actually
-                -- on the bed: two hundred feet of hose reaches two hundred feet, and finding
-                -- that out at the door is a real part of stretching a line.
-                local holderPed = entry.holder
+                else
+                    local from = sourceCoords(line)
 
-                if from and holderPed and DoesEntityExist(holderPed) then
-                    local size = MIFireHose.sizes[line.diameter] or {}
-                    local maximum = Hose.lengthFeet(size, line.sections) * 0.3048
-                    local slack = 1.0 + (MIFireHose.visuals.slack or 0.18)
+                    if not from then
+                        undraw(id)
+                    else
+                        local hand = GetWorldPositionOfEntityBone(entry.holder,
+                            GetPedBoneIndex(entry.holder, 6286))
 
-                    local wanted = math.min(maximum,
-                        math.max(1.0, #(from - GetEntityCoords(holderPed)) * slack))
+                        -- The nozzle end.
+                        PinRopeVertex(entry.rope, 0, hand.x, hand.y, hand.z)
 
-                    if math.abs(wanted - (entry.length or 0)) > 0.4 then
-                        RopeForceLength(entry.rope, wanted)
-                        entry.length = wanted
+                        -- The coupling end, along the outlet's axis so the hose leaves it
+                        -- straight rather than at whatever angle the physics settles on.
+                        local axis = portAxis(entry.vehicle, entry.port)
+                        local last = entry.vertices - 1
+
+                        PinRopeVertex(entry.rope, last, from.x, from.y, from.z)
+                        PinRopeVertex(entry.rope, last - 1,
+                            from.x + axis.x * 0.25, from.y + axis.y * 0.25, from.z + axis.z * 0.25)
+                        PinRopeVertex(entry.rope, last - 2,
+                            from.x + axis.x * 0.5, from.y + axis.y * 0.5, from.z + axis.z * 0.5)
+
+                        -- Pay the line out as the crew walks and haul it in as they return, so
+                        -- there is always slack and never a heap. Capped at what is on the bed:
+                        -- two hundred feet of hose reaches two hundred feet, and finding that
+                        -- out at the door is part of stretching a line.
+                        local slack = 1.0 + (MIFireHose.visuals.slack or 0.35)
+                        local wanted = math.min(entry.maxLength,
+                            math.max(2.0, #(from - hand) * slack))
+
+                        if math.abs(wanted - (entry.length or 0)) > 0.3 then
+                            RopeForceLength(entry.rope, wanted)
+                            entry.length = wanted
+                        end
                     end
                 end
             end

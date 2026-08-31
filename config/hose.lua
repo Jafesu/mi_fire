@@ -247,13 +247,20 @@ MIFireHose.visuals = {
     --- Diameter above which the thicker rope is used, in inches.
     largeAbove = 2.5,
 
+    --- Length the rope is created at, in metres, before it starts paying out.
+    ---
+    --- Short. A rope created at its full two hundred feet between two points five metres apart
+    --- is a heap rather than a hose; this is the length it has while the crew is still at the
+    --- rig, and it grows as they walk.
+    initialLength = 12.0,
+
     --- Slack, as a fraction of the distance between the two ends.
     ---
     --- The rope is kept at roughly this much more than the span, and pays out as the crew walks
     --- away. Creating it at its full length instead gives sixty metres of rope between two
     --- points five metres apart, which is a heap rather than a hose; creating it at exactly the
     --- span gives a tow cable. Raise it for a lazier, more realistic lay.
-    slack = 0.18,
+    slack = 0.35,
 
     --- Props. Base game, all four confirmed present in resources on this machine.
     --- Nothing, by default. There is no vanilla prop that looks like a nozzle --

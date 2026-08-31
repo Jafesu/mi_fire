@@ -21,21 +21,34 @@ MIFireApparatus = {}
 --- and a typo in a `type` should be a startup error rather than a control that silently does
 --- nothing at an incident.
 MIFireApparatus.portTypes = {
-    --- Water out: crosslays, rear beds, LDH, deck gun feed.
+    --- Water out: crosslays, rear beds, LDH, deck gun feed, and the line that fills another
+    --- rig's tank.
     ---
-    --- **A crosslay is a discharge**, not an intake -- an intake is water coming in from a
-    --- hydrant or a draft, and a crosslay is water going out. It is a discharge that happens
-    --- to have hose already flaked on it, which is what `preconnected` describes:
+    --- **What a crosslay is.** A preconnected attack line -- also called a mattydale or a
+    --- speedlay -- stored in a *transverse* bed above the pump, running side to side so it can
+    --- be pulled from either side of the rig. Usually 1.75 inch, 150 to 250 feet, already
+    --- coupled to its discharge. It is the first line off the truck at a house fire, and it is
+    --- the reason an engine can put water on a fire within seconds of stopping.
+    ---
+    --- It is **not** anything to do with moving water between apparatus. That confusion is
+    --- easy to have and worth writing down: rig-to-rig transfer is a `discharge` on the
+    --- supplying engine connected to an `intake` on the receiving one, and the same intake
+    --- takes a hydrant supply line. Some rigs also carry a dedicated direct tank fill inlet;
+    --- model that as another `intake` unless it needs to behave differently.
+    ---
+    --- A crosslay is a discharge with hose already on it, which is what `preconnected`
+    --- describes:
     ---
     ---     { id = 'crosslay1', type = 'discharge', x = ..., y = ..., z = ...,
     ---       size = 1.75, preconnected = { feet = 200 } }
     ---
-    --- Modelling it as its own type would mean the pump panel, the hydraulics and the hose
-    --- system each needing to know that two type names mean the same thing. The panel has a
-    --- gauge and a valve for a crosslay exactly as it does for the rear bed, because on a real
-    --- rig it is the same plumbing.
+    --- Its own type would mean the pump panel, the hydraulics and the hose system each having
+    --- to know that two names mean one thing. On the real rig it is the same plumbing, with a
+    --- gauge and a valve on the panel exactly like the rear bed.
     discharge   = true,
-    intake      = true,   -- water in: hydrant supply, draft, tank fill
+    --- Water in: a hydrant supply line, a draft from open water, or another rig's discharge
+    --- filling this one's tank. All three arrive the same way, so they are one type.
+    intake      = true,
     hosebed     = true,   -- where a line is pulled from
     deckgun     = true,   -- the monitor itself
     panel       = true,   -- where the pump panel NUI is opened

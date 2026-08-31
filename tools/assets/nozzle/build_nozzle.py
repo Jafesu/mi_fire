@@ -51,6 +51,33 @@ WELD_DISTANCE = 0.0001
 # 512, not 1024. The texture is written uncompressed, so it costs width x height x 4 bytes
 # and every player downloads it: 512 is 1 MB, 1024 is 4 MB, for an object the size of a fist.
 # A BC1 encoder would give 1024 at 512 KB and is the obvious later improvement.
+# A length of hose off the back of the coupling.
+#
+# Without it the model is a nozzle floating in mid air, and there is nothing for the second hand
+# to hold -- which matters because the carrying pose is two-handed. With it the left hand has
+# something real to grip and the line reads as continuing past the frame.
+#
+# The measurements are off the model rather than invented: the coupling body settles at radius
+# 0.0324 about 60 mm forward of the back face, having flared out from a 6 mm stem at the very
+# end. A hose of radius 0.030 butts onto that without a step, and swallows the stem, which is
+# what a coupling swaged onto hose actually looks like.
+#
+# The path curves back and **down**. A straight tube points into the firefighter's own chest.
+# Points are relative to the back face of the nozzle, in metres.
+HOSE_STUB = {
+    "radius": 0.030,
+    "path": [
+        (0.0, 0.020, 0.0),
+        (0.0, -0.130, -0.020),
+        (0.0, -0.280, -0.090),
+        (0.0, -0.430, -0.200),
+    ],
+    # Kept low on purpose: this is added *after* decimation, so every one of these triangles is
+    # on top of the budget rather than inside it.
+    "bevel_resolution": 3,
+    "resolution_u": 5,
+}
+
 TEXTURE_SIZE = 512
 AO_SAMPLES = 24
 
@@ -71,6 +98,7 @@ ZONES = {
     "rubber": (0.16, 0.16, 0.16),   # matte black bumper and grip
     "olive":  (0.38, 0.38, 0.29),   # anodized body
     "chrome": (0.85, 0.86, 0.88),   # polished band
+    "hose":   (0.20, 0.20, 0.21),   # rubber-jacketed line off the back
 }
 
 # Where each zone lives, in metres, in final orientation (tip +Y, up +Z). These came off a
@@ -238,12 +266,16 @@ def face_components(mesh):
     return comp_of, comps
 
 
-def classify_face(centre, is_handle):
+def classify_face(centre, is_handle, hose_start=None):
     """Which material zone a face belongs to.
 
     The handle arrives from CAD as a single island covering both its olive arms and its black
     ribbed grip, so no per-island rule can separate them -- but a height threshold can.
     """
+    # The hose first: it lives behind everything else, so nothing further down can claim it.
+    if hose_start is not None and centre.y < hose_start:
+        return "hose"
+
     radius = math.hypot(centre.x, centre.z)
 
     if is_handle:
@@ -255,6 +287,58 @@ def classify_face(centre, is_handle):
             and CHROME_RADIUS[0] <= radius <= CHROME_RADIUS[1]):
         return "chrome"
     return "olive"
+
+
+def add_hose_stub(ob):
+    """Attach a length of hose to the back of the coupling.
+
+    Built from a bevelled curve rather than stacked cylinders: a curve gives a smooth bend for a
+    handful of control points, and converting it to a mesh at a low resolution keeps the cost
+    down. Joined into the nozzle so the whole thing stays one drawable with one material.
+
+    Returns the Y coordinate where the hose starts, which is what tells the zone classifier
+    which faces are hose.
+    """
+    lo, _ = mesh_bounds(ob)
+    back = lo.y
+
+    curve_data = bpy.data.curves.new("mi_hose", type="CURVE")
+    curve_data.dimensions = "3D"
+    curve_data.resolution_u = HOSE_STUB["resolution_u"]
+    curve_data.bevel_depth = HOSE_STUB["radius"]
+    curve_data.bevel_resolution = HOSE_STUB["bevel_resolution"]
+    curve_data.use_fill_caps = True
+
+    spline = curve_data.splines.new("BEZIER")
+    points = HOSE_STUB["path"]
+    spline.bezier_points.add(len(points) - 1)
+
+    for i, (x, y, z) in enumerate(points):
+        bp = spline.bezier_points[i]
+        bp.co = (x, back + y, z)
+        bp.handle_left_type = "AUTO"
+        bp.handle_right_type = "AUTO"
+
+    curve_obj = bpy.data.objects.new("mi_hose", curve_data)
+    bpy.context.scene.collection.objects.link(curve_obj)
+
+    bpy.ops.object.select_all(action="DESELECT")
+    curve_obj.select_set(True)
+    bpy.context.view_layer.objects.active = curve_obj
+    bpy.ops.object.convert(target="MESH")
+
+    before = tri_count(ob)
+
+    bpy.ops.object.select_all(action="DESELECT")
+    curve_obj.select_set(True)
+    ob.select_set(True)
+    bpy.context.view_layer.objects.active = ob
+    bpy.ops.object.join()
+
+    step("hose stub: +{:,} triangles, starting at y {:.3f}".format(
+        tri_count(ob) - before, back + points[0][1]))
+
+    return back + points[0][1]
 
 
 def build_zone_materials(ob, image):
@@ -308,10 +392,6 @@ def main():
         (0.0, 0.0, 0.0, 1.0),
     ))
     ob.data.transform(M)
-
-    # Move the mesh so GRIP_ORIGIN lands on (0, 0, 0).
-    ob.data.transform(Matrix.Translation((-GRIP_ORIGIN[0], -GRIP_ORIGIN[1], -GRIP_ORIGIN[2])))
-
     ob.matrix_world = Matrix.Identity(4)
     # Straight off the mesh data. `ob.dimensions` reads the evaluated bounding box, which has
     # not refreshed this early and reports the pre-transform size -- which looks exactly like
@@ -345,6 +425,10 @@ def main():
     after = tri_count(ob)
     step("decimated {:,} -> {:,} triangles ({:.1f}% kept)".format(
         before, after, 100.0 * after / before))
+
+    # After decimation, so the stub keeps the shape it was built with. It is already cheap and
+    # collapsing it would only cost it its roundness.
+    hose_start = add_hose_stub(ob)
 
     # Smooth shading with a 30 degree break, so cylinders read as round and machined edges
     # stay crisp. Flat shading on a decimated cylinder shows every facet.
@@ -383,7 +467,7 @@ def main():
 
     tally = dict.fromkeys(ZONES, 0)
     for poly in ob.data.polygons:
-        zone = classify_face(poly.center, comp_of[poly.index] == handle_comp)
+        zone = classify_face(poly.center, comp_of[poly.index] == handle_comp, hose_start)
         poly.material_index = index_of[zone]
         tally[zone] += 1
     step("zones: " + ", ".join("{} {}".format(v, k) for k, v in tally.items()))
@@ -467,6 +551,21 @@ def main():
     img.source = "FILE"
     img.filepath = dds_path
     img.reload()
+
+    # ---- move the origin to the grip -----------------------------------------------------
+    # Last, deliberately.
+    #
+    # Every zone threshold above -- GRIP_MIN_Z, COLLAR_MIN_Y, CHROME_Y -- was read off a
+    # colour-coded render of the model in its own space, where the barrel axis is z = 0 and the
+    # handle tops out near z = 0.15. Shifting the mesh before classifying silently invalidates
+    # all of them: moving the origin onto the bale handle dropped everything by 0.128, the
+    # handle stopped reaching GRIP_MIN_Z, `handle is #-1` went by in the log, and a nozzle
+    # shipped with its grip the wrong colour.
+    #
+    # Doing it here means the two are independent: the grip can move without touching the zones.
+    ob.data.transform(Matrix.Translation(
+        (-GRIP_ORIGIN[0], -GRIP_ORIGIN[1], -GRIP_ORIGIN[2])))
+    step("origin moved to the grip {}".format(GRIP_ORIGIN))
 
     # ---- save ---------------------------------------------------------------------------
     blend_path = os.path.join(args["out"], "mi_nozzle.blend")

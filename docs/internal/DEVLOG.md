@@ -1960,3 +1960,64 @@ the minigun's, and the nozzle was gripped by its body rather than its handle.
 
 **Next:** water, once the thing is being held properly.
 
+---
+
+## 2026-08-31 (seventh) — the model gets a hose, and a shipped bug found by log line
+
+**Scope:** the nozzle was a nozzle floating in mid air. Now it has a line off the back.
+
+**Changed:**
+
+- `tools/assets/nozzle/build_nozzle.py` — `HOSE_STUB`, a bevelled curve off the coupling; a
+  `hose` material zone; and the grip-origin shift moved to the end of the pipeline.
+
+**Decisions:**
+
+- **The second hand needs something to hold.** The carrying pose is two-handed and the model
+  ended at the coupling, so the left hand gripped air. A length of hose fixes that and makes the
+  line read as continuing past the frame.
+
+- **Its dimensions were measured off the model, not chosen.** Walking the radius forward from the
+  back face: a 6 mm stem for the first 20 mm, flaring to 0.0324 by 60 mm, which is the coupling
+  body. A hose of radius 0.030 butts onto that with no visible step and swallows the stem, which
+  is what a coupling swaged onto hose actually looks like.
+
+- **It curves back and down.** A straight tube points into the firefighter's own chest.
+
+- **Added after decimation.** Its 316 triangles sit on top of the 8,000 rather than inside it,
+  and it keeps the roundness it was built with instead of being collapsed.
+
+**A bug that shipped, and how it surfaced:**
+
+Moving `GRIP_ORIGIN` onto the bale handle last session dropped the whole mesh by 0.128 *before*
+the zones were classified. Every zone threshold had been read off a render of the model in its
+own space, so `GRIP_MIN_Z = 0.100` no longer matched anything: the handle was not found, its
+ribbed grip was never marked rubber, and **a nozzle shipped with the wrong colours**.
+
+Nothing failed. The only trace was one line in the build log reading `handle is #-1` where it
+had previously read `handle is #31`, and it only got noticed because this build printed it again
+next to a number that had changed. That is a thin thread to hang a catch on.
+
+The fix is structural rather than a corrected constant: the origin shift now happens **last**,
+after classification and baking, so the grip and the zones cannot invalidate each other. The
+general shape of the mistake — a later step quietly breaking an earlier one's assumptions
+because they share a coordinate space — is worth remembering, because no test covers it and the
+diagnostic that caught it was luck.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1043 passed, 0 failed**.
+- Rebuilt: 8,316 triangles, zones `3904 rubber, 3837 olive, 210 chrome, 215 hose` — the rubber
+  count back to what it was before the regression, which is the check that the handle is found.
+- `w_mi_nozzle.ydr`, 364,122 bytes, exported clean.
+- **Not** tested in game.
+
+**Open:**
+
+- Find the grip with `/fire nozzlegrip` now there is a hose to hold.
+- Confirm walking no longer T-poses.
+- The hose stub carries a faint seam along its length from the UV projection. Cosmetic.
+- Still nothing fired.
+
+**Next:** water.
+

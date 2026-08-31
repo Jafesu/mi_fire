@@ -39,6 +39,21 @@ OUT="build/nozzle"
 
 `--tris N` overrides the triangle budget on step 1 if 8,000 turns out to be the wrong call.
 
+### The model is a nozzle *and* a length of hose
+
+`HOSE_STUB` adds a bevelled curve off the back of the coupling. Without it the nozzle floats in
+mid air and there is nothing for the second hand to hold, which matters because the carrying
+pose is two-handed.
+
+The numbers came off the model rather than being invented: the coupling body settles at radius
+0.0324 about 60 mm forward of the back face, having flared from a 6 mm stem at the very end. A
+hose of radius 0.030 butts onto that with no step and swallows the stem — which is what a
+coupling swaged onto hose looks like.
+
+It curves back and **down**. A straight tube points into the firefighter's own chest. It is
+added *after* decimation, so its ~316 triangles sit on top of the budget rather than inside it,
+and it keeps the roundness it was built with.
+
 ### `GRIP_ORIGIN` is the one knob for how it sits in the hand
 
 For an **equipped** weapon there are no attach offsets to tune in Lua — GTA puts the model
@@ -50,8 +65,15 @@ and a little behind the middle so the bale handle ends up above and slightly for
 fist. This model has **no pistol grip** — the disc underneath is the bale handle's pivot plate,
 not something to hold, which took a render with marker spheres to establish.
 
-Changing it means a rebuild and re-export. That is the cost of an equipped weapon, and it is
-worth it: an attached object needs no rebuild and cannot be fired.
+**The shift happens last, after the zones are classified and baked.** That is not tidiness. Every
+zone threshold — `GRIP_MIN_Z`, `COLLAR_MIN_Y`, `CHROME_Y` — was read off a colour-coded render of
+the model in its own space, where the barrel axis is `z = 0`. Shifting before classifying
+silently invalidates all of them: moving the origin onto the bale handle dropped everything by
+0.128, the handle stopped clearing `GRIP_MIN_Z`, `handle is #-1` slid past in the log, and a
+nozzle shipped with its grip the wrong colour. Doing it last keeps the two independent.
+
+In practice you should rarely need to change it now — `/fire nozzlegrip` moves the nozzle in the
+hand live, without a rebuild.
 
 ### Do not pass `--factory-startup` to step 2
 

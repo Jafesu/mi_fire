@@ -18,6 +18,7 @@ local registered = {
     zones = {},
     globalVehicle = {},
     globalPed = {},
+    globalPlayer = {},
 }
 
 local function ensure()
@@ -114,6 +115,11 @@ function Target.addGlobalVehicle(options)
     return id
 end
 
+--- Options on every **NPC** ped.
+---
+--- Not on players. ox_target keeps those apart, and registering here for something meant to
+--- appear on a colleague produces an option that silently never fires -- which is exactly what
+--- happened to "Back up this line".
 ---@param options table[]
 ---@return integer id
 function Target.addGlobalPed(options)
@@ -121,6 +127,20 @@ function Target.addGlobalPed(options)
     local decorated = decorateAll(options)
     local id = exports.ox_target:addGlobalPed(decorated)
     registered.globalPed[#registered.globalPed + 1] = id
+    return id
+end
+
+--- Options on every **player** ped, including your own.
+---
+--- The separate registration is the whole reason this function exists rather than callers
+--- reaching for `addGlobalPed` and wondering why nothing appears on a firefighter.
+---@param options table[]
+---@return integer id
+function Target.addGlobalPlayer(options)
+    if not ensure() then return 0 end
+    local decorated = decorateAll(options)
+    local id = exports.ox_target:addGlobalPlayer(decorated)
+    registered.globalPlayer[#registered.globalPlayer + 1] = id
     return id
 end
 
@@ -185,7 +205,14 @@ function Target.removeAll()
         pcall(function() exports.ox_target:removeGlobalPed(registered.globalPed[i]) end)
     end
 
-    registered = { models = {}, entities = {}, zones = {}, globalVehicle = {}, globalPed = {} }
+    for i = 1, #registered.globalPlayer do
+        pcall(function() exports.ox_target:removeGlobalPlayer(registered.globalPlayer[i]) end)
+    end
+
+    registered = {
+        models = {}, entities = {}, zones = {},
+        globalVehicle = {}, globalPed = {}, globalPlayer = {},
+    }
 end
 
 AddEventHandler('onResourceStop', function(resource)

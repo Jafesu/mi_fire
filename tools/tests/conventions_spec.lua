@@ -188,4 +188,30 @@ return function(t)
             end
         end
     end
+
+    -- -----------------------------------------------------------------------
+
+    t.describe('player interactions use the player registration')
+
+    -- ox_target keeps NPC peds and player peds apart: `addGlobalPed` never fires on a player.
+    -- "Back up this line" was registered on the NPC one and could not appear on a colleague at
+    -- any distance, under any condition -- an option that exists, passes review, and is
+    -- unreachable.
+    do
+        local hose = read('client/modules/hose/init.lua')
+
+        if hose then
+            t.equal(findCode(hose, 'addGlobalPed'), nil,
+                'the hose module targets players with addGlobalPlayer, not addGlobalPed')
+        end
+
+        local bridge = read('bridge/target/ox_target.lua')
+
+        if bridge then
+            t.ok(bridge:find('function Target.addGlobalPlayer') ~= nil,
+                'the target bridge offers a player registration at all')
+            t.ok(bridge:find('removeGlobalPlayer') ~= nil,
+                'and takes it down again, or a restart leaves it behind')
+        end
+    end
 end

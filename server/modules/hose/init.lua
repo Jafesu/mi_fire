@@ -569,6 +569,18 @@ RegisterNetEvent('mi_fire:server:cycleNozzlePattern', function()
         ('Pattern: %s'):format(line.pattern), 'inform')
 end)
 
+--- Relay a client's own diagnosis back to it, so both halves arrive the same way.
+RegisterNetEvent('mi_fire:server:relayHoseDiagnosis', function(lines_)
+    local source = source
+    if type(lines_) ~= 'table' then return end
+
+    for i = 1, math.min(#lines_, 20) do
+        if type(lines_[i]) == 'string' then
+            TriggerClientEvent('mi_fire:client:notify', source, lines_[i], 'inform')
+        end
+    end
+end)
+
 --- A client that just joined has no lines at all.
 RegisterNetEvent('mi_fire:server:requestHoses', function()
     local source = source

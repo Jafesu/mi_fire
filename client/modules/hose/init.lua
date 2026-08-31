@@ -594,7 +594,7 @@ CreateThread(function()
         return nil
     end
 
-    Target.addGlobalPed({
+    Target.addGlobalPlayer({
         {
             name = 'mi_fire:backupLine',
             icon = 'people-group',
@@ -629,7 +629,7 @@ CreateThread(function()
     })
 
     --- Leaving is done to yourself, so it goes on your own ped.
-    Target.addGlobalPed({
+    Target.addGlobalPlayer({
         {
             name = 'mi_fire:leaveLine',
             icon = 'right-from-bracket',
@@ -725,10 +725,12 @@ RegisterNetEvent('mi_fire:client:diagnoseHoses', function()
         out[#out + 1] = '  none -- if the server says otherwise, the sync is not arriving'
     end
 
-    for i = 1, #out do
-        TriggerEvent('chat:addMessage', { args = { 'mi_fire', out[i] } })
-        print('[mi_fire] ' .. out[i])
-    end
+    for i = 1, #out do print('[mi_fire] ' .. out[i]) end
+
+    -- Sent back to be replied through the same path as the server's half, so both land in the
+    -- same place. The last round produced a screenshot of the server half alone, because the
+    -- client's went to a chat box that was not open.
+    TriggerServerEvent('mi_fire:server:relayHoseDiagnosis', out)
 end)
 
 RegisterNetEvent('mi_fire:client:clearHoseProps', function()

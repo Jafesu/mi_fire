@@ -2395,3 +2395,56 @@ Two things were missing, and neither was the hard part.
 
 **Next:** put it on an actual fire and watch the intensity come down.
 
+---
+
+## 2026-08-31 (fifteenth) — a crash on opening the nozzle
+
+**Scope:** the game goes down on the first trigger pull. Cause unconfirmed.
+
+**What could not be established:** the crash log. The legacy FiveM data directory has nothing
+newer than several hours before the crash, and the `FiveM for GTAV Enhanced` install alongside it
+has no `logs` or `crashes` directory at all. So this entry is reasoning, not evidence, and it
+says so.
+
+**Changed:**
+
+- `client/modules/hose/init.lua` — the stream particle attaches to the **hand bone** rather than
+  the weapon entity; `/fire nozzlestream off` disables the particle outright.
+- `config/hose.lua` — `stream` offsets are now from the hand, and `stream = false` removes it.
+
+**Decisions:**
+
+- **The particle moved off the weapon entity.** On the weapon reads better -- the jet follows the
+  nozzle for free -- but the weapon object is created and destroyed by the game *and* re-attached
+  by `applyNozzleGrip` on every stance change. Aiming is a stance change, so pulling the trigger
+  while aiming re-attached the weapon and started a looped particle on it in the same frame.
+  That is a plausible way to take a game down, and the ped is stable in a way a weapon object is
+  not.
+
+  It is the best suspect. It is not a confirmed cause, and the difference matters.
+
+- **`off` disables the particle rather than the tuning.** The first question about this crash is
+  whether the particle is involved at all, and that deserves an answer in ten seconds rather than
+  another round of edits and a restart. Water still flows with it off, so the two halves can be
+  bisected against each other in game.
+
+  This is the more useful half of the change. A fix that might work is worth less than a way to
+  find out what is actually broken -- and everything else here has been settled by looking rather
+  than reasoning.
+
+- **The offsets restart from zero**, because they were relative to the model and are now relative
+  to the hand. Nothing carries over and there is nothing to derive them from; `/fire nozzlestream
+  nudge` finds them.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1094 passed, 0 failed**.
+- Definition order checked: `BONES` and `activeGrip` are both above `startStream`.
+- **Nothing about the crash is verified.** The change is a hypothesis with a switch attached.
+
+**Open:**
+
+- Does it still crash with `/fire nozzlestream off`? That answer decides everything next.
+- If it does, the particle is innocent and the suspects are the water event, the shape test in
+  `aimPoint`, or the control handling.
+

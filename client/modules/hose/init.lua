@@ -282,7 +282,8 @@ end
 --- preference being discovered, not server state.
 local function saveGrips()
     local ok, encoded = pcall(json.encode, {
-        carry = grips.carry, aim = grips.aim, stream = streamOverride,
+        carry = grips.carry, aim = grips.aim,
+        stream = streamOverride, streamOff = not streamEnabled,
     })
     if ok and encoded then SetResourceKvp(GRIP_KVP, encoded) end
 end
@@ -296,6 +297,7 @@ local function loadGrips()
         grips.carry = decoded.carry
         grips.aim = decoded.aim
         streamOverride = decoded.stream
+        if decoded.streamOff then streamEnabled = false end
     end
 end
 
@@ -830,10 +832,24 @@ local PATTERN_WIDEN = 14
 
 --- The stream, as a particle.
 ---
---- Attached to the weapon entity rather than the ped, so it follows the nozzle through every
---- stance and every grip change without anything having to track it.
+--- **Attached to the hand bone, not to the weapon entity.**
+---
+--- It was on the weapon at first, which reads better -- the jet follows the nozzle for free.
+--- But the weapon object is created and destroyed by the game, and `applyNozzleGrip` re-attaches
+--- it on every stance change. Aiming *is* a stance change, so pressing the trigger while aiming
+--- re-attached the weapon and started a looped particle on it in the same frame. That is a
+--- plausible way to crash a game, and the ped is stable in a way the weapon object is not.
+---
+--- The hand moves with the nozzle regardless, so nothing is lost but the offsets, which had to
+--- be found by eye either way.
 local streamHandle = nil
 local streamAssetAsked = false
+
+--- Off is a diagnostic, not a preference.
+---
+--- If the game still goes down with this disabled then the particle was never the problem, and
+--- that is worth being able to find out in ten seconds rather than by another round of edits.
+local streamEnabled = true
 
 ---@return table
 local function streamCfg()
@@ -859,6 +875,10 @@ end
 
 ---@param ped integer
 local function startStream(ped)
+    if not streamEnabled then return end
+    if not MIFireHose.visuals.stream then return end
+    if not ped or ped == 0 or not DoesEntityExist(ped) then return end
+
     local cfg = streamCfg()
 
     if not HasNamedPtfxAssetLoaded(cfg.asset) then
@@ -871,13 +891,14 @@ local function startStream(ped)
         return
     end
 
-    local object = GetCurrentPedWeaponEntityIndex(ped)
-    if not object or object == 0 or not DoesEntityExist(object) then return end
+    -- The same hand the nozzle is in, so the jet tracks it without knowing anything about it.
+    local grip = activeGrip() or {}
+    local bone = GetPedBoneIndex(ped, BONES[grip.bone or 'right'] or BONES.right)
 
     UseParticleFxAssetNextCall(cfg.asset)
 
-    streamHandle = StartParticleFxLoopedOnEntity(cfg.name, object,
-        cfg.x, cfg.y, cfg.z, cfg.rx, cfg.ry, cfg.rz, cfg.scale, false, false, false)
+    streamHandle = StartParticleFxLoopedOnEntityBone(cfg.name, ped,
+        cfg.x, cfg.y, cfg.z, cfg.rx, cfg.ry, cfg.rz, bone, cfg.scale, false, false, false)
 end
 
 --- Put water on the fire.
@@ -986,15 +1007,32 @@ RegisterNetEvent('mi_fire:client:nozzleStream', function(action, axis, amount)
 
     local function report()
         local c = streamCfg()
+        say(('particle is %s; offsets are from the hand bone')
+            :format(streamEnabled and 'on' or 'OFF'))
         say(("stream = { asset = '%s', name = '%s', scale = %.2f, x = %.3f, y = %.3f, z = %.3f, rx = %.1f, ry = %.1f, rz = %.1f },")
             :format(c.asset, c.name, c.scale, c.x, c.y, c.z, c.rx, c.ry, c.rz))
     end
 
     if action == 'off' then
-        streamOverride = nil
+        streamEnabled = false
         saveGrips()
         stopStream()
-        return say('stream override cleared -- config/hose.lua applies')
+        return say('stream particle OFF. Water still flows -- if it still crashes, '
+            .. 'the particle was not the cause.')
+    end
+
+    if action == 'on' then
+        streamEnabled = true
+        saveGrips()
+        return say('stream particle on')
+    end
+
+    if action == 'reset' then
+        streamOverride = nil
+        streamEnabled = true
+        saveGrips()
+        stopStream()
+        return say('stream tuning cleared -- config/hose.lua applies')
     end
 
     if action == 'show' then return report() end

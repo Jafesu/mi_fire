@@ -715,7 +715,9 @@ end
 ---
 ---     /fire nozzlestream show
 ---     /fire nozzlestream nudge <x|y|z|rx|ry|rz|scale> <amount>
----     /fire nozzlestream off
+---     /fire nozzlestream off     no particle at all -- water still flows
+---     /fire nozzlestream on
+---     /fire nozzlestream reset   back to the config
 ---
 --- Which way a particle emits is not readable from the effect or the model, so it gets found by
 --- looking, the same as the grip did.
@@ -726,9 +728,22 @@ subcommands.nozzlestream = function(source, args)
 
     local action = args[2]
 
-    if action == 'off' or action == 'reset' then
+    -- `off` kills the particle rather than the tuning, because the first question about a
+    -- crash is whether the particle is in it at all, and that wants answering in seconds.
+    if action == 'off' then
         TriggerClientEvent('mi_fire:client:nozzleStream', source, 'off')
-        return reply(source, 'stream override cleared')
+        return reply(source,
+            'particle off -- water still flows. If it still crashes, it was not the particle.')
+    end
+
+    if action == 'on' then
+        TriggerClientEvent('mi_fire:client:nozzleStream', source, 'on')
+        return reply(source, 'particle on')
+    end
+
+    if action == 'reset' then
+        TriggerClientEvent('mi_fire:client:nozzleStream', source, 'reset')
+        return reply(source, 'stream tuning cleared')
     end
 
     if not action or action == 'show' then
@@ -751,7 +766,8 @@ subcommands.nozzlestream = function(source, args)
         return reply(source, ('%s %+g -- hold the trigger'):format(tostring(axis), amount))
     end
 
-    reply(source, ('"%s" is not one of show, nudge, off'):format(tostring(action)), 'error')
+    reply(source, ('"%s" is not one of show, nudge, on, off, reset')
+        :format(tostring(action)), 'error')
 end
 
 --- `/fire perms` -- why you can or cannot use these commands.

@@ -398,28 +398,29 @@ MIFireHose.visuals = {
     --- `conventions_spec` both read it, so the next borrow has to be declared.
     borrowed = {},
 
-    --- The stream itself.
+    --- The stream itself. Set to `false` to have no water particle at all.
     ---
     --- `core` / `water_cannon_jet` is the base game's own water cannon jet, and it is not a
     --- guess: it is what the water cannon rigs on this machine use, at scale 2.0, driven with an
-    --- offset and a rotation exactly like this. Same rule as the fire particle pairs and the roll
-    --- animation -- take the one that is already working somewhere rather than the one whose
-    --- name sounds right.
+    --- offset and a rotation. Same rule as the fire particle pairs and the roll animation --
+    --- take the one that is already working somewhere rather than the one whose name sounds
+    --- right.
     ---
-    --- Attached to the weapon entity rather than the ped, so it follows the nozzle through every
-    --- stance without anything having to track it.
+    --- **Attached to the hand bone, not the weapon.** On the weapon reads better, since the jet
+    --- would follow the nozzle for free -- but the weapon object is created and destroyed by the
+    --- game and re-attached by `applyNozzleGrip` on every stance change. Aiming is a stance
+    --- change, so pulling the trigger while aiming re-attached the weapon and started a looped
+    --- particle on it in the same frame. The ped is stable in a way the weapon object is not.
     ---
-    --- The offset is in the **model's** space: the origin is the bale handle, the barrel axis
-    --- runs 0.128 below it, and the tip is 0.139 forward. Rotation is the awkward part, because
-    --- which way a particle emits is not something you can read off anything -- tune it with
-    --- `/fire nozzlestream`.
+    --- So the offsets below are **from the hand**, not from the nozzle's origin, and they start
+    --- at zero because there is nothing to derive them from. Find them with
+    --- `/fire nozzlestream nudge`, which prints the line to paste back.
     stream = {
         asset = 'core',
         name = 'water_cannon_jet',
         scale = 1.2,
 
-        -- At the tip, on the barrel axis.
-        x = 0.0, y = 0.139, z = -0.128,
+        x = 0.0, y = 0.0, z = 0.0,
         rx = 0.0, ry = 0.0, rz = 0.0,
     },
 

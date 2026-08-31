@@ -47,9 +47,26 @@ end
 ---@param portType string
 ---@return string
 local function suggestId(portType)
-    local count = 1
+    -- Counts what is already in the config as well as what has been placed this session.
+    -- Counting only the session means a second sitting starts back at 1 and collides with the
+    -- work from the first, which fails the boot check with a duplicate id -- and does so long
+    -- after the person who caused it has stopped thinking about offsets.
+    local taken = {}
+
+    local profile = session.modelName
+        and MIFireApparatus.profiles[session.modelName:lower()]
+
+    for _, port in ipairs(profile and profile.ports or {}) do
+        taken[port.id] = true
+    end
+
     for _, port in ipairs(session.ports) do
-        if port.type == portType then count = count + 1 end
+        taken[port.id] = true
+    end
+
+    local count = 1
+    while taken[('%s%d'):format(portType, count)] do
+        count = count + 1
     end
 
     return ('%s%d'):format(portType, count)

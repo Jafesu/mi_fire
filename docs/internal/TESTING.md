@@ -53,7 +53,41 @@ tight sphere.
 
 ---
 
-## 2. The HUD
+## 2. Hose lines — new, never run
+
+Needs the `EengineHT`, which is the only rig with authored ports.
+
+- [ ] Third-eye the **crosslay** (`rear_crosslay_white`). **Pull a line** appears.
+- [ ] Pull it. A rope should appear between the outlet and you, and a nozzle in your hands.
+- [ ] Walk away from the rig. The rope should follow you and sag rather than going taut.
+- [ ] Third-eye a **bare discharge** with no line in hand — **Pull a line** there too, but it
+      comes off *unconnected*, because only a preconnected port has hose on it already.
+- [ ] With an unconnected line, third-eye a discharge — **Connect the line here**.
+- [ ] Try connecting a 1.75″ line to a 2.5″ outlet. It should refuse and say the sizes.
+
+**Water.**
+
+- [ ] Third-eye the **pump panel**. **Charge the line** appears, listing your connected lines.
+- [ ] Charge it with the pump **not engaged** — it should refuse.
+- [ ] Engage the pump, charge it. Press **G** to open the nozzle.
+- [ ] Put it on a fire and confirm the fire goes down.
+- [ ] Press **B** to change pattern on a fog nozzle. On a smooth bore it should tell you there
+      is only one pattern, which is the point of a smooth bore.
+- [ ] Watch the tank drain. 750 gallons at 200 gpm is under four minutes.
+- [ ] Let it run dry — the line goes soft and you are told, rather than water silently
+      continuing.
+
+**Crew.** *Needs a second player.*
+
+- [ ] Player two third-eyes **you** — **Back up this line**.
+- [ ] With two on a 1.75″, full flow should be available.
+- [ ] Try a 2½″ alone. It should let you, and cap the flow well below its rating, and say
+      what the crew can actually hold.
+- [ ] Player two leaves. The line stays, one hand short — it must **not** vanish.
+
+---
+
+## 3. The HUD
 
 Everything below depends on this, because the HUD is now the only readout for air, gear
 condition and heat — the screen effects that used to hint at them are gone.
@@ -72,7 +106,7 @@ condition and heat — the screen effects that used to hint at them are gone.
 
 ---
 
-## 3. Screen effects are gone
+## 4. Screen effects are gone
 
 Your call, and this is now intended behaviour rather than a gap.
 
@@ -88,7 +122,7 @@ every flag in it is `false`.
 
 ---
 
-## 4. SCBA from a clothing menu
+## 5. SCBA from a clothing menu
 
 The fix with the widest blast radius: SCBA was never given the treatment turnout gear got in
 ADR 0004, so a visible harness counted for nothing.
@@ -107,7 +141,7 @@ Then confirm the rig route still works:
 
 ---
 
-## 5. Air is ten minutes now
+## 6. Air is ten minutes now
 
 - [ ] With the valve open, **sprint** around and watch the AIR row. It should drain visibly
       faster than standing still. *You could not check this before — there was no gauge.*
@@ -117,7 +151,7 @@ Then confirm the rig route still works:
 
 ---
 
-## 6. Catching fire is survivable now
+## 7. Catching fire is survivable now
 
 Two separate natives were applying the engine's own fire damage over the top of this
 resource's model: `StartEntityFire` on the burning player, and `StartScriptFire` under every
@@ -147,7 +181,7 @@ model's numbers.
 
 ---
 
-## 7. Turnout repair and replacement
+## 8. Turnout repair and replacement
 
 Both options were unreachable until now, so none of this has ever run.
 
@@ -173,7 +207,7 @@ Both options were unreachable until now, so none of this has ever run.
 
 ---
 
-## 8. PASS runs on its own battery
+## 9. PASS runs on its own battery
 
 Your observation was right and the behaviour changed to match: a PASS is not powered by
 cylinder pressure, so an empty bottle must not switch it off.
@@ -194,7 +228,7 @@ cylinder pressure, so an empty bottle must not switch it off.
 
 ---
 
-## 9. Class B smoke reads like Class B
+## 10. Class B smoke reads like Class B
 
 Colour was driven only by how developed the fire was, with no input from the fuel — so a
 flammable-liquid fire smoked white while it was still small.
@@ -213,7 +247,7 @@ flammable-liquid fire smoked white while it was still small.
 
 ---
 
-## 10. Burn marks
+## 11. Burn marks
 
 Marks are drawn as **flat dark discs**, not decals. Decals are the better mechanism and this
 build does not render them: `AddDecal` accepts five type IDs, hands back real non-zero
@@ -236,7 +270,7 @@ behind `MIFireScorch.renderer = 'decal'` for servers where it works.
 
 ---
 
-## 11. Teardown, with the new particle
+## 12. Teardown, with the new particle
 
 Only worth re-running because burning is now a particle we start rather than an engine
 effect, and an orphaned one would survive the restart.

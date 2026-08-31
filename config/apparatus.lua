@@ -206,6 +206,16 @@ MIFireApparatus.profiles = {
             --- against the rig if it carries something else.
             { id = "rear_crosslay_white", type = "discharge", x = -0.120, y = -4.469, z = -0.209, heading = 180.0,
               label = "Crosslay (white)", size = 1.75, preconnected = { feet = 200 } },
+            --- RENAMED from "gear1", which was already taken -- a duplicate id fails the boot
+            --- check, because the pump panel binds controls by id and two ports sharing one
+            --- means a valve that opens the wrong outlet.
+            ---
+            --- **This offset looks wrong and is worth re-measuring.** x is metres to the right
+            --- of the vehicle centreline, and an engine is about 2.5m wide, so anything on the
+            --- rig sits within roughly +/-1.3. At 5.8 this is about four and a half metres past
+            --- the side of the truck -- most likely the aim ray went past the rig and hit the
+            --- ground or a wall behind it.
+            { id = "gear2", type = "gear", x = 5.841, y = -2.605, z = -0.238, heading = 64.4 },
 
         },
     },

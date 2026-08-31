@@ -312,6 +312,16 @@ function Apparatus.warnings(profile, reach)
     for i = 1, #ports do
         local port = ports[i]
 
+        -- An apparatus is about 2.5m wide and 10m long, so anything much past 1.5m either
+        -- side of the centreline is off the rig. Not an error, because a deck gun or an
+        -- outrigger legitimately reaches -- but it is far more often an aim ray that went past
+        -- the truck and hit the ground behind it, and that is worth saying out loud.
+        if Apparatus.anchor(port) == 'offset' and math.abs(port.x or 0) > 2.0 then
+            warnings[#warnings + 1] = ('port "%s" is %.1fm from the centreline, which is off '
+                .. 'the side of the rig -- most likely the aim went past the truck')
+                :format(port.id, math.abs(port.x))
+        end
+
         if port.preconnected and not tonumber(port.size) then
             warnings[#warnings + 1] = ('port "%s" has hose preconnected but no size -- the '
                 .. 'hose system cannot work out what diameter it is pulling'):format(port.id)

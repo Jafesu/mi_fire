@@ -53,6 +53,7 @@ client_scripts {
     'client/modules/exposure/init.lua',
     'client/modules/smoke/init.lua',
     'client/modules/scorch/init.lua',
+    'client/modules/hose/init.lua',
     'client/modules/apparatus/init.lua',
     'client/modules/placement/init.lua',
     'client/modules/offsetfinder/scan.lua',

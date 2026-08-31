@@ -62,6 +62,16 @@ local function publicOf(line)
     }
 end
 
+--- Tell everyone on a line something.
+---@param line table
+---@param message string
+---@param kind string|nil
+local function notifyLine(line, message, kind)
+    for source in pairs(line.crew or {}) do
+        TriggerClientEvent('mi_fire:client:notify', source, message, kind or 'inform')
+    end
+end
+
 ---@param line table
 ---@param target integer|nil
 local function sync(line, target)
@@ -458,6 +468,86 @@ RegisterNetEvent('mi_fire:server:stowHose', function(lineId)
     if not ok and why then
         TriggerClientEvent('mi_fire:client:notify', source, why, 'error')
     end
+end)
+
+--- Water on the fire.
+---
+--- The client says where it is aiming and the server decides what that does, because
+--- suppression is fire state and fire state is the server's. The worst a forged aim achieves
+--- is putting water somewhere the player is not looking.
+---
+--- It also spends the tank, which is the thing that makes a supply line matter: an engine with
+--- 750 gallons flowing 150 gpm has five minutes, and that clock is the whole reason anyone
+--- lays a hydrant line rather than parking and fighting the fire off the tank.
+RegisterNetEvent('mi_fire:server:hoseWater', function(coords, gpm, seconds)
+    local source = source
+    if type(coords) ~= 'table' then return end
+
+    local line = HoseServer.lineFor(source)
+    if not line or line.state ~= 'charged' then return end
+    if line.nozzleHolder ~= source then return end
+
+    gpm = math.max(0.0, math.min(tonumber(gpm) or 0.0, line.gpm or 0.0))
+    seconds = math.max(0.0, math.min(tonumber(seconds) or 0.5, 2.0))
+    if gpm <= 0 then return end
+
+    local entity = NetworkGetEntityFromNetworkId(line.sourceNet)
+    if not entity or entity == 0 then return end
+
+    -- Gallons actually delivered, which is not necessarily what was asked for. A tank running
+    -- dry does not announce itself; the line simply goes soft, which is what happens.
+    local wanted = gpm * (seconds / 60.0)
+    local drawn = MIFire.ApparatusServer.draw(entity, wanted)
+
+    if drawn <= 0 then
+        if not line.warnedDry then
+            line.warnedDry = true
+            notifyLine(line, 'The line has gone soft -- the tank is empty', 'error')
+        end
+        return
+    end
+
+    line.warnedDry = nil
+
+    -- The agent is water unless the rig is proportioning foam, which Phase 8 turns on. Routed
+    -- through the same entry point every other water source uses, so no line can bypass the
+    -- agent matrix and quietly put water on a Class D fire without consequence.
+    local delivered = drawn * (60.0 / math.max(0.01, seconds))
+
+    MIFire.Fire.applyAgent(coords, 3.0, line.agent or 'water', {
+        gpm = delivered,
+        seconds = seconds,
+        source = source,
+    })
+end)
+
+--- Cycle the nozzle pattern.
+---
+--- Server-side because pattern changes what the water does, and what the water does is fire
+--- state.
+RegisterNetEvent('mi_fire:server:cycleNozzlePattern', function()
+    local source = source
+    local line = HoseServer.lineFor(source)
+    if not line or line.nozzleHolder ~= source then return end
+
+    local nozzle = MIFireHose.nozzles[line.nozzle or '']
+    if not nozzle or not nozzle.patterns or #nozzle.patterns < 2 then
+        return TriggerClientEvent('mi_fire:client:notify', source,
+            'A smooth bore has one pattern -- that is rather the point of it', 'inform')
+    end
+
+    local current = line.pattern or nozzle.defaultPattern or nozzle.patterns[1]
+    local index = 1
+
+    for i = 1, #nozzle.patterns do
+        if nozzle.patterns[i] == current then index = i break end
+    end
+
+    line.pattern = nozzle.patterns[(index % #nozzle.patterns) + 1]
+    sync(line)
+
+    TriggerClientEvent('mi_fire:client:notify', source,
+        ('Pattern: %s'):format(line.pattern), 'inform')
 end)
 
 --- A client that just joined has no lines at all.

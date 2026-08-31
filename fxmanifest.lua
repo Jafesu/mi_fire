@@ -45,6 +45,13 @@ client_scripts {
     'bridge/medical/init.lua',
     'client/main.lua',
     'client/modules/notify.lua',
+
+    -- Shared client helpers, before anything that reads them at file scope. `hose` captures
+    -- `MIFire.ApparatusClient` as a local, and loading it first got a nil that only surfaced
+    -- when somebody aimed at a truck.
+    'client/modules/apparatus/init.lua',
+    'client/modules/placement/init.lua',
+
     'client/modules/hud.lua',
     'client/modules/fire/render.lua',
     'client/modules/fire/init.lua',
@@ -54,10 +61,6 @@ client_scripts {
     'client/modules/smoke/init.lua',
     'client/modules/scorch/init.lua',
     'client/modules/hose/init.lua',
-    'client/modules/apparatus/init.lua',
-    'client/modules/placement/init.lua',
-    'client/modules/offsetfinder/scan.lua',
-    'client/modules/offsetfinder/scan.lua',
     'client/modules/offsetfinder/scan.lua',
     'client/modules/offsetfinder/init.lua',
 }

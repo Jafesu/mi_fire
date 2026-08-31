@@ -16,7 +16,18 @@ local HoseClient = {}
 local Util = MIFire.Util
 local Hose = MIFire.Hose
 local Target = MIFire.Target
-local ApparatusClient = MIFire.ApparatusClient
+
+--- Resolved at call time rather than captured at load time.
+---
+--- A file-scope `local ApparatusClient = MIFire.ApparatusClient` binds whatever happened to be
+--- there when this file loaded, and nothing in the file says which other files have loaded
+--- yet. It was nil, and the only symptom was an error the first time somebody aimed at a
+--- truck. The manifest order is fixed too, but one of those is a rule you have to remember and
+--- the other cannot go wrong.
+---@return table
+local function apparatus()
+    return MIFire.ApparatusClient
+end
 
 --- What the server says exists, keyed by line id.
 ---@type table<string, table>
@@ -98,12 +109,12 @@ local function sourceCoords(line)
 
     if entity == 0 or not DoesEntityExist(entity) then return nil end
 
-    local profile = ApparatusClient.profile(entity)
+    local profile = apparatus().profile(entity)
     local port = profile and MIFire.Apparatus.port(profile, line.sourcePort)
 
     if not port then return GetEntityCoords(entity) end
 
-    return ApparatusClient.portCoords(entity, port), entity
+    return apparatus().portCoords(entity, port), entity
 end
 
 ---@param id string
@@ -276,11 +287,11 @@ end)
 local function dischargeAt(entity, coords)
     if not coords then return nil end
 
-    local ports = ApparatusClient.ports(entity, 'discharge')
+    local ports = apparatus().ports(entity, 'discharge')
 
     for i = 1, #ports do
-        if ApparatusClient.atPort(entity, coords, 'discharge') then
-            local world = ApparatusClient.portCoords(entity, ports[i])
+        if apparatus().atPort(entity, coords, 'discharge') then
+            local world = apparatus().portCoords(entity, ports[i])
             if #(coords - world) <= 1.0 then return ports[i] end
         end
     end
@@ -301,7 +312,7 @@ CreateThread(function()
             distance = 2.5,
             canInteract = function(entity, _, coords)
                 if mine then return false end
-                if not ApparatusClient.isApparatus(entity) then return false end
+                if not apparatus().isApparatus(entity) then return false end
                 return dischargeAt(entity, coords) ~= nil
             end,
             onSelect = function(data)
@@ -329,7 +340,7 @@ CreateThread(function()
             canInteract = function(entity, _, coords)
                 local line = mine and lines[mine]
                 if not line or line.sourceNet then return false end
-                if not ApparatusClient.isApparatus(entity) then return false end
+                if not apparatus().isApparatus(entity) then return false end
                 return dischargeAt(entity, coords) ~= nil
             end,
             onSelect = function(data)
@@ -355,7 +366,7 @@ CreateThread(function()
             label = 'Charge the line',
             distance = 2.5,
             canInteract = function(entity, _, coords)
-                if not ApparatusClient.atPort(entity, coords, 'panel') then return false end
+                if not apparatus().atPort(entity, coords, 'panel') then return false end
 
                 for _, line in pairs(lines) do
                     if line.state == 'connected' then return true end

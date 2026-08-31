@@ -113,4 +113,79 @@ return function(t)
         t.ok(findCode(render, 'StartScriptFire') ~= nil,
             'the script fire path still exists for servers that want it')
     end
+
+    -- -----------------------------------------------------------------------
+
+    t.describe('the manifest lists each file once')
+
+    -- `offsetfinder/scan.lua` appeared three times, because a wiring script that inserts a line
+    -- was run three times and nothing objected. FiveM loads a duplicate entry twice, which for
+    -- most files is merely waste and for one holding state is a bug nobody would look for.
+    do
+        local manifest = read('fxmanifest.lua')
+
+        -- Per block, not across the whole file. The bridges are deliberately in both
+        -- `client_scripts` and `server_scripts` -- one adapter, two sides -- and flagging that
+        -- would be flagging the design.
+        if manifest then
+            for _, block in ipairs({ 'shared_scripts', 'client_scripts', 'server_scripts' }) do
+                local body = manifest:match(block .. '%s*{(.-)}')
+
+                if body then
+                    local seen, duplicates = {}, {}
+
+                    for path in body:gmatch("'([%w_/%.%-]+%.lua)'") do
+                        if seen[path] then
+                            duplicates[#duplicates + 1] = path
+                        else
+                            seen[path] = true
+                        end
+                    end
+
+                    t.equal(#duplicates, 0,
+                        ('%s declares each file once%s'):format(block,
+                            #duplicates > 0 and (': ' .. table.concat(duplicates, ', ')) or ''))
+                end
+            end
+        end
+    end
+
+    t.describe('and loads shared client helpers before what reads them')
+
+    -- `hose` takes `MIFire.ApparatusClient` as a file-scope local. Loading it first bound nil,
+    -- and the only symptom was an error the first time somebody aimed at a truck. The lazy
+    -- lookup in that file makes it safe either way; this keeps the order honest as well.
+    do
+        local manifest = read('fxmanifest.lua')
+
+        if manifest then
+            local order = {}
+            local index = 0
+
+            for path in manifest:gmatch("'([%w_/%.%-]+%.lua)'") do
+                index = index + 1
+                order[path] = order[path] or index
+            end
+
+            local helpers = {
+                'client/modules/apparatus/init.lua',
+                'client/modules/placement/init.lua',
+            }
+
+            local consumers = {
+                'client/modules/hose/init.lua',
+                'client/modules/turnout/init.lua',
+                'client/modules/offsetfinder/init.lua',
+            }
+
+            for _, helper in ipairs(helpers) do
+                for _, consumer in ipairs(consumers) do
+                    if order[helper] and order[consumer] then
+                        t.ok(order[helper] < order[consumer],
+                            ('%s loads before %s'):format(helper, consumer))
+                    end
+                end
+            end
+        end
+    end
 end

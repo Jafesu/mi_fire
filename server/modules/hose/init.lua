@@ -85,7 +85,24 @@ local function publicOf(line)
     }
 end
 
---- Tell everyone on a line something.
+--- The nozzle is the client's to draw.
+---
+--- It was briefly an inventory item, on the theory that ox_inventory strips a weapon given
+--- directly -- which it does, and which was the wrong conclusion. SmartHose does not give the
+--- weapon at all: it makes a **weapon object** out of the hash and attaches it, so nothing is
+--- ever equipped, no inventory is involved, and a firefighter's inventory does not gain and
+--- lose an item every time they pick up a line.
+---
+--- Left as a no-op rather than deleted, because every call site reads correctly and the next
+--- person to wonder where the nozzle is handled should find this note.
+---@param source integer
+---@param give boolean
+local function nozzleItem(source, give)
+end
+
+HoseServer.nozzleItem = nozzleItem
+
+--- Tell everyone on a line something.--- Tell everyone on a line something.
 ---@param line table
 ---@param message string
 ---@param kind string|nil
@@ -107,7 +124,11 @@ local function drop(id)
     if not line then return end
 
     for source in pairs(line.crew or {}) do playerLine[source] = nil end
-    if line.nozzleHolder then playerLine[line.nozzleHolder] = nil end
+
+    if line.nozzleHolder then
+        playerLine[line.nozzleHolder] = nil
+        nozzleItem(line.nozzleHolder, false)
+    end
 
     lines[id] = nil
     TriggerClientEvent('mi_fire:client:hoseLine', -1, id, nil)
@@ -246,6 +267,7 @@ function HoseServer.pullFromBed(source, entity, portId, diameter, lengths)
     }
 
     playerLine[source] = id
+    nozzleItem(source, true)
     sync(lines[id])
 
     Util.debug('hose', '%s pulled %d length(s) of %s off the bed',
@@ -319,6 +341,7 @@ function HoseServer.pull(source, entity, portId)
     }
 
     playerLine[source] = id
+    nozzleItem(source, true)
     sync(lines[id])
 
     Util.debug('hose', '%s took the %s preconnect (%s, %d section(s))',
@@ -439,6 +462,7 @@ function HoseServer.leaveCrew(source)
     -- lying charged on the ground is a real and instructive hazard.
     if line.nozzleHolder == source then
         line.nozzleHolder = nil
+        nozzleItem(source, false)
     end
 
     sync(line)
@@ -461,6 +485,7 @@ function HoseServer.takeNozzle(source, lineId)
     end
 
     line.nozzleHolder = source
+    nozzleItem(source, true)
     sync(line)
 
     return true

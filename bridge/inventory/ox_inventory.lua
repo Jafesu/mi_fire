@@ -96,6 +96,41 @@ end
 ---@param amount number Positive removes durability.
 ---@param minimum number|nil
 ---@return number|nil remaining
+--- Put an item in someone's inventory.
+---
+--- Needed for weapons above all. ox_inventory owns the ped's weapons: it syncs what is in the
+--- hand to what is equipped from the inventory, so `GiveWeaponToPed` is removed again on the
+--- next sync. A weapon has to *be* an item.
+---@param source integer
+---@param item string
+---@param count integer|nil
+---@param metadata table|nil
+---@return boolean
+function Inventory.add(source, item, count, metadata)
+    if not Inventory.available then return false end
+
+    local ok = pcall(function()
+        exports.ox_inventory:AddItem(source, item, count or 1, metadata)
+    end)
+
+    return ok
+end
+
+--- Take an item back.
+---@param source integer
+---@param item string
+---@param count integer|nil
+---@return boolean
+function Inventory.remove(source, item, count)
+    if not Inventory.available then return false end
+
+    local ok = pcall(function()
+        exports.ox_inventory:RemoveItem(source, item, count or 1)
+    end)
+
+    return ok
+end
+
 function Inventory.consumeDurability(source, item, key, amount, minimum)
     local slot = Inventory.getSlot(source, item)
     if not slot then return nil end

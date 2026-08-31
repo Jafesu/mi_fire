@@ -82,52 +82,52 @@ local function ensureTextures()
     return texturesLoaded
 end
 
---- The nozzle, as a weapon.
+--- The nozzle: a weapon **object**, attached to the hand.
 ---
---- A weapon rather than a prop, because a nozzle sprays and a prop cannot. It also gives the
---- two-handed grip and the aiming stance, which is what holding a charged line looks like.
+--- Three attempts got this wrong before SmartHose's config settled it, and the distinction is
+--- the whole thing:
+---
+---   `GiveWeaponToPed`   equips a weapon. ox_inventory owns the ped's weapons and syncs the
+---                       hand to whatever is equipped from the inventory, so a weapon handed
+---                       over directly is taken away again within the second. It was being
+---                       given and immediately removed.
+---
+---   `CreateObject`      needs a plain model archetype. `w_am_hose` is a *weapon* archetype,
+---                       so this returns nothing.
+---
+---   `CreateWeaponObject` makes a world object out of a weapon hash. It is not equipped, so no
+---                       inventory touches it, and it is not a plain model, so the weapon
+---                       archetype is exactly what it wants.
+---
+--- The metas are still required -- they are what define the archetype at all -- which is why
+--- copying the `.ydr` alone left it unknown however many times anyone reconnected.
 ---@param ped integer
----@return boolean given
-local function giveNozzle(ped)
+---@return integer|nil
+local function createNozzle(ped)
     local name = MIFireHose.visuals.nozzleWeapon
-    if not name then return false end
+    if not name then return nil end
 
     local hash = joaat(name)
+    local coords = GetEntityCoords(ped)
 
-    -- **Not gated on `IsWeaponValid`.**
-    --
-    -- That predicate knows the game's own weapon list. A weapon added through a `weapons.meta`
-    -- fails it while working perfectly, so gating on it refused to even try -- and reported
-    -- "not registered" for a weapon that was registered, which sent the search off after the
-    -- metas instead of at the check.
-    --
-    -- This is the second time in two attempts: `IsModelInCdimage` did the same for the model.
-    -- The rule that comes out of it is that a validity predicate answers about the base game
-    -- and a custom asset is not the base game, so **do the thing and look at what happened**.
-    GiveWeaponToPed(ped, hash, 1, false, true)
-    SetCurrentPedWeapon(ped, hash, true)
+    local object = CreateWeaponObject(hash, 1, coords.x, coords.y, coords.z, true, 1.0, 0)
 
-    if HasPedGotWeapon(ped, hash, false) then return true end
-
-    Util.warn('nozzle weapon "%s" did not take. Check `data/weapons.meta` and '
-        .. '`data/weaponarchetypes.meta` are present and declared with `data_file` in '
-        .. 'fxmanifest.lua, then restart the resource and reconnect -- a weapon model is inert '
-        .. 'without its archetype, and both have to reach the client.', name)
-
-    return false
-end
-
----@param ped integer
-local function takeNozzleAway(ped)
-    local name = MIFireHose.visuals.nozzleWeapon
-
-    if name then
-        local hash = joaat(name)
-        if HasPedGotWeapon(ped, hash, false) then RemoveWeaponFromPed(ped, hash) end
+    if not object or object == 0 then
+        Util.warn('nozzle "%s" would not create. It needs data/weaponarchetypes.meta and '
+            .. 'data/weapons.meta present and declared with `data_file` in fxmanifest.lua, and '
+            .. 'the client has to reconnect after they are added -- a weapon model is inert '
+            .. 'without its archetype.', name)
+        return nil
     end
+
+    -- Right hand. The offsets put the grip in the palm rather than the body of it.
+    AttachEntityToEntity(object, ped, GetPedBoneIndex(ped, 57005),
+        0.10, 0.03, -0.02, -80.0, 10.0, 0.0, true, true, false, true, 1, true)
+
+    return object
 end
 
---- A prop, for a server that has no weapon registered.
+--- A plain prop, for a server without the weapon registered.
 ---@param ped integer
 ---@return integer|nil
 local function attachNozzleProp(ped)
@@ -312,23 +312,21 @@ end
 --- a crew walking an uncoupled line out from the bed had nothing in their hands the whole way,
 --- which is exactly the part of the job where they are carrying a nozzle.
 local heldNozzle = nil
-local heldWeapon = false
 
+--- The nozzle in our own hands.
+---
+--- Kept apart from the rope, which it used to be built alongside -- so it only appeared once a
+--- line was coupled, and a crew walking an uncoupled line out from the bed carried nothing the
+--- whole way.
 local function reconcileNozzle()
     local line = mine and lines[mine]
     local holding = line ~= nil and line.nozzleHolder == GetPlayerServerId(PlayerId())
 
-    if holding and not heldWeapon and not heldNozzle then
-        heldWeapon = giveNozzle(cache.ped)
+    if holding and not heldNozzle then
+        heldNozzle = createNozzle(cache.ped) or attachNozzleProp(cache.ped)
 
-        -- Only if the weapon is unavailable. A prop is the consolation prize.
-        if not heldWeapon then heldNozzle = attachNozzleProp(cache.ped) end
-
-    elseif not holding and (heldWeapon or heldNozzle) then
-        if heldWeapon then takeNozzleAway(cache.ped) end
-        if heldNozzle and DoesEntityExist(heldNozzle) then DeleteEntity(heldNozzle) end
-
-        heldWeapon = false
+    elseif not holding and heldNozzle then
+        if DoesEntityExist(heldNozzle) then DeleteEntity(heldNozzle) end
         heldNozzle = nil
     end
 end
@@ -1076,10 +1074,8 @@ RegisterNetEvent('mi_fire:client:clearHoseProps', function()
     for id in pairs(drawn) do undraw(id) end
 
     if heldNozzle and DoesEntityExist(heldNozzle) then DeleteEntity(heldNozzle) end
-    if heldWeapon then takeNozzleAway(cache.ped) end
 
     heldNozzle = nil
-    heldWeapon = false
     drawn = {}
     lines = {}
     mine = nil
@@ -1088,10 +1084,9 @@ end)
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= GetCurrentResourceName() then return end
 
-    -- A prop or a weapon outlives the resource otherwise, and there is nothing left to take
-    -- it away. A firefighter stuck holding a hose nozzle after a restart is a support ticket.
+    -- An attached object outlives the resource otherwise, with nothing left to remove it. A
+    -- firefighter stuck holding a nozzle after a restart is a support ticket.
     if heldNozzle and DoesEntityExist(heldNozzle) then DeleteEntity(heldNozzle) end
-    if heldWeapon then takeNozzleAway(cache.ped) end
 end)
 
 --- The pump panel, until Phase 4's NUI replaces it.

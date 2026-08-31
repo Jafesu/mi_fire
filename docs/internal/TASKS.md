@@ -10,11 +10,22 @@ also gives the two-handed grip and the aiming stance, which is what holding a ch
 like. That makes the replacement a larger job than a model -- it needs an archetype in a
 `weaponarchetypes.meta`, an entry in `weapons.meta`, and the `data_file` lines to register both.
 
-**The thing that cost two rounds of testing:** the `.ydr` alone is inert. A weapon needs its
-archetype, so copying only the model left it unknown to every client no matter how many refreshes
-and reconnects it was given, and it was twice diagnosed as a streaming problem. Reading
-SmartHose's manifest would have shown it immediately. If a nozzle ever goes missing again, check
-the metas are present and declared before checking anything else.
+**What cost four rounds of testing**, worth writing down because none of it is guessable:
+
+The `.ydr` alone is inert -- a weapon needs its archetype, so copying only the model left it
+unknown to every client no matter how many refreshes and reconnects it was given. That was twice
+diagnosed as a streaming problem.
+
+`IsWeaponValid` and `IsModelInCdimage` both answer about the base game, so a custom asset fails
+them while working perfectly. Using either as a gate refuses to try and then reports the asset as
+missing, which sends the search after the asset rather than the check.
+
+And it is **not given as a weapon**. Equipping one means ox_inventory owns it -- it syncs the
+hand to whatever is equipped from the inventory, so a weapon handed over directly is removed
+within the second. `CreateWeaponObject` makes a world object from the weapon hash instead:
+nothing is equipped, no inventory is involved, and the weapon archetype is exactly what it wants.
+SmartHose's own config said so in one line -- `HoseModel = WEAPON_HOSE` beside a timeout for
+"the hose model to be loaded" -- and reading it first would have saved all four rounds.
 
 The boot check names every borrowed asset and its owner on each start, and `conventions_spec`
 fails if something is used that is neither base game nor declared in `visuals.borrowed`.

@@ -275,19 +275,29 @@ MIFireHose.visuals = {
     slack = 0.35,
 
     --- Props. Base game, all four confirmed present in resources on this machine.
-    --- The nozzle in a firefighter's hands, as a **weapon**.
+    --- The nozzle in a firefighter's hands.
     ---
-    --- A weapon rather than a prop, because a nozzle sprays. A prop can be held and cannot be
-    --- fired, and the stance is wrong besides -- a weapon gives the two-handed grip and the
-    --- aiming that holding a charged line actually looks like.
+    --- A weapon hash, made into a world **object** with `CreateWeaponObject` and attached to
+    --- the hand. Three things went wrong before that landed and the distinction is the whole
+    --- of it:
     ---
-    --- `WEAPON_HOSE` is SmartHose's, borrowed for development along with the four meta files
-    --- that define it. The model alone is inert: a weapon needs an archetype, which is why
-    --- copying just the `.ydr` left it unknown to every client however many times anyone
-    --- reconnected. The metas are declared in `fxmanifest.lua` and gitignored with the model.
+    ---   Giving the weapon equips it, and ox_inventory owns the ped's weapons -- it syncs the
+    ---   hand to whatever is equipped from the inventory, so a weapon handed over directly is
+    ---   removed again within the second.
     ---
-    --- **Replace before release.** Its replacement has to be a weapon too, which is a larger
-    --- job than a prop -- see `ASSET-001`.
+    ---   `CreateObject` wants a plain model archetype, and this is a weapon archetype, so it
+    ---   returns nothing.
+    ---
+    ---   `CreateWeaponObject` makes an object from a weapon hash. Nothing is equipped, so no
+    ---   inventory is involved, and the weapon archetype is exactly what it wants.
+    ---
+    --- The metas are still what define the archetype, which is why copying the `.ydr` alone
+    --- left it unknown however many times anyone reconnected.
+    ---
+    --- `WEAPON_HOSE` is SmartHose's, borrowed for development along with the four metas.
+    --- Declared in `fxmanifest.lua` and gitignored with the model. **Replace before release**
+    --- -- and the replacement is a weapon archetype, not a prop, which is a larger job. See
+    --- `ASSET-001`.
     nozzleWeapon = 'WEAPON_HOSE',
 
     --- Fallback for a server without the weapon registered. Nothing is a legitimate answer

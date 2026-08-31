@@ -82,39 +82,29 @@ local function ensureTextures()
     return texturesLoaded
 end
 
---- The nozzle: a weapon **object**, attached to the hand.
+--- Put the nozzle in the hands, as an actual equipped weapon.
 ---
---- Three attempts got this wrong before SmartHose's config settled it, and the distinction is
---- the whole thing:
+--- **This used to make a world object with `CreateWeaponObject` and glue it to the hand bone,
+--- and that was the wrong call.** An attached object is scenery: it cannot be fired, it has no
+--- stance, and the ped stands there with a thing stuck to their fist. Water has to come out of
+--- a nozzle, so the nozzle has to be a weapon the game has actually equipped.
 ---
----   `GiveWeaponToPed`   equips a weapon. ox_inventory owns the ped's weapons and syncs the
----                       hand to whatever is equipped from the inventory, so a weapon handed
----                       over directly is taken away again within the second. It was being
----                       given and immediately removed.
+--- The note that used to be here said `GiveWeaponToPed` gets stripped by ox_inventory within a
+--- second. **That was wrong too, and it is worth spelling out because it sent the whole thing
+--- down a dead end.** It was concluded while the weapon had no archetype -- and a weapon that
+--- does not exist, when given, is absent immediately afterwards, which looks exactly like
+--- something taking it away. It was never the inventory. There was simply no weapon.
 ---
----   `CreateObject`      needs a plain model archetype. `w_am_hose` is a *weapon* archetype,
----                       so this returns nothing.
----
----   `CreateWeaponObject` makes a world object out of a weapon hash. It is not equipped, so no
----                       inventory touches it, and it is not a plain model, so the weapon
----                       archetype is exactly what it wants.
----
---- The metas are still required -- they are what define the archetype at all -- which is why
---- copying the `.ydr` alone left it unknown however many times anyone reconnected.
+--- A weapon asset still has to be requested and waited on, the same as a model. Missing that
+--- returns nothing and looks, once again, exactly like a missing archetype.
 ---@param ped integer
----@return integer|nil
-local function createNozzle(ped)
+---@return boolean equipped
+local function equipNozzle(ped)
     local name = MIFireHose.visuals.nozzleWeapon
-    if not name then return nil end
+    if not name then return false end
 
     local hash = joaat(name)
 
-    -- A weapon asset has to be requested and loaded before an object can be made from it, the
-    -- same as a model. Missing this returned 0 from `CreateWeaponObject` and looked exactly
-    -- like a missing archetype -- which is what it was read as, twice.
-    --
-    -- SmartHose's config had this in it too: `HoseModelTimeout = 2500` is the wait, and it
-    -- being called a *model* timeout for a *weapon* hash is the whole clue.
     if not HasWeaponAssetLoaded(hash) then
         RequestWeaponAsset(hash, 31, 0)
 
@@ -126,27 +116,65 @@ local function createNozzle(ped)
     end
 
     if not HasWeaponAssetLoaded(hash) then
-        Util.warn('nozzle weapon "%s" would not load. If it is a custom weapon, its '
-            .. 'weapons.meta must be declared with `data_file` **and** listed in `files` -- '
-            .. 'declaring alone sends nothing to the client. Falling back to a prop.', name)
-        return nil
+        Util.warn('nozzle weapon "%s" would not load. Its weapons.meta and '
+            .. 'weaponarchetypes.meta must be declared with `data_file` **and** listed in '
+            .. '`files`, and the client has to reconnect after they are added. Falling back '
+            .. 'to a prop.', name)
+        return false
     end
 
-    local coords = GetEntityCoords(ped)
-    local object = CreateWeaponObject(hash, 1, coords.x, coords.y, coords.z, true, 1.0, 0)
+    -- Ammo is nominal. Nothing about the water is decided here: how much reaches the fire is
+    -- the server's business, from the line's flow. The weapon exists to be held and aimed.
+    GiveWeaponToPed(ped, hash, 1000, false, true)
+    SetCurrentPedWeapon(ped, hash, true)
 
-    if not object or object == 0 then
-        Util.warn('nozzle "%s" loaded but would not create an object', name)
-        return nil
+    return HasPedGotWeapon(ped, hash, false)
+end
+
+---@param ped integer
+local function unequipNozzle(ped)
+    local name = MIFireHose.visuals.nozzleWeapon
+    if not name then return end
+
+    local hash = joaat(name)
+    if HasPedGotWeapon(ped, hash, false) then RemoveWeaponFromPed(ped, hash) end
+end
+
+--- How a charged line is carried.
+---
+--- A nozzle is held at the waist in both hands, braced against the reaction of the stream --
+--- which is the minigun stance, not a pistol one. `weapons@heavy@minigun` is the movement
+--- clipset the game uses for exactly that, and setting it directly avoids shipping a
+--- `weaponanimations.meta`.
+---
+--- That matters more than it sounds. A weapon animations meta **replaces** the game whole file
+--- rather than merging into it, which is why the two resources on this machine that ship one
+--- each carry a 13,000 line copy of the vanilla data. Two such resources cannot both be right,
+--- and ours would be a third.
+---@param ped integer
+local function applyNozzleHold(ped)
+    local clipset = MIFireHose.visuals.nozzleClipset
+    if not clipset or clipset == '' then return end
+
+    RequestAnimSet(clipset)
+
+    local waited = 0
+    while not HasAnimSetLoaded(clipset) and waited < 2000 do
+        Wait(50)
+        waited = waited + 50
     end
 
-    -- Right hand. The offsets put the grip in the palm rather than the body of it.
-    AttachEntityToEntity(object, ped, GetPedBoneIndex(ped, 57005),
-        0.10, 0.03, -0.02, -80.0, 10.0, 0.0, true, true, false, true, 1, true)
+    if HasAnimSetLoaded(clipset) then
+        SetPedMovementClipset(ped, clipset, 1.0)
+    else
+        Util.warn('nozzle clipset "%s" would not load; the stance will be the weapon default',
+            clipset)
+    end
+end
 
-    RemoveWeaponAsset(hash)
-
-    return object
+---@param ped integer
+local function clearNozzleHold(ped)
+    ResetPedMovementClipset(ped, 0.0)
 end
 
 --- A plain prop, for a server without the weapon registered.
@@ -335,21 +363,63 @@ end
 --- which is exactly the part of the job where they are carrying a nozzle.
 local heldNozzle = nil
 
+--- Whether the weapon itself is equipped, as opposed to the fallback prop being attached.
+local nozzleEquipped = false
+
+--- How many times it has had to be put back. See `reconcileNozzle`.
+local reEquips = 0
+
 --- The nozzle in our own hands.
 ---
 --- Kept apart from the rope, which it used to be built alongside -- so it only appeared once a
 --- line was coupled, and a crew walking an uncoupled line out from the bed carried nothing the
 --- whole way.
+---
+--- The weapon is re-checked rather than assumed. Something else on a server can take a weapon
+--- off a ped, and the failure is silent: the nozzle vanishes from the hand and the line goes on
+--- flowing. If it keeps happening that is said out loud once, because the cause is outside this
+--- resource and guessing at it from in here wastes an evening.
 local function reconcileNozzle()
     local line = mine and lines[mine]
     local holding = line ~= nil and line.nozzleHolder == GetPlayerServerId(PlayerId())
 
-    if holding and not heldNozzle then
-        heldNozzle = createNozzle(cache.ped) or attachNozzleProp(cache.ped)
+    if holding then
+        if not nozzleEquipped and not heldNozzle then
+            nozzleEquipped = equipNozzle(cache.ped)
 
-    elseif not holding and heldNozzle then
-        if DoesEntityExist(heldNozzle) then DeleteEntity(heldNozzle) end
+            if nozzleEquipped then
+                applyNozzleHold(cache.ped)
+            else
+                heldNozzle = attachNozzleProp(cache.ped)
+            end
+
+        elseif nozzleEquipped then
+            local hash = joaat(MIFireHose.visuals.nozzleWeapon)
+
+            if not HasPedGotWeapon(cache.ped, hash, false) then
+                reEquips = reEquips + 1
+
+                if reEquips == 4 then
+                    Util.warn('the nozzle weapon keeps being removed from this ped -- '
+                        .. 'something outside mi_fire is taking it. Check whether an inventory '
+                        .. 'resource knows about "%s".', MIFireHose.visuals.nozzleWeapon)
+                end
+
+                nozzleEquipped = equipNozzle(cache.ped)
+            end
+        end
+
+    elseif nozzleEquipped or heldNozzle then
+        if nozzleEquipped then
+            unequipNozzle(cache.ped)
+            clearNozzleHold(cache.ped)
+        end
+
+        if heldNozzle and DoesEntityExist(heldNozzle) then DeleteEntity(heldNozzle) end
+
+        nozzleEquipped = false
         heldNozzle = nil
+        reEquips = 0
     end
 end
 
@@ -1006,27 +1076,57 @@ RegisterNetEvent('mi_fire:client:testNozzle', function()
         end
 
         local loaded = HasWeaponAssetLoaded(hash)
-        local object = loaded
-            and CreateWeaponObject(hash, 1,
-                GetEntityCoords(cache.ped).x, GetEntityCoords(cache.ped).y,
-                GetEntityCoords(cache.ped).z, true, 1.0, 0)
-            or 0
 
-        local line = ('  %-26s assetLoaded=%s object=%s')
-            :format(weapon, tostring(loaded), tostring(object ~= 0))
+        -- Equip it, rather than making a world object out of it.
+        --
+        -- The object test only ever proved the archetype existed, which was the old question.
+        -- The question now is whether the weapon **stays** equipped, because that is what
+        -- decides if it can be fired -- and if something on the server strips it, that shows up
+        -- here as gotAfter=false rather than as a mystery on the fireground.
+        local gaveOk, heldNow, heldAfter = false, false, false
+
+        if loaded then
+            GiveWeaponToPed(cache.ped, hash, 1000, false, true)
+            SetCurrentPedWeapon(cache.ped, hash, true)
+
+            gaveOk = true
+            heldNow = HasPedGotWeapon(cache.ped, hash, false)
+
+            local clipset = MIFireHose.visuals.nozzleClipset
+            if clipset and clipset ~= '' then
+                RequestAnimSet(clipset)
+
+                local w = 0
+                while not HasAnimSetLoaded(clipset) and w < 2000 do
+                    Wait(50)
+                    w = w + 50
+                end
+
+                if HasAnimSetLoaded(clipset) then SetPedMovementClipset(cache.ped, clipset, 1.0) end
+            end
+
+            TriggerEvent('chat:addMessage',
+                { args = { 'mi_fire', '      equipped -- look at your hands, then wait' } })
+
+            Wait(4000)
+            heldAfter = HasPedGotWeapon(cache.ped, hash, false)
+
+            RemoveWeaponFromPed(cache.ped, hash)
+            ResetPedMovementClipset(cache.ped, 0.0)
+        end
+
+        local line = ('  %-26s assetLoaded=%s gave=%s gotNow=%s gotAfter4s=%s')
+            :format(weapon, tostring(loaded), tostring(gaveOk),
+                tostring(heldNow), tostring(heldAfter))
 
         TriggerEvent('chat:addMessage', { args = { 'mi_fire', line } })
         print('[mi_fire] ' .. line)
 
-        if object and object ~= 0 then
-            AttachEntityToEntity(object, cache.ped, GetPedBoneIndex(cache.ped, 57005),
-                0.10, 0.03, -0.02, -80.0, 10.0, 0.0, true, true, false, true, 1, true)
-
-            TriggerEvent('chat:addMessage',
-                { args = { 'mi_fire', '      attached -- look at your hand' } })
-
-            Wait(3000)
-            DeleteEntity(object)
+        if loaded and not heldAfter then
+            local why = '      it did not stay equipped -- something on this server is '
+                .. 'removing it. That is the ox_inventory case, and the fix is one entry.'
+            TriggerEvent('chat:addMessage', { args = { 'mi_fire', why } })
+            print('[mi_fire] ' .. why)
         end
 
         RemoveWeaponAsset(hash)
@@ -1144,8 +1244,14 @@ RegisterNetEvent('mi_fire:client:clearHoseProps', function()
     for id in pairs(drawn) do undraw(id) end
 
     if heldNozzle and DoesEntityExist(heldNozzle) then DeleteEntity(heldNozzle) end
+    if nozzleEquipped then
+        unequipNozzle(cache.ped)
+        clearNozzleHold(cache.ped)
+    end
 
     heldNozzle = nil
+    nozzleEquipped = false
+    reEquips = 0
     drawn = {}
     lines = {}
     mine = nil
@@ -1154,9 +1260,14 @@ end)
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= GetCurrentResourceName() then return end
 
-    -- An attached object outlives the resource otherwise, with nothing left to remove it. A
-    -- firefighter stuck holding a nozzle after a restart is a support ticket.
+    -- An equipped weapon and an attached object both outlive the resource, with nothing left
+    -- to remove either. A firefighter stuck holding a nozzle after a restart is a support
+    -- ticket, and one stuck in the minigun stance is a stranger one.
     if heldNozzle and DoesEntityExist(heldNozzle) then DeleteEntity(heldNozzle) end
+    if nozzleEquipped then
+        unequipNozzle(cache.ped)
+        clearNozzleHold(cache.ped)
+    end
 end)
 
 --- The pump panel, until Phase 4's NUI replaces it.

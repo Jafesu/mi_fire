@@ -28,6 +28,18 @@ from mathutils import Matrix, Vector
 # rifles near 6-10k, so this is deliberately at the generous end of normal.
 TARGET_TRIS = 8000
 
+# Where the right hand goes.
+#
+# For an *equipped* weapon this is the only control there is: GTA puts the model origin at the
+# hand bone and the animation does the rest. There are no attach offsets to tune in Lua, so
+# this constant is the one knob, and it is why the origin is not simply the centre.
+#
+# On the barrel axis (z = 0) because a hand wrapping a cylinder sits on its centreline, and a
+# little behind the middle so the bale handle ends up above and slightly forward of the fist,
+# which is where it belongs. This model has no pistol grip -- the disc underneath is the bale
+# handle's pivot plate, not something to hold.
+GRIP_ORIGIN = (0.0, -0.015, 0.0)
+
 # 0.1 mm. STL stores every triangle's corners independently, so the mesh arrives as loose
 # triangles that merely touch. Without this there are no shared edges: nothing is smoothable
 # and decimation has nothing to collapse along.
@@ -293,6 +305,10 @@ def main():
         (0.0, 0.0, 0.0, 1.0),
     ))
     ob.data.transform(M)
+
+    # Move the mesh so GRIP_ORIGIN lands on (0, 0, 0).
+    ob.data.transform(Matrix.Translation((-GRIP_ORIGIN[0], -GRIP_ORIGIN[1], -GRIP_ORIGIN[2])))
+
     ob.matrix_world = Matrix.Identity(4)
     # Straight off the mesh data. `ob.dimensions` reads the evaluated bounding box, which has
     # not refreshed this early and reports the pre-transform size -- which looks exactly like

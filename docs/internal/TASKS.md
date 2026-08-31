@@ -1,4 +1,4 @@
-### `ASSET-001` — a nozzle of our own, built and wired, untested in game
+### `ASSET-001` — a nozzle of our own, in game, being tuned
 
 **Done on disk.** A real fog nozzle, built from a CAD model, with nothing borrowed:
 
@@ -11,15 +11,35 @@
 `tools/assets/nozzle/` holds the whole recipe in two headless scripts, and its README explains
 the parts that were not obvious.
 
-**What remains is one in-game test.** Restart, reconnect — a client that has not reconnected
-since the metas were added will not have them — and run `/fire nozzle`. If the nozzle is
-missing, the fallback prop appears instead, which is the deliberate signal that the metas did
-not reach the client rather than that the hose system is broken.
+**It loads.** First in-game run reported `assetLoaded=1 object=true`, so the metas reach the
+client and the model is real. Two things were wrong and are now fixed, pending a retest:
 
-Four things that had to be right, each of which cost a round of testing:
+- **It was not equipped.** `CreateWeaponObject` makes a world object and attaches it to a bone,
+  which cannot be fired and has no stance. Now `GiveWeaponToPed` + `SetCurrentPedWeapon`.
+- **The model origin was its centre.** For an equipped weapon the origin *is* the grip, so it
+  hung out of the fist at an angle. `GRIP_ORIGIN` in `build_nozzle.py` moves it.
 
-- `CreateWeaponObject`, not `GiveWeaponToPed`. ox_inventory owns the ped's weapons and strips
-  anything handed over directly within a second.
+The carrying stance is `weapons@heavy@minigun`, set with `SetPedMovementClipset` — a nozzle on a
+charged line is braced at the waist in both hands, which is the minigun pose. Set directly
+rather than shipped as a `weaponanimations.meta`, because that file replaces the game's whole
+animation set instead of merging: both resources on this machine that ship one carry a 13,000
+line copy of the vanilla data, and two of those cannot both be right.
+
+**`WEAPON_HOSE` in ox_inventory is SmartHose's, and it is stale.** `failed to equip
+WEAPON_HOSE` is that item trying to equip a weapon that no longer exists on the server; it has
+nothing to do with mi_fire. Our nozzle is not an inventory item on purpose — it comes from
+taking the nozzle on a line, so nobody walks around with one attached to nothing.
+
+If `/fire nozzle` reports `gotAfter4s=false`, something *is* stripping the weapon, and the fix
+is one entry in `ox_inventory/data/weapons.lua` naming `WEAPON_MINOZZLE`.
+
+Five things that had to be right, each of which cost a round of testing:
+
+- **`GiveWeaponToPed`, not `CreateWeaponObject`.** The opposite of what this list used to say.
+  The claim that ox_inventory strips a directly-given weapon was measured while the weapon had
+  no archetype -- and a weapon that does not exist is absent right after being given, which
+  looks identical. It was never the inventory.
+- The model origin is where the hand goes. There are no Lua offsets for an equipped weapon.
 - `RequestWeaponAsset` then wait on `HasWeaponAssetLoaded`. Skipping it returns 0, which looks
   exactly like a missing archetype.
 - The metas need `data_file` **and** `files`. Declaring alone ships nothing, which also looks

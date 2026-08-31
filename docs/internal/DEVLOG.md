@@ -1708,3 +1708,68 @@ panel photographs.
 
 **Next:** hold the nozzle in game and tune where it sits in the hand.
 
+---
+
+## 2026-08-31 (third) — the nozzle is a weapon, not an ornament
+
+**Scope:** first in-game run of `WEAPON_MINOZZLE`, and what it showed.
+
+**What the test reported:** `assetLoaded=1 object=true`. The metas reach the client, the
+archetype resolves, the model is real. Everything after this is placement and plumbing.
+
+**Changed:**
+
+- `client/modules/hose/init.lua` — `equipNozzle` / `unequipNozzle` replace `createNozzle`.
+  `applyNozzleHold` / `clearNozzleHold` set the carrying stance. `reconcileNozzle` re-checks
+  that the weapon is still there and says so once if it keeps disappearing.
+- `tools/assets/nozzle/build_nozzle.py` — `GRIP_ORIGIN`, so the model origin is the grip.
+- `config/hose.lua` — `nozzleClipset = 'weapons@heavy@minigun'`.
+- `/fire nozzle` now equips and re-checks after four seconds rather than making an object.
+
+**Decisions:**
+
+- **A correction, and it is the important entry.** The note in this repository saying
+  `GiveWeaponToPed` is stripped by ox_inventory within a second was **wrong**, and it cost the
+  whole nozzle path. It was concluded while the weapon had no archetype, and a weapon that does
+  not exist is absent immediately after being given -- indistinguishable from something taking
+  it away. `CreateWeaponObject` was adopted to work around a problem that did not exist, and an
+  attached object cannot be fired, which is the entire point of a nozzle.
+
+  The general lesson is the one this project keeps relearning: when two explanations fit, the
+  boring one is usually right, and the way to tell them apart is a measurement rather than an
+  argument. `/fire nozzle` now makes that measurement -- it reports whether the weapon is still
+  equipped four seconds later, so the inventory question is answered by data.
+
+- **The model origin is the grip, and it is baked.** An equipped weapon has no Lua attach
+  offsets; GTA puts the origin at the hand bone. So `GRIP_ORIGIN` is the only control, and
+  tuning it costs a rebuild. Worth it -- the alternative tunes freely and cannot spray.
+
+- **No pistol grip on this model.** The disc underneath is the bale handle's pivot plate. Found
+  by rendering marker spheres at candidate origins rather than by reading part centroids, which
+  had already been wrong twice on this model.
+
+- **The stance is a movement clipset, not a meta.** `weapons@heavy@minigun` via
+  `SetPedMovementClipset`. A `weaponanimations.meta` **replaces** the game's animation set
+  rather than merging, which is why the two resources here that ship one each carry 13,000 lines
+  of copied vanilla data. Ours would have been a third, and they cannot all win.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1026 passed, 0 failed** (was 1021).
+- Five new assertions: the hose client does not use `CreateWeaponObject`, does equip and
+  unequip, and clears the stance.
+- Rebuilt and re-exported: `w_mi_nozzle.ydr`, 356,218 bytes, bounds now
+  `(-0.061, -0.135, -0.064) .. (0.061, 0.162, 0.150)` -- shifted by the grip origin.
+- **Not** retested in game.
+
+**Open:**
+
+- Retest: restart, reconnect, `/fire nozzle`, then pull a line. `gotAfter4s=false` would mean
+  something really is stripping the weapon, and the fix is one ox_inventory entry.
+- `GRIP_ORIGIN` is a first guess. Expect one round of adjustment.
+- `WEAPON_HOSE` in `ox_inventory/data/weapons.lua` is SmartHose's and stale -- that item errors
+  because the weapon no longer exists, and it is not ours to use.
+- `HOSE-010`, `HOSE-011`, `SCORCH-002` unchanged.
+
+**Next:** hold a charged line and see where the nozzle actually sits.
+

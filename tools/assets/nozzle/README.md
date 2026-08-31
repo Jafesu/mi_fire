@@ -39,6 +39,20 @@ OUT="build/nozzle"
 
 `--tris N` overrides the triangle budget on step 1 if 8,000 turns out to be the wrong call.
 
+### `GRIP_ORIGIN` is the one knob for how it sits in the hand
+
+For an **equipped** weapon there are no attach offsets to tune in Lua — GTA puts the model
+origin at the hand bone and the animation does the rest. So where the origin sits *is* how the
+nozzle is held, and it is baked into the model.
+
+It is on the barrel axis (`z = 0`) because a hand wrapping a cylinder sits on its centreline,
+and a little behind the middle so the bale handle ends up above and slightly forward of the
+fist. This model has **no pistol grip** — the disc underneath is the bale handle's pivot plate,
+not something to hold, which took a render with marker spheres to establish.
+
+Changing it means a rebuild and re-export. That is the cost of an equipped weapon, and it is
+worth it: an attached object needs no rebuild and cannot be fired.
+
 ### Do not pass `--factory-startup` to step 2
 
 It does not merely disable add-ons — it discards the extension *repository* list, so Sollumz

@@ -296,6 +296,20 @@ MIFireHose.visuals = {
     --- equipped and ox_inventory has nothing to strip.
     nozzleWeapon = 'WEAPON_MINOZZLE',
 
+    --- How a charged line is carried.
+    ---
+    --- A nozzle is held at the waist in both hands, braced against the reaction of the stream.
+    --- That is the minigun stance, not a pistol one, and `weapons@heavy@minigun` is the
+    --- movement clipset the game already has for it.
+    ---
+    --- Set directly with `SetPedMovementClipset` rather than shipping a `weaponanimations.meta`.
+    --- That file **replaces** the game whole animation set rather than merging into it -- which
+    --- is why both resources on this machine that ship one carry a 13,000 line copy of the
+    --- vanilla data. Two of those cannot both be right, and ours would have been a third.
+    ---
+    --- Set to nil or '' to leave the stance to whatever the weapon itself implies.
+    nozzleClipset = 'weapons@heavy@minigun',
+
     --- Only if the weapon fails to load, which means the metas did not reach the client.
     ---
     --- Deliberately still here. A weapon needs `data/weapons.meta` and

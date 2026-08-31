@@ -217,6 +217,45 @@ return function(t)
 
     -- -----------------------------------------------------------------------
 
+    t.describe('the nozzle is equipped, not glued to the hand')
+
+    -- `CreateWeaponObject` makes a world object out of a weapon hash and it can be attached to
+    -- a bone, which looks right in a screenshot and is useless: an attached object cannot be
+    -- fired and carries no stance. A nozzle exists to put water on a fire, so it has to be a
+    -- weapon the game has actually equipped.
+    --
+    -- This was believed to be impossible because `GiveWeaponToPed` appeared to be stripped by
+    -- ox_inventory within a second. It was not. That was measured while the weapon had no
+    -- archetype, and a weapon that does not exist is absent right after being given -- which
+    -- looks exactly the same. The dead end cost a rebuild of the whole nozzle path.
+    do
+        local source = read('client/modules/hose/init.lua') or ''
+
+        t.equal(findCode(source, 'CreateWeaponObject'), nil,
+            'the hose client does not create the nozzle as a world object')
+
+        t.ok(findCode(source, 'GiveWeaponToPed') ~= nil,
+            'the hose client equips the nozzle as a weapon')
+
+        -- Equipping without ever removing leaves a firefighter armed with a nozzle for the
+        -- rest of the session, including after they put the line down.
+        t.ok(findCode(source, 'RemoveWeaponFromPed') ~= nil,
+            'and takes it away again')
+
+        -- The stance is set from a movement clipset rather than a weaponanimations.meta,
+        -- because that file replaces the game's whole animation set instead of merging into
+        -- it -- both resources on this machine that ship one carry a 13,000 line copy of the
+        -- vanilla data, and two of those cannot both be right.
+        local clipset = (MIFireHose.visuals or {}).nozzleClipset
+        t.ok(clipset == nil or type(clipset) == 'string',
+            'nozzleClipset is a clipset name or nothing')
+
+        t.ok(findCode(source, 'ResetPedMovementClipset') ~= nil,
+            'the carrying stance is cleared when the nozzle is put down')
+    end
+
+    -- -----------------------------------------------------------------------
+
     t.describe('the nozzle weapon agrees across every file that names it')
 
     -- Four files have to say the same thing for a custom weapon to load, and nothing in Lua

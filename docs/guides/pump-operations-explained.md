@@ -29,8 +29,9 @@ Every line is solved the same way:
 
 > **Pump discharge pressure = nozzle pressure + friction loss + elevation + appliances**
 
-The operator sets the discharge pressure at the outlet. Everything between the panel and the
-tip takes its share, and what is left is what does the work.
+The operator works the throttle, which is one number for the whole pump, and pulls the gate on
+each discharge. Everything between the panel and the tip then takes its share, and what is left
+is what does the work.
 
 Crucially, **the nozzle operator does not choose a flow.** They open the bail. What comes out
 is whatever survives the trip. A crew that wants more water has to ask for more pressure, and
@@ -109,11 +110,16 @@ a nozzle crew to feel, and it is the reason a governor exists at all.
 3. They stretch it **dry** — charged hose is about three times the weight — and get into
    position.
 4. They call for water.
-5. The operator charges the line and **sets a discharge pressure**.
+5. The operator charges the line, **opens its gate**, and works the throttle.
 6. Water arrives at the tip at whatever is left after the trip.
 
-A charged line with no discharge pressure set flows nothing. That is deliberate and it is the
-step people forget.
+A charged line with a shut gate flows nothing, and a pump in gear at idle makes about 40 psi —
+so forgetting the throttle gives a soft line rather than a dead one. Both are deliberate and
+both are steps people forget.
+
+There is **one throttle for the whole pump**, because there is one pump. Raising it raises the
+pressure on every open outlet, which is exactly why opening a second line takes water off the
+first, and why a governor is a thing that exists.
 
 ---
 
@@ -137,7 +143,7 @@ has water and does not is the failure worth naming.
 
 ## The tank is a clock
 
-An engine carries 750 gallons. At 150 gpm that is five minutes; at 250 it is three. When it
+An engine carries 1000 gallons. At 150 gpm that is under seven minutes; at 250 it is four. When it
 runs dry the line goes soft — there is no alarm, the water simply stops, which is what happens.
 
 That clock is the entire reason anyone lays a supply line rather than parking and fighting the
@@ -175,7 +181,13 @@ These numbers are ours, not published. **Are they roughly right?**
 - **Master streams and the deck gun.**
 - **Intake pressure**, beyond enough to detect cavitation off the tank.
 - **Changing gear, transfer valve, pressure/volume mode.**
-- **Individual discharge gates.** A discharge is a pressure, not a valve position.
+- **The transfer valve**, and pressure against volume mode.
+- **Engine RPM and temperature**, which are on the panel and behind nothing.
+
+Gates *are* modelled — each discharge is a handle from shut to wide open, and a part-open gate
+throttles what passes it. What is ours rather than published is how much: we treat the loss as
+growing with the square of how far shut it is, which is the right shape and an invented
+coefficient.
 
 ---
 

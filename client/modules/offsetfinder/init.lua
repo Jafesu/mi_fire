@@ -271,8 +271,11 @@ local function showBones(vehicle)
                 local onScreen, sx, sy = GetScreenCoordFromWorldCoord(world.x, world.y, world.z)
 
                 if onScreen then
+                    -- Zero for the first argument. It is not a second axis, and passing the
+                    -- size twice renders roughly three times too large -- the mistake that
+                    -- made the placement help unreadable.
                     SetTextFont(4)
-                    SetTextScale(0.24, 0.24)
+                    SetTextScale(0.0, 0.28)
                     SetTextColour(200, 160, 255, 230)
                     SetTextOutline()
                     SetTextCentre(true)

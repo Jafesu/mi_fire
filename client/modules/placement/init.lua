@@ -136,6 +136,7 @@ end
 
 function Placement.stop()
     active = nil
+    Placement.hideHelp()
 end
 
 ---@return boolean
@@ -190,58 +191,59 @@ function Placement.drawPreview(state)
     DrawLine(c.x, c.y, c.z, c.x, c.y, c.z + 0.4, 80, 200, 255, 120)
 end
 
+--- The help panel.
+---
+--- `lib.showTextUI` rather than `DrawText`, after getting `DrawText` wrong twice. Its scale
+--- argument is not a second axis and behaves differently per font, `SetTextWrap` silently
+--- turns one line into three without telling the caller to advance further down the screen,
+--- and the result both times was an unreadable overlapping stack across the middle of the
+--- screen. None of that is interesting to solve: ox_lib is already a hard dependency, it
+--- renders this in NUI at a size that is correct by construction, and it cannot overlap
+--- itself.
+---
+--- Refreshed only when the text actually changes. It is an NUI message, so sending it every
+--- frame would be pure waste for a panel that changes a few times a second at most.
 ---@param state table
 ---@param override string|nil
 function Placement.drawHelp(state, override)
-    local lines = {
-        ('~b~%s~s~'):format(state.label),
-        override or (state.following
-            and '~y~Aiming~s~ -- nudge or ~b~ENTER~s~ to place'
-            or '~g~Adjusting~s~'),
-        '',
-        '~b~Arrows~s~ move  ~b~PgUp/PgDn~s~ height  ~b~[ ]~s~ turn',
-        '~b~SHIFT~s~ fine  ~b~ALT~s~ coarse  ~b~R~s~ re-aim',
-        '~b~ENTER~s~ confirm  ~b~BACKSPACE~s~ cancel',
-    }
+    local position = ''
 
     if state.coords and state.parent and DoesEntityExist(state.parent) then
         local offset = GetOffsetFromEntityGivenWorldCoords(state.parent,
             state.coords.x, state.coords.y, state.coords.z)
-        lines[3] = ('~c~x %.3f  y %.3f  z %.3f'):format(offset.x, offset.y, offset.z)
+        position = ('x %.3f   y %.3f   z %.3f'):format(offset.x, offset.y, offset.z)
     elseif state.coords then
-        lines[3] = ('~c~%.2f, %.2f, %.2f'):format(state.coords.x, state.coords.y, state.coords.z)
+        position = ('%.2f, %.2f, %.2f'):format(state.coords.x, state.coords.y, state.coords.z)
     end
 
-    -- `SetTextScale`'s first argument is not a second axis -- it is effectively ignored on
-    -- most fonts, and passing the same value twice was rendering this at roughly three times
-    -- the intended size, wide enough to cross the screen and with the lines overlapping each
-    -- other. Zero for the first, the real size in the second, and line spacing derived from
-    -- that size rather than guessed.
-    local size = 0.30
-    local spacing = size * 0.075
+    local status = override or (state.following and 'Aiming' or 'Adjusting')
 
-    -- A backdrop, because outlined white text over a bright red fire station is unreadable
-    -- whatever size it is.
-    local height = spacing * (#lines + 0.8)
-    DrawRect(0.145, 0.34 + height * 0.5 - spacing * 0.4, 0.27, height, 0, 0, 0, 150)
+    local text = table.concat({
+        ('**%s**'):format(state.label),
+        ('%s  ·  %s'):format(status, position),
+        '',
+        'Arrows move  ·  PgUp/PgDn height  ·  [ ] turn',
+        'SHIFT fine  ·  ALT coarse  ·  R re-aim',
+        'ENTER place  ·  BACKSPACE cancel',
+    }, '  \n')
 
-    SetTextFont(4)
-    SetTextScale(0.0, size)
-    SetTextColour(235, 240, 245, 230)
-    SetTextOutline()
+    if text == state.shownText then return end
+    state.shownText = text
 
-    local y = 0.34
-    for i = 1, #lines do
-        SetTextEntry('STRING')
-        AddTextComponentString(lines[i])
+    lib.showTextUI(text, {
+        position = 'left-center',
+        icon = 'crosshairs',
+        style = {
+            borderRadius = 4,
+            backgroundColor = 'rgba(18, 20, 24, 0.92)',
+            color = 'white',
+        },
+    })
+end
 
-        -- Constrain the width, or a long label runs off the side of the backdrop instead of
-        -- wrapping inside it.
-        SetTextWrap(0.015, 0.28)
-        DrawText(0.02, y)
-
-        y = y + spacing
-    end
+--- Take it down. Without this the panel outlives the gizmo and sits on screen forever.
+function Placement.hideHelp()
+    if lib.isTextUIOpen() then lib.hideTextUI() end
 end
 
 --- Move it. Relative to the camera, not to the world, so "left" means left on screen.
@@ -325,6 +327,7 @@ function Placement.confirm()
 
     local callback = state.onConfirm
     active = nil
+    Placement.hideHelp()
 
     if callback then callback(result) end
 end
@@ -335,6 +338,7 @@ function Placement.cancel()
 
     local callback = state.onCancel
     active = nil
+    Placement.hideHelp()
 
     if callback then callback() end
 end

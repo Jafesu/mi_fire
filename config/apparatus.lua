@@ -81,6 +81,9 @@ MIFireApparatus.profiles = {
         pumpRatingGpm = 1500.0,
         panelFamily = 'engine',
         deployPanelMod = true,
+        ports = {
+            { id = "hosebed1", type = "hosebed", x = -0.086, y = -4.142, z = 0.853, heading = 180.0 },
+        },
     },
 
     ['epucht'] = {

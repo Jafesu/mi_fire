@@ -214,4 +214,39 @@ return function(t)
                 'and takes it down again, or a restart leaves it behind')
         end
     end
+
+    -- -----------------------------------------------------------------------
+
+    t.describe('borrowed assets are declared, not hidden')
+
+    -- `w_am_hose` belongs to SmartHose. Referencing a streamed model by name while that
+    -- resource is installed copies nothing and redistributes nothing, which makes it fine for
+    -- development and not fine to forget. The declaration is what the boot warning reads, so
+    -- an undeclared borrow is a silent one.
+    do
+        local visuals = MIFireHose.visuals or {}
+        local borrowed = visuals.borrowed or {}
+
+        local ours = {
+            prop_fire_hosereel = true,
+            prop_fire_hosereel_l1 = true,
+            prop_fire_hosebox_01 = true,
+            hei_prop_heist_hose_01 = true,
+        }
+
+        for key, value in pairs(visuals) do
+            if type(value) == 'string' and value:find('^[%w_]+$') and key ~= 'borrowed' then
+                local vanilla = ours[value] or value:find('^prop_') or value:find('^hei_')
+
+                t.ok(vanilla ~= nil or borrowed[value] ~= nil,
+                    ('%s = "%s" is either a base game model or declared as borrowed')
+                        :format(key, value))
+            end
+        end
+
+        for model, owner in pairs(borrowed) do
+            t.ok(type(owner) == 'string' and owner ~= '',
+                ('borrowed model "%s" names the resource it came from'):format(model))
+        end
+    end
 end

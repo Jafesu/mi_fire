@@ -263,10 +263,28 @@ MIFireHose.visuals = {
     slack = 0.35,
 
     --- Props. Base game, all four confirmed present in resources on this machine.
-    --- Nothing, by default. There is no vanilla prop that looks like a nozzle --
-    --- prop_fire_hosereel_l1 is the reel itself, and in hand it reads as a firefighter
-    --- carrying a large flat coil. Better nothing in the hand than the wrong thing.
-    nozzleProp = nil,
+    --- The prop in a firefighter's hands.
+    ---
+    --- There is no vanilla model that looks like a nozzle. `prop_fire_hosereel_l1` is the reel
+    --- itself, and in hand it reads as someone carrying a large flat coil.
+    ---
+    --- `w_am_hose` is SmartHose's nozzle model. It is **borrowed, not copied**: while SmartHose
+    --- is running its stream folder is loaded and every resource on the server can use the
+    --- model by name, so nothing of theirs sits in this repository and nothing of theirs would
+    --- be redistributed with it. If SmartHose is stopped the prop simply does not load, which
+    --- is handled -- the hose still works, there is just nothing in the hand.
+    ---
+    --- **This must not ship.** Set it to your own model before release, or to nil. The boot
+    --- check in `server/main.lua` refuses to be quiet about it.
+    nozzleProp = 'w_am_hose',
+
+    --- Models borrowed from another resource for development.
+    ---
+    --- Listed so the boot check can say so out loud every time the server starts. A borrowed
+    --- asset that nobody is reminded about is one that ships.
+    borrowed = {
+        w_am_hose = 'SmartHose',
+    },
     couplingProp = 'prop_fire_hosebox_01',
     reelProp = 'prop_fire_hosereel',
 

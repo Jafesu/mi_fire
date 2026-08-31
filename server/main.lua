@@ -43,6 +43,21 @@ CreateThread(function()
         return
     end
 
+    -- Borrowed assets, said out loud on every start.
+    --
+    -- Using another resource's streamed model by name is legitimate while that resource is
+    -- installed -- nothing is copied and nothing would be redistributed. What is not
+    -- legitimate is forgetting, and a note in a config file is not a reminder. This is.
+    for key, value in pairs(MIFireHose.visuals or {}) do
+        local owner = (MIFireHose.visuals.borrowed or {})[tostring(value)]
+
+        if owner then
+            MIFire.Util.warn(
+                'using "%s" for %s, which belongs to %s. Development only -- replace it with '
+                .. 'your own model before this ships.', tostring(value), key, owner)
+        end
+    end
+
     -- Dispatch is optional but a silent board is confusing, so say which way it went.
     local dispatchOk, dispatchDetail = MIFire.Dispatch.status()
     if not dispatchOk then

@@ -236,6 +236,23 @@ Wiring those is what makes a 2.5 inch a three-person line rather than a number i
 file. `/fire hose` returns both the server's view and the client's in one block, which is the
 tool for the next attempt.
 
+### `ASSET-001` — replace the borrowed nozzle model
+
+`MIFireHose.visuals.nozzleProp` is `w_am_hose`, which belongs to **SmartHose**.
+
+Nothing of theirs is in this repository. The model is referenced by name while SmartHose is
+installed, so it is loaded by their stream folder and used by ours -- no copy, and nothing that
+would be redistributed with mi_fire. If SmartHose stops, the prop does not load and the hose
+works without one.
+
+**It still must not ship.** Their escrow covers the Lua rather than the stream folder, so the
+asset is technically readable; that is a fact about the packaging and not permission. Replace
+it with an own model before release, or set it to nil.
+
+Two things make forgetting hard rather than merely discouraged: the server warns on every start
+naming the model and its owner, and `conventions_spec` fails if a model is used that is
+neither base game nor declared in `visuals.borrowed`.
+
 ### Remaining phases
 
 | Phase | Scope |

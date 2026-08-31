@@ -55,18 +55,44 @@ Set a task to `in-progress` before you start it, not after.
 | `DOC-001` | `docs/guides/firefighting-basics.md` | todo | `FIRE-005` |
 | `DOC-002` | `docs/guides/admin-guide.md` | todo | `ADMIN-002` |
 
+### `SCORCH-002` — burn marks, parked
+
+Working, but on the fallback renderer. Parked deliberately; picked up later.
+
+Burn marks currently draw as flat dark marker discs. That works everywhere and cannot
+silently fail, but it costs a draw call per visible mark and does not conform to a slope.
+
+**Do not start by trying more decal type IDs.** That ground is covered: on the build this was
+developed against, `AddDecal` accepts exactly five types — 1010, 1015, 1017, 1020, 1030 —
+returns real non-zero handles for every one, and draws nothing. Tested at four metres across,
+flat white, full opacity, with a marker directly overhead, indoors and outdoors, with both
+the 0-1 and 0-255 colour conventions and with positive and negative timeouts. The native is
+not refusing the call; something upstream of this resource is eating the result.
+
+Worth trying when it comes back around, roughly in order of promise:
+
+- Whether another resource on the server is clearing decals (`RemoveDecalsInRange` on a
+  timer is a common thing for cleanup scripts to do, and it would produce exactly this).
+- A streamed texture dictionary shipped with the resource and applied to a flat prop, which
+  sidesteps the decal system entirely and conforms to the ground the way a marker cannot.
+- `/fire decals sweep` on a different build, to establish whether this is the build or the
+  server.
+
+The marker path is good enough that this is polish, not a defect.
+
 ## Phase 2 — Placement, apparatus, turnout
 
 | ID | Task | Status | Depends on |
 |---|---|---|---|
-| `PLACE-001` | Shared placement gizmo: raycast preview, surface-normal orientation | todo | — |
-| `PLACE-002` | Gizmo: 6-DOF nudge, snap toggles, confirm and cancel | todo | `PLACE-001` |
+| `SCORCH-002` | Burn marks: revisit the renderer | **parked** | — |
+| `PLACE-001` | Shared placement gizmo: raycast preview, surface-normal orientation | **done** | — |
+| `PLACE-002` | Gizmo: 6-DOF nudge, snap toggles, confirm and cancel | **done** | `PLACE-001` |
 | `PLACE-003` | Polygon builder: walk the perimeter, close the loop, set height | todo | `PLACE-001` |
-| `APP-001` | Apparatus profile schema and config | todo | — |
-| `APP-002` | Offset finder on the shared gizmo, snapping to vehicle bones | todo | `PLACE-002`, `APP-001` |
-| `APP-003` | Offset finder: export to clipboard and to config | todo | `APP-002` |
-| `APP-004` | Tank state: water and foam, per vehicle | todo | `APP-001` |
-| `APP-005` | Pump engage and disengage | todo | `APP-004` |
+| `APP-001` | Apparatus profile schema and config | **done** | — |
+| `APP-002` | Offset finder on the shared gizmo | **done** | `PLACE-002`, `APP-001` |
+| `APP-003` | Offset finder: export to clipboard | **done** | `APP-002` |
+| `APP-004` | Tank state: water and foam, per vehicle | **done** | `APP-001` |
+| `APP-005` | Pump engage and disengage | **done** | `APP-004` |
 | `TURN-001` | Gear compartment target on apparatus | done | `APP-001` |
 | `TURN-002` | Don and doff through illenium-appearance | done | `TURN-001` |
 | `TURN-003` | Gear state survives disconnect and reconnect | todo | `TURN-002` |
@@ -127,6 +153,7 @@ the user is capturing. Authoring a layout from guesswork means building it twice
 |---|---|---|---|
 | `PANEL-001` | Layout schema: grid, widget types, data bindings | todo | — |
 | `PANEL-002` | React renderer, widget components, theme system | todo | `PANEL-001` |
+| `PANEL-000` | Panel photographs captured to `docs/Reference/PumpPanels/` | **done** | — |
 | `PANEL-003` | Auto-generated fallback from apparatus ports | todo | `PANEL-002`, `APP-001` |
 | `PANEL-004` | Boot validation: layout `portId`s must exist on the apparatus | todo | `PANEL-001` |
 | `PANEL-005` | `engine` family, authored against `EengineHT` | todo | `PANEL-003`, screenshots |

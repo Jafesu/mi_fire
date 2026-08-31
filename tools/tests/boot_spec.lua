@@ -33,6 +33,18 @@ return function(t)
         --- survives its optional integrations all being missing.
         GetResourceState = function() return 'missing' end,
         GetCurrentResourceName = function() return 'mi_fire' end,
+
+        --- Apparatus profiles are keyed by model name in config and resolved to hashes at
+        --- boot, so this has to exist for the boot check to run at all. A real hash is not
+        --- needed -- only that distinct names give distinct keys, which is what the profile
+        --- table depends on.
+        GetHashKey = function(name)
+            local hash = 0
+            for i = 1, #tostring(name) do
+                hash = (hash * 31 + tostring(name):byte(i)) % 2147483647
+            end
+            return hash
+        end,
         IsDuplicityVersion = function() return true end,
         LoadResourceFile = function() return nil end,
 
@@ -105,6 +117,7 @@ return function(t)
         'shared/gearmatch.lua',
         'shared/integrity.lua',
         'shared/scorch.lua',
+        'shared/apparatus.lua',
         'config/config.lua',
         'config/dispatch.lua',
         'config/zones.lua',
@@ -116,6 +129,7 @@ return function(t)
         'config/scba.lua',
         'config/smoke.lua',
         'config/scorch.lua',
+        'config/apparatus.lua',
     }
 
     local serverFiles = {
@@ -126,6 +140,7 @@ return function(t)
         'server/core/db.lua',
         'server/core/state.lua',
         'server/core/permissions.lua',
+        'server/modules/apparatus/init.lua',
         'server/main.lua',
         'server/modules/fire/init.lua',
         'server/modules/fire/spread.lua',
@@ -199,6 +214,8 @@ return function(t)
             'client/modules/exposure/init.lua',
             'client/modules/smoke/init.lua',
             'client/modules/scorch/init.lua',
+            'client/modules/placement/init.lua',
+            'client/modules/offsetfinder/init.lua',
         }) do known[path] = true end
 
         for path in pairs(declared) do
@@ -215,7 +232,7 @@ return function(t)
         'Enums', 'Util', 'Hydraulics', 'Validate', 'FireClass', 'Suppression',
         'Framework', 'Dispatch', 'Inventory', 'DB', 'State', 'Permissions',
         'Fire', 'Spread', 'Admin', 'Turnout', 'Appearance', 'GearAppearance',
-        'Pass', 'PassServer', 'Exposure', 'ExposureServer', 'Medical', 'Smoke', 'SmokeServer', 'GearMatch', 'Integrity', 'Scorch',
+        'Pass', 'PassServer', 'Exposure', 'ExposureServer', 'Medical', 'Smoke', 'SmokeServer', 'GearMatch', 'Integrity', 'Scorch', 'Apparatus',
     }
     for _, name in ipairs(expected) do
         t.ok(type(MIFire) == 'table' and MIFire[name] ~= nil,

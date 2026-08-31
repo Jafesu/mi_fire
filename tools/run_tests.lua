@@ -63,6 +63,7 @@ local specs = {
     'tools/tests/gearmatch_spec.lua',
     'tools/tests/integrity_spec.lua',
     'tools/tests/scorch_spec.lua',
+    'tools/tests/apparatus_spec.lua',
     'tools/tests/pass_spec.lua',
     'tools/tests/exposure_spec.lua',
     'tools/tests/smoke_spec.lua',

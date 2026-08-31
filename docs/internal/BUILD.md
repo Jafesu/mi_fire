@@ -107,7 +107,7 @@ rather than stubbed, so the table below records what is actually in the tree.
 |---|---|---|
 | 0 | Foundation: scaffold, bridges, config, test harness | **done** |
 | 1 | Fire core: nodes, classes, agents, exposure, districts, AOP, generation, admin, exports | **mostly done** -- engine, suppression, three-channel exposure, smoke, admin and exports done and tested in game. Ambient generation and dispatch still unproven. |
-| 2 | Placement gizmo, apparatus, offset finder, turnout | **partly done** -- turnout gear is complete and in game: tiers, recognition from clothing, coverage, integrity, condition, repair and replacement. The placement gizmo, `config/apparatus.lua` and `/fireoffset` are untouched, and until they exist any emergency-class vehicle counts as apparatus. |
+| 2 | Placement gizmo, apparatus, offset finder, turnout | **built, unproven in game** -- turnout is complete and tested. The shared placement gizmo, `config/apparatus.lua`, `/fireoffset`, tank state and pump engage all exist now but none has been used in game. **No rig has any ports authored yet**, which is the gate on Phase 3. |
 | 3 | Hoses: pull, lay, connect, crew slots | todo |
 | 4 | Pump operations and the panel | todo -- waiting on panel screenshots |
 | 5 | Supply and ground ladders | todo |

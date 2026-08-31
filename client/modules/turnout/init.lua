@@ -211,20 +211,18 @@ end)
 
 --- Is this vehicle fire apparatus?
 ---
---- Until `config/apparatus.lua` exists (`APP-001`), any emergency-class vehicle a
---- firefighter is standing at counts. That is deliberately loose: it makes gear reachable
---- now, and tightens to a real model list later without the interaction changing.
+--- Now that `config/apparatus.lua` exists, this is a real model list -- but it still falls
+--- back to any emergency-class vehicle while `allowUnprofiled` is on, so a server running
+--- rigs nobody has authored yet is usable rather than broken.
 ---@param entity integer
 ---@return boolean
 local function isApparatus(entity)
     if not entity or entity == 0 then return false end
 
-    local apparatus = rawget(_G, 'MIFireApparatus')
-    if apparatus and apparatus.profiles then
-        return apparatus.profiles[GetEntityModel(entity)] ~= nil
-    end
+    local name = GetDisplayNameFromVehicleModel(GetEntityModel(entity))
+    if name and MIFireApparatus.profiles[name:lower()] then return true end
 
-    return GetVehicleClass(entity) == 18   -- emergency
+    return MIFireApparatus.allowUnprofiled and GetVehicleClass(entity) == 18
 end
 
 local function coordsOf(entity)

@@ -26,6 +26,14 @@ end
 CreateThread(function()
     local problems = validateConfig()
 
+    -- Apparatus profiles are validated here rather than in `shared/validate.lua` because
+    -- resolving a model name to a hash needs the game. A bad port surfaces as a hose
+    -- connecting to nothing halfway through an incident, so it is a boot failure like the
+    -- rest and not a warning.
+    for _, err in ipairs(MIFire.ApparatusServer.build()) do
+        problems[#problems + 1] = err
+    end
+
     if #problems > 0 then
         print('[mi_fire] configuration problems found:')
         for i = 1, #problems do

@@ -40,6 +40,36 @@ brush truck on the strength of its name; it has no place in the apparatus config
 
 ---
 
+## Panel photographs
+
+`docs/Reference/PumpPanels/` holds photographs of the real in-game panels, captured
+2026-08-30. **Phase 4 layouts are authored against these**, not invented — which is the whole
+reason that phase was gated on them existing.
+
+| File | Rig |
+|---|---|
+| `EengineHT-PumpPanel.png` | Engine |
+| `EpucHT-PumpPanel.png` | PUC |
+| `EladderLT-PumpPanel.png` | Aerial |
+| `EtowerLT-PumpPanel.png` | Tower |
+| `EtankerHT-PumpPanel.png` | Tanker |
+| `EnforcerENG-PumpPanel.png` | Enforcer engine |
+| `engine1-PumpPanel-Controls.png` | engine1, controls |
+| `engine1-PumpPanel-Left Hookups.png` | engine1, left side connections |
+| `engine1-PumpPanel-Right Hookups.png` | engine1, right side connections |
+
+Two rigs appear here that the earlier survey did not list: **`EnforcerENG`** and **`engine1`**.
+Both are in service, both now have profiles in `config/apparatus.lua`, and both carry
+conventional engine figures that should be corrected against the real rigs.
+
+The `engine1` set is the most useful of the nine for Phase 3 as well as Phase 4: the two
+hookup photographs show where the discharges and intakes physically are, which is exactly what
+`/fireoffset` has to reproduce as port offsets.
+
+There is no `ERescueHT` panel photograph, consistent with it carrying little or no pump.
+
+---
+
 ## Mod slots
 
 The 2026 pack attaches functional-looking geometry to **vehicle mod slots**, which means it can

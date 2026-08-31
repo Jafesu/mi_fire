@@ -337,4 +337,32 @@ return function(t)
                 ('%s is awaited from %s and something answers it'):format(name, path))
         end
     end
+
+    -- -----------------------------------------------------------------------
+
+    t.describe('custom assets are not gated on base game validity checks')
+
+    -- Twice in two attempts, and both cost a round of testing.
+    --
+    -- `IsModelInCdimage` and `IsWeaponValid` answer about the game's own archetypes and weapon
+    -- list. A streamed model or a weapon from a `weapons.meta` fails them while working
+    -- perfectly -- so using one as a gate refuses to try, and then reports the asset as
+    -- missing, which sends the search after the asset instead of after the check.
+    --
+    -- Ask them if the answer is interesting. Never let them decide whether to attempt.
+    do
+        local hose = read('client/modules/hose/init.lua')
+
+        if hose then
+            for _, predicate in ipairs({ 'IsWeaponValid', 'IsModelInCdimage' }) do
+                for line in hose:gmatch('[^\n]+') do
+                    if not line:match('^%s*%-%-') and line:find(predicate) then
+                        t.ok(line:find('^%s*local ') ~= nil,
+                            ('%s is recorded rather than used as a gate (%s)')
+                                :format(predicate, line:gsub('^%s+', '')))
+                    end
+                end
+            end
+        end
+    end
 end

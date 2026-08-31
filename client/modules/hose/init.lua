@@ -90,21 +90,29 @@ end
 ---@return boolean given
 local function giveNozzle(ped)
     local name = MIFireHose.visuals.nozzleWeapon
+    if not name then return false end
 
-    if name then
-        local hash = joaat(name)
+    local hash = joaat(name)
 
-        if IsWeaponValid(hash) then
-            GiveWeaponToPed(ped, hash, 1, false, true)
-            SetCurrentPedWeapon(ped, hash, true)
-            return true
-        end
+    -- **Not gated on `IsWeaponValid`.**
+    --
+    -- That predicate knows the game's own weapon list. A weapon added through a `weapons.meta`
+    -- fails it while working perfectly, so gating on it refused to even try -- and reported
+    -- "not registered" for a weapon that was registered, which sent the search off after the
+    -- metas instead of at the check.
+    --
+    -- This is the second time in two attempts: `IsModelInCdimage` did the same for the model.
+    -- The rule that comes out of it is that a validity predicate answers about the base game
+    -- and a custom asset is not the base game, so **do the thing and look at what happened**.
+    GiveWeaponToPed(ped, hash, 1, false, true)
+    SetCurrentPedWeapon(ped, hash, true)
 
-        Util.warn('nozzle weapon "%s" is not registered. A weapon needs its archetype and '
-            .. 'info metas declared with `data_file` in fxmanifest.lua -- the model alone is '
-            .. 'inert, which is why it stays unknown however many times a client reconnects.',
-            name)
-    end
+    if HasPedGotWeapon(ped, hash, false) then return true end
+
+    Util.warn('nozzle weapon "%s" did not take. Check `data/weapons.meta` and '
+        .. '`data/weaponarchetypes.meta` are present and declared with `data_file` in '
+        .. 'fxmanifest.lua, then restart the resource and reconnect -- a weapon model is inert '
+        .. 'without its archetype, and both have to reach the client.', name)
 
     return false
 end

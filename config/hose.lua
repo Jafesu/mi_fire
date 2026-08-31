@@ -240,9 +240,13 @@ MIFireHose.visuals = {
     --- is worth having while the rendering is the least proven part of the system.
     enabled = true,
 
-    --- Rope type. 4 is the one a working hose resource uses; 7 is thicker, for LDH.
+    --- Rope type. 4 is the one the working hose resource on this machine uses.
+    ---
+    --- **Not 7.** `mi_utils`' rappel uses type 7 for its rescue rope, and while two resources
+    --- sharing a type does no harm on its own, it means any future attempt to make one of them
+    --- look different would drag the other along. Ours stay off it.
     ropeType = 4,
-    ropeTypeLarge = 7,
+    ropeTypeLarge = 5,
 
     --- Diameter above which the thicker rope is used, in inches.
     largeAbove = 2.5,
@@ -286,7 +290,6 @@ MIFireHose.visuals = {
     --- asset that nobody is reminded about is one that ships.
     borrowed = {
         w_am_hose = 'SmartHose',
-        ['rope.ytd'] = 'SmartHose',
     },
     couplingProp = 'prop_fire_hosebox_01',
     reelProp = 'prop_fire_hosereel',

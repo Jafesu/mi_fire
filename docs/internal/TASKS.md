@@ -209,6 +209,12 @@ where the nozzle was put down.
 `Supply-Line` on this drive lays a hose along a road and may already do the trail part; read it
 before writing this, the way SmartHose should have been read before the rope.
 
+**This and the texture problem have the same answer.** A hose that stays where it was walked is
+a *path*, and a path is rendered as a chain of segments rather than as a rope -- at which point
+it is our own model with our own texture, looking like hose, affecting nobody else's ropes, and
+lying where it was laid. Three problems, one rewrite. Worth doing that way rather than solving
+the rope's appearance first and throwing it away.
+
 ### `HOSE-011` — crew slots, unverified in game
 
 The state, the flow ceiling and the interactions are all written. **None of it has run with two
@@ -252,10 +258,14 @@ permission, and the gitignore is what keeps the distinction from mattering.
 The resource runs without them. The prop does not load, the server warns naming the model and
 its owner, and the hose works with nothing in the hand.
 
-**`rope.ytd` is worth understanding separately.** It replaces the game's rope texture
-dictionary, so it changes the appearance of *every* rope on the server rather than only ours.
-That is how SmartHose recolours its own. If another resource's ropes start looking like fire
-hose, this is why -- and it is a reason to replace this one sooner than the nozzle.
+**`rope.ytd` was copied and then removed.** It replaces the game's rope texture dictionary,
+which changes the appearance of *every* rope on the server -- including `mi_utils`' rappel
+rescue rope. There is no way to scope it: GTA resolves rope textures through `ropedata.xml`
+against one shared dictionary, and no native overrides the texture of a single rope.
+
+So the hose currently draws as a default GTA rope. Making it look like hose without touching
+anybody else's ropes means not using `AddRope` at all -- see `HOSE-010`, which wants the same
+thing for a different reason.
 
 Two things make forgetting hard rather than merely discouraged: the server warns on every start,
 and `conventions_spec` fails if a model is used that is neither base game nor declared in

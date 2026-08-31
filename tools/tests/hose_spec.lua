@@ -161,4 +161,48 @@ return function(t)
 
     t.ok(MIFireHose.work.repackSecondsPerSection > MIFireHose.work.rewindSecondsPerSection * 2,
         'which is exactly why the reel gets reached for when it should not be')
+
+    -- -----------------------------------------------------------------------
+
+    t.describe('a bed carries more than one hose')
+
+    -- The big bed is supply -- a thousand feet of LDH to lay back to a hydrant -- and there is
+    -- an attack bed beside it. Different hose for different jobs, and a crew picks.
+    local bed = MIFireHose.defaultBed
+
+    t.ok(#bed >= 2, 'the default bed is divided rather than one size of hose')
+
+    -- Named for what it holds rather than `sizes`, which is already the hose table above.
+    local carried = {}
+    for i = 1, #bed do carried[bed[i].size] = bed[i].feet end
+
+    t.ok(carried[5.0] ~= nil, 'it carries LDH for supply')
+    t.ok(carried[5.0] >= 800,
+        ('and enough of it to reach a hydrant (%d ft)'):format(carried[5.0]))
+
+    t.describe('and every size it carries is a hose we know about')
+
+    for i = 1, #bed do
+        t.ok(MIFireHose.sizes[bed[i].size] ~= nil,
+            ('the bed carries %s inch and there is a hose of that size'):format(bed[i].size))
+    end
+
+    t.describe('the bed runs out')
+
+    -- A thousand feet is a thousand feet. Without this, repacking has no purpose and laying a
+    -- supply line costs nothing but time.
+    t.equal(MIFireHose.finiteBed, true, 'hose is finite, which is what makes repacking matter')
+
+    t.describe('and a supply line is not something you take a nozzle to')
+
+    -- The sizes on a bed are mostly supply. Confirming they refuse a nozzle is confirming that
+    -- pulling LDH and expecting to fight fire with it does not work.
+    for i = 1, #bed do
+        local size = MIFireHose.sizes[bed[i].size]
+
+        if size and size.supplyOnly then
+            t.equal(Hose.acceptsNozzle(size, 'fog'), false,
+                ('%s is supply and refuses a nozzle'):format(size.label))
+        end
+    end
 end

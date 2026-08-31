@@ -299,6 +299,36 @@ MIFireHose.visuals = {
     syncMs = 500,
 }
 
+-- ---------------------------------------------------------------------------
+-- The hose bed
+-- ---------------------------------------------------------------------------
+
+--- What a hose bed carries, when the apparatus does not say.
+---
+--- **This is where a bare line comes from.** A crosslay or a reel is pulled from its discharge
+--- because it is already coupled to one -- that is what preconnected means. Everything else
+--- comes off the bed, gets walked out, and is coupled to a discharge afterwards. Pulling a
+--- bare line from the discharge it will eventually connect to had the order backwards.
+---
+--- A real bed is divided. The big one is supply -- a thousand feet of LDH to lay back to a
+--- hydrant -- and there is usually a smaller attack bed beside it. They are different hose for
+--- different jobs and a crew picks.
+---
+--- Override per rig with `carries` on the hosebed port:
+---
+---     { id = 'hosebed1', type = 'hosebed', corners = { ... },
+---       carries = { { size = 5.0, feet = 1200 }, { size = 2.5, feet = 600 } } }
+MIFireHose.defaultBed = {
+    { size = 5.0, feet = 1000 },
+    { size = 2.5, feet = 600 },
+}
+
+--- Does a bed run out?
+---
+--- **Yes.** A thousand feet is a thousand feet, and a crew that lays it all has laid it all.
+--- Turning this off makes the bed infinite, which removes the reason repacking exists.
+MIFireHose.finiteBed = true
+
 --- Maximum lengths a single line may be built from, so nobody lays a mile of hose off one
 --- discharge and stalls the water graph.
 MIFireHose.maxSections = 20

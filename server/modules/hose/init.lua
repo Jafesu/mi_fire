@@ -117,13 +117,150 @@ end
 -- Pulling a line
 -- ---------------------------------------------------------------------------
 
---- Pull a line off an apparatus.
+--- What a bed has left, per rig and per size.
 ---
---- A preconnected port comes with its hose already on it -- that is what a crosslay is, and
---- why it is the first line off the truck. A bare discharge gives you a coupling and nothing
---- else until someone brings hose to it.
+--- Keyed by network id so it follows the vehicle rather than the model -- two engines of the
+--- same type do not share a hose bed.
+---@type table<number, table<number, number>>
+local bedRemaining = {}
+
+--- Feet of a given size left on a rig's bed.
+---@param netId number
+---@param port table The hosebed port.
+---@param diameter number
+---@return number feet
+local function bedFeet(netId, port, diameter)
+    bedRemaining[netId] = bedRemaining[netId] or {}
+
+    if bedRemaining[netId][diameter] == nil then
+        local carries = port.carries or MIFireHose.defaultBed
+
+        for i = 1, #carries do
+            if carries[i].size == diameter then
+                bedRemaining[netId][diameter] = carries[i].feet or 0
+                break
+            end
+        end
+
+        bedRemaining[netId][diameter] = bedRemaining[netId][diameter] or 0
+    end
+
+    return bedRemaining[netId][diameter]
+end
+
+--- What sizes this bed is carrying, and how much of each is left.
+---@param entity integer
+---@param portId string
+---@return table[] `{ size, feet, label }`
+function HoseServer.bedContents(entity, portId)
+    local profile = MIFire.ApparatusServer.profile(entity)
+    if not profile then return {} end
+
+    local port = MIFire.Apparatus.port(profile, portId)
+    if not port or port.type ~= 'hosebed' then return {} end
+
+    local netId = NetworkGetNetworkIdFromEntity(entity)
+    local carries = port.carries or MIFireHose.defaultBed
+    local out = {}
+
+    for i = 1, #carries do
+        local size = MIFireHose.sizes[carries[i].size]
+
+        out[#out + 1] = {
+            size = carries[i].size,
+            feet = bedFeet(netId, port, carries[i].size),
+            capacity = carries[i].feet or 0,
+            label = size and size.label or tostring(carries[i].size),
+        }
+    end
+
+    return out
+end
+
+--- Pull hose off the bed.
+---
+--- The line comes out **uncoupled**. It gets walked to where it is needed and the butt end is
+--- coupled to a discharge afterwards, which is the order a crew actually works in and the
+--- reason the two are separate acts.
 ---@param source integer
----@param entity integer The apparatus.
+---@param entity integer
+---@param portId string The hosebed.
+---@param diameter number
+---@param lengths integer
+---@return boolean ok
+---@return string|nil reason
+---@return string|nil lineId
+function HoseServer.pullFromBed(source, entity, portId, diameter, lengths)
+    if playerLine[source] then return false, 'you already have a line' end
+
+    local profile = MIFire.ApparatusServer.profile(entity)
+    if not profile then return false, 'that is not fire apparatus' end
+
+    local port = MIFire.Apparatus.port(profile, portId)
+    if not port or port.type ~= 'hosebed' then return false, 'that is not a hose bed' end
+
+    local size = MIFireHose.sizes[diameter]
+    if not size then return false, 'no such hose' end
+
+    lengths = math.max(1, math.min(math.floor(tonumber(lengths) or 1), MIFireHose.maxSections))
+
+    local netId = NetworkGetNetworkIdFromEntity(entity)
+    local wanted = lengths * (size.sectionFeet or 50)
+
+    if MIFireHose.finiteBed then
+        local left = bedFeet(netId, port, diameter)
+
+        if left <= 0 then
+            return false, ('there is no %s left on this bed'):format(size.label or diameter)
+        end
+
+        if wanted > left then
+            -- Take what is there rather than refusing. A crew that asks for more than the bed
+            -- holds gets the bed, which is what happens.
+            lengths = math.max(1, math.floor(left / (size.sectionFeet or 50)))
+            wanted = lengths * (size.sectionFeet or 50)
+        end
+
+        bedRemaining[netId][diameter] = math.max(0, left - wanted)
+    end
+
+    local id = newId()
+
+    lines[id] = {
+        id = id,
+        diameter = diameter,
+        sections = lengths,
+        --- Uncoupled. This is the whole difference from a preconnect.
+        state = 'stretching',
+        sourceNet = nil,
+        sourcePort = nil,
+        fromBed = { net = netId, port = portId },
+        nozzle = size.nozzles and size.nozzles[1] or nil,
+        pattern = nil,
+        gpm = 0.0,
+        bail = 0.0,
+        nozzleHolder = source,
+        crew = { [source] = true },
+        crewRequired = Hose.crewRequired(size),
+        anchors = {},
+    }
+
+    playerLine[source] = id
+    sync(lines[id])
+
+    Util.debug('hose', '%s pulled %d length(s) of %s off the bed',
+        tostring(source), lengths, tostring(diameter))
+
+    return true, nil, id
+end
+
+--- Take a preconnect off its discharge.
+---
+--- Only a preconnected outlet. A crosslay and a booster reel are already coupled -- that is
+--- what preconnected means and why they are the first line off the truck. A bare discharge has
+--- no hose on it and there is nothing there to pull.
+---@param source integer
+---@param entity integer
 ---@param portId string
 ---@return boolean ok
 ---@return string|nil reason
@@ -140,7 +277,12 @@ function HoseServer.pull(source, entity, portId)
     if not port then return false, 'no such connection on this rig' end
 
     if port.type ~= 'discharge' then
-        return false, 'you pull a line from a discharge, not from that'
+        return false, 'you pull a line from a discharge or the bed, not from that'
+    end
+
+    if not port.preconnected then
+        return false, ('there is no hose on %s -- pull it off the bed and couple it here')
+            :format(port.label or portId)
     end
 
     local diameter = tonumber(port.size) or 1.75
@@ -151,14 +293,9 @@ function HoseServer.pull(source, entity, portId)
             :format(tostring(diameter))
     end
 
-    local netId = NetworkGetNetworkIdFromEntity(entity)
-
-    -- Preconnected means the hose is already coupled to the outlet. Anything else is a bare
-    -- port, and connecting to it is a separate act.
     local preconnected = port.preconnected
-    local sections = preconnected
-        and math.max(1, math.floor((tonumber(preconnected.feet) or 200) / (size.sectionFeet or 50)))
-        or 1
+    local sections = math.max(1,
+        math.floor((tonumber(preconnected.feet) or 200) / (size.sectionFeet or 50)))
 
     local id = newId()
 
@@ -166,9 +303,10 @@ function HoseServer.pull(source, entity, portId)
         id = id,
         diameter = diameter,
         sections = sections,
-        state = preconnected and 'connected' or 'stretching',
-        sourceNet = preconnected and netId or nil,
-        sourcePort = preconnected and portId or nil,
+        --- Already coupled. Nothing to connect.
+        state = 'connected',
+        sourceNet = NetworkGetNetworkIdFromEntity(entity),
+        sourcePort = portId,
         nozzle = size.nozzles and size.nozzles[1] or nil,
         pattern = nil,
         gpm = 0.0,
@@ -177,17 +315,37 @@ function HoseServer.pull(source, entity, portId)
         crew = { [source] = true },
         crewRequired = Hose.crewRequired(size),
         anchors = {},
-        reel = preconnected and preconnected.reel or false,
+        reel = preconnected.reel or false,
     }
 
     playerLine[source] = id
     sync(lines[id])
 
-    Util.debug('hose', '%s pulled %s (%s, %d section(s), %s)',
-        tostring(source), id, tostring(diameter), sections, lines[id].state)
+    Util.debug('hose', '%s took the %s preconnect (%s, %d section(s))',
+        tostring(source), portId, tostring(diameter), sections)
 
     return true, nil, id
 end
+
+--- Put hose back on the bed it came from.
+---
+--- Only what came off a bed goes back on one. A crosslay is repacked into its own tray, and a
+--- reel is wound in, neither of which adds to the supply bed.
+---@param line table
+local function returnToBed(line)
+    if not line.fromBed or not MIFireHose.finiteBed then return end
+
+    local size = MIFireHose.sizes[line.diameter]
+    if not size then return end
+
+    local remaining = bedRemaining[line.fromBed.net]
+    if not remaining then return end
+
+    remaining[line.diameter] = (remaining[line.diameter] or 0)
+        + (line.sections or 0) * (size.sectionFeet or 50)
+end
+
+HoseServer.returnToBed = returnToBed
 
 -- ---------------------------------------------------------------------------
 -- Connecting
@@ -429,6 +587,7 @@ function HoseServer.stow(source, lineId, force)
         return false, 'shut the line down before you pack it'
     end
 
+    returnToBed(line)
     drop(lineId)
     return true
 end
@@ -458,6 +617,26 @@ RegisterNetEvent('mi_fire:server:pullHose', function(netId, portId)
     if not ok and why then
         TriggerClientEvent('mi_fire:client:notify', source, why, 'error')
     end
+end)
+
+RegisterNetEvent('mi_fire:server:pullFromBed', function(netId, portId, diameter, lengths)
+    local source = source
+    local entity = NetworkGetEntityFromNetworkId(netId)
+    if not entity or entity == 0 then return end
+
+    local ok, why = HoseServer.pullFromBed(source, entity, portId,
+        tonumber(diameter) or 0, tonumber(lengths) or 1)
+
+    if not ok and why then
+        TriggerClientEvent('mi_fire:client:notify', source, why, 'error')
+    end
+end)
+
+lib.callback.register('mi_fire:bedContents', function(source, netId, portId)
+    local entity = NetworkGetEntityFromNetworkId(netId)
+    if not entity or entity == 0 then return {} end
+
+    return HoseServer.bedContents(entity, portId)
 end)
 
 RegisterNetEvent('mi_fire:server:connectHose', function(netId, portId)

@@ -451,14 +451,18 @@ CreateThread(function()
 
     Target.addGlobalVehicle({
         {
-            name = 'mi_fire:pullHose',
+            name = 'mi_fire:pullPreconnect',
             icon = 'fire-flame-simple',
-            label = 'Pull a line',
+            label = 'Take the preconnect',
             distance = 2.5,
             canInteract = function(entity, _, coords)
                 if mine then return false end
                 if not apparatus().isApparatus(entity) then return false end
-                return dischargeAt(entity, coords) ~= nil
+
+                -- Only an outlet with hose already on it. A bare discharge has nothing to
+                -- take: its hose is still on the bed.
+                local port = dischargeAt(entity, coords)
+                return port ~= nil and port.preconnected ~= nil
             end,
             onSelect = function(data)
                 local port = dischargeAt(data.entity, data.coords)
@@ -478,9 +482,84 @@ CreateThread(function()
             end,
         },
         {
+            name = 'mi_fire:pullFromBed',
+            icon = 'layer-group',
+            label = 'Pull hose off the bed',
+            distance = 2.5,
+            canInteract = function(entity, _, coords)
+                if mine then return false end
+                if not apparatus().isApparatus(entity) then return false end
+                return apparatus().atPort(entity, coords, 'hosebed')
+            end,
+            onSelect = function(data)
+                local netId = VehToNet(data.entity)
+                local port = apparatus().nearestPort(data.entity, 'hosebed')
+                if not port then return end
+
+                local contents = lib.callback.await('mi_fire:bedContents', false, netId, port.id)
+
+                if not contents or #contents == 0 then
+                    return lib.notify({ description = 'This bed is empty', type = 'error' })
+                end
+
+                local options = {}
+
+                for _, entry in ipairs(contents) do
+                    local size = MIFireHose.sizes[entry.size] or {}
+
+                    options[#options + 1] = {
+                        title = entry.label,
+                        description = ('%d ft left of %d  ·  %d for a crew')
+                            :format(entry.feet, entry.capacity, size.crew or 1),
+                        icon = 'grip-lines',
+                        disabled = entry.feet <= 0,
+                        onSelect = function()
+                            local sectionFeet = size.sectionFeet or 50
+                            local most = math.max(1, math.floor(entry.feet / sectionFeet))
+
+                            local input = lib.inputDialog(entry.label, {
+                                {
+                                    type = 'slider',
+                                    label = 'Lengths',
+                                    description = ('%d ft each. The bed has %d.')
+                                        :format(sectionFeet, most),
+                                    min = 1,
+                                    max = math.min(most, MIFireHose.maxSections),
+                                    default = math.min(4, most),
+                                },
+                            })
+
+                            if not input then return end
+
+                            local finished = lib.progressBar({
+                                duration = math.floor(
+                                    (MIFireHose.work.pullSeconds or 4.0) * 1000 * input[1] * 0.5),
+                                label = ('Pulling %d length(s)'):format(input[1]),
+                                canCancel = true,
+                                disable = { move = true, car = true, combat = true },
+                            })
+
+                            if finished then
+                                TriggerServerEvent('mi_fire:server:pullFromBed',
+                                    netId, port.id, entry.size, input[1])
+                            end
+                        end,
+                    }
+                end
+
+                lib.registerContext({
+                    id = 'mi_fire_bed',
+                    title = 'Hose bed',
+                    options = options,
+                })
+
+                lib.showContext('mi_fire_bed')
+            end,
+        },
+        {
             name = 'mi_fire:connectHose',
             icon = 'link',
-            label = 'Connect the line here',
+            label = 'Couple the line here',
             distance = 2.5,
             canInteract = function(entity, _, coords)
                 local line = mine and lines[mine]

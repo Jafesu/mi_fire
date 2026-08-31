@@ -67,6 +67,28 @@ function Apparatus.hasPump(profile)
     return (tonumber(profile.pumpRatingGpm) or 0) > 0
 end
 
+--- How does this port work out where it is?
+---
+--- Two anchors, and the difference matters:
+---
+---   **bone**    The port hangs off a named bone on the model. Survives the model being
+---               updated, moves with anything animated, and needs no measuring -- if the
+---               author put a bone at the hookup, that *is* the hookup. `x/y/z` become a
+---               fine offset from the bone rather than from the vehicle.
+---
+---   **offset**  A fixed point in vehicle-local space, measured with `/fireoffset`. Always
+---               available, and wrong the moment the model changes.
+---
+--- Bone is preferred wherever one exists. The catch is that bone names cannot be read from
+--- an `RSC7` model, so they have to be discovered in game -- which `/fireoffset` does by
+--- enumerating them rather than by anyone guessing.
+---@param port table
+---@return string 'bone' | 'offset'
+function Apparatus.anchor(port)
+    if type(port.bone) == 'string' and port.bone ~= '' then return 'bone' end
+    return 'offset'
+end
+
 --- Check one port for the things that are wrong regardless of context.
 ---@param port table
 ---@param portTypes table `MIFireApparatus.portTypes`
@@ -86,21 +108,35 @@ function Apparatus.validatePort(port, portTypes, index)
             :format(port.id, tostring(port.type))
     end
 
+    local bone = Apparatus.anchor(port) == 'bone'
+
+    -- A bone-anchored port needs no coordinates at all; anything it does carry is a fine
+    -- offset from the bone and is optional.
     for _, axis in ipairs({ 'x', 'y', 'z' }) do
         if type(port[axis]) ~= 'number' then
-            return ('port "%s" has no %s offset'):format(port.id, axis)
+            if not bone then
+                return ('port "%s" has no %s offset'):format(port.id, axis)
+            end
+            port[axis] = 0.0
         end
     end
 
     -- An offset this far from the vehicle origin is not a port on the truck, it is a typo or
     -- a world coordinate pasted in by mistake. Both are worth catching at boot rather than
     -- discovering when a hose connects to a point in the sky.
-    local reach = 20.0
+    local reach = bone and 3.0 or 20.0
     if math.abs(port.x) > reach or math.abs(port.y) > reach or math.abs(port.z) > reach then
+        local worst = math.max(math.abs(port.x), math.abs(port.y), math.abs(port.z))
+
+        if bone then
+            return ('port "%s" is offset %.1fm from bone "%s" -- a bone offset is a nudge, '
+                .. 'not a position. If it needs to be that far, the bone is the wrong one.')
+                :format(port.id, worst, port.bone)
+        end
+
         return ('port "%s" is %.1fm from the vehicle origin -- offsets are local to the '
             .. 'vehicle, in metres. A world coordinate pasted here would look exactly like '
-            .. 'this.'):format(port.id, math.max(math.abs(port.x), math.abs(port.y),
-                math.abs(port.z)))
+            .. 'this.'):format(port.id, worst)
     end
 
     return nil
@@ -146,6 +182,21 @@ end
 ---@param port table
 ---@return string
 function Apparatus.format(port)
+    -- A bone-anchored port leads with the bone, because that is the interesting part and the
+    -- offsets after it are a nudge. Zero offsets are dropped entirely rather than written as
+    -- `x = 0.000`, which reads as a measurement someone took.
+    if Apparatus.anchor(port) == 'bone' then
+        local nudge = ''
+
+        if (port.x or 0) ~= 0 or (port.y or 0) ~= 0 or (port.z or 0) ~= 0 then
+            nudge = (', x = %.3f, y = %.3f, z = %.3f')
+                :format(port.x or 0, port.y or 0, port.z or 0)
+        end
+
+        return ('        { id = %q, type = %q, bone = %q%s },')
+            :format(port.id, port.type, port.bone, nudge)
+    end
+
     return ('        { id = %q, type = %q, x = %.3f, y = %.3f, z = %.3f, heading = %.1f },')
         :format(port.id, port.type, port.x, port.y, port.z, port.heading or 0.0)
 end

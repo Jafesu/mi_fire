@@ -136,4 +136,42 @@ return function(t)
     -- It has to be loadable Lua, since the whole point is pasting it into a config file.
     local chunk = loadstring and loadstring('return {' .. line .. '}') or load('return {' .. line .. '}')
     t.ok(chunk ~= nil, 'and it parses as Lua, which is the only thing it is for')
+
+    -- -----------------------------------------------------------------------
+
+    t.describe('a port can hang off a bone instead of an offset')
+
+    -- Worth having because a bone needs no measuring and survives the model being updated.
+    -- If the vehicle author put a bone at the hookup, that bone *is* the hookup, and it beats
+    -- anything produced by nudging a marker around by hand.
+    local boned = { id = 'ldh', type = 'discharge', bone = 'misc_e' }
+
+    t.equal(Apparatus.anchor(boned), 'bone', 'a port with a bone is bone-anchored')
+    t.equal(Apparatus.anchor(good), 'offset', 'one without is offset-anchored')
+
+    t.equal(Apparatus.validatePort(boned, types, 1), nil,
+        'and it needs no coordinates at all')
+
+    t.describe('but a bone offset is a nudge, not a position')
+
+    -- The distinction that matters: two metres from the vehicle origin is a plausible port,
+    -- two metres from a bone means the wrong bone was picked and nobody noticed.
+    local wrongBone = { id = 'ldh', type = 'discharge', bone = 'misc_e',
+        x = 2.5, y = 0.0, z = 0.0 }
+    local boneErr = Apparatus.validatePort(wrongBone, types, 1)
+
+    t.ok(boneErr, 'a large offset from a bone is rejected')
+    t.ok(boneErr:find('wrong one') ~= nil, 'and says the bone is probably wrong')
+
+    t.describe('and it formats as a bone line')
+
+    local boneLine = Apparatus.format({ id = 'ldh', type = 'discharge', bone = 'misc_e' })
+
+    t.ok(boneLine:find('bone = "misc_e"') ~= nil, 'it names the bone')
+    t.ok(boneLine:find('x = 0.000') == nil,
+        'and does not write zero offsets, which read as a measurement someone took')
+
+    local nudged = Apparatus.format({ id = 'ldh', type = 'discharge', bone = 'misc_e',
+        x = 0.1, y = 0.0, z = 0.0 })
+    t.ok(nudged:find('x = 0.100') ~= nil, 'but a real nudge is kept')
 end

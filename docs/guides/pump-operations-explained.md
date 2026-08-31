@@ -167,7 +167,7 @@ capped, the nozzle wanders, and the line can get away from them. The intent is t
 crew on a small line beats a short crew on a big one**: two on a 1¾″ flow more than the same
 two on a 2½″.
 
-These numbers are ours, not published. **Are they roughly right?**
+These numbers are ours, not published.
 
 ---
 
@@ -199,39 +199,31 @@ coefficient.
 2. **Is 0.434 psi/foot right for this, or should we use the ½ psi rule of thumb people actually
    work in?** One is accurate, the other is what a real operator does in their head.
 
-3. ~~**How do you actually set a discharge?**~~ **Answered: you do not type a pressure.** The
-   operator works the throttle and pulls the gate handles, and the gauges read what that
-   produces. Rebuilt to match — there is one throttle for the whole pump, because there is one
-   pump, and each discharge is a handle from shut to wide open. Raising the throttle raises it
-   for everybody, which is what makes a second line take water off the first.
+3. **What would you pump a 200 ft 1¾″ crosslay with a 15/16″ tip at?** If our model does not
+   give roughly your number, our model is wrong, and this one answer would tell us.
 
-   **Still open, and smaller:** we model a part-open gate as a pressure loss growing with the
-   square of how far shut it is. The shape is right; the coefficient is ours. How much does a
-   half-open gate actually knock off?
-
-4. **What would you pump a 200 ft 1¾″ crosslay with a 15/16″ tip at?** If our model does not
-   give roughly your number, our model is wrong.
+4. **How much does a part-open gate actually knock off?** We treat the loss as growing with the
+   square of how far shut the handle is. The shape seems right; the number is invented.
 
 5. **Is "every line loses proportionally when the pump is over capacity" what actually
-   happens?** Or does the nearest/largest discharge win?
+   happens?** Or does the nearest or largest discharge win?
 
 6. **Is under ⅓ of rated nozzle pressure the right place to call a line soft?**
 
-7. ~~**Are 750 gallons right?**~~ **Answered: 1000.** Set. The 1500 gpm pump rating is still
-   ours rather than measured.
+7. **Which gauges on these rigs have a use we have not modelled?** Every gauge that has a use
+   is going to be rendered and driven by real state — no decorative faces. So the useful
+   question is what is missing behind them. We currently have nothing behind the intake gauge
+   beyond enough to detect cavitation, nothing behind foam, no governor at all, and no engine
+   RPM or temperature.
 
-8. ~~**Which gauges do you actually watch?**~~ **Answered: all of them, and they must be
-   live.** Every gauge that has a use gets rendered and driven by real state — no decorative
-   faces. That decision shapes the whole panel, so the question worth asking instead is:
-   **which gauges on these rigs have a use we have not modelled yet?** We currently have
-   nothing behind an intake gauge beyond enough to detect cavitation, and nothing at all behind
-   a foam or a governor readout.
-
-9. **How does cavitation present to you, and what do you do about it?** We warn the crew on the
+8. **How does cavitation present to you, and what do you do about it?** We warn the crew on the
    line as well as the operator, on the grounds that they are the ones about to lose water.
 
+9. **Are the crew numbers roughly right?** One on a booster reel, two on a 1¾″, three on a
+   2½″ — ours rather than published.
+
 10. **Of the things we do not model, which would you miss first?** If the answer is the
-    governor, we would like to know before we build the panel around not having one.
+    governor, we would like to know before the panel is built around not having one.
 
 ---
 

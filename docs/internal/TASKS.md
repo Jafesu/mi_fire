@@ -258,14 +258,15 @@ permission, and the gitignore is what keeps the distinction from mattering.
 The resource runs without them. The prop does not load, the server warns naming the model and
 its owner, and the hose works with nothing in the hand.
 
-**`rope.ytd` was copied and then removed.** It replaces the game's rope texture dictionary,
-which changes the appearance of *every* rope on the server -- including `mi_utils`' rappel
-rescue rope. There is no way to scope it: GTA resolves rope textures through `ropedata.xml`
-against one shared dictionary, and no native overrides the texture of a single rope.
+**`rope.ytd` is back and under test.** A `.ytd` replaces textures by name, so whether it is
+global depends on what is in it -- only the entries for SmartHose's rope type, or the whole
+dictionary. The file is compressed and unreadable, so it is being answered by looking: pull a
+hose, then use the rappel rope in `mi_utils`, and see whether the rappel changed. The procedure
+is in `stream/README.md`.
 
-So the hose currently draws as a default GTA rope. Making it look like hose without touching
-anybody else's ropes means not using `AddRope` at all -- see `HOSE-010`, which wants the same
-thing for a different reason.
+If it is scoped, it stays and `HOSE-010` loses one of its three reasons. If it is global it has
+to go -- a hose that looks right at the cost of every other rope on the server is not a trade
+worth making -- and the rewrite becomes the answer.
 
 Two things make forgetting hard rather than merely discouraged: the server warns on every start,
 and `conventions_spec` fails if a model is used that is neither base game nor declared in

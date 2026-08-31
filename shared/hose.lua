@@ -154,6 +154,41 @@ function Hose.acceptsNozzle(size, nozzleName)
     return false, ('%s does not take that nozzle'):format(size.label or 'that hose')
 end
 
+--- Turn the bezel one notch.
+---
+--- Pure, and separate from the event that calls it, because the interesting part is the
+--- **ends**. Opening a fog fully and finding it back at a straight stream is not something a
+--- nozzle does, and on a fireground it would be a faceful of steam -- so a directional step
+--- clamps. A plain cycle still wraps, because the command that uses it has nowhere to show you
+--- which end you are at and stopping dead reads as broken.
+---
+---@param nozzle table
+---@param current string|nil
+---@param direction integer|nil -1 tightens toward a straight stream, 1 opens the fog, nil cycles
+---@return string|nil pattern nil when there is nothing to change to
+function Hose.stepPattern(nozzle, current, direction)
+    if type(nozzle) ~= 'table' then return nil end
+
+    local patterns = nozzle.patterns
+    if type(patterns) ~= 'table' or #patterns < 2 then return nil end
+
+    current = current or nozzle.defaultPattern or patterns[1]
+
+    local index = 1
+    for i = 1, #patterns do
+        if patterns[i] == current then index = i break end
+    end
+
+    if direction == 1 or direction == -1 then
+        local wanted = math.max(1, math.min(#patterns, index + direction))
+        if wanted == index then return nil end
+        return patterns[wanted]
+    end
+
+    return patterns[(index % #patterns) + 1]
+end
+
+
 --- How much of the flow lands where it is aimed.
 ---
 --- A wide fog is a shield, not an extinguishing pattern. It protects a crew crossing a room

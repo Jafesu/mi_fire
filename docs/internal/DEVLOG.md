@@ -2328,3 +2328,70 @@ nozzleGripAiming = { bone = 'left', x = 0.100, y = 0, z = 0, rx = 55, ry = 203, 
 
 **Next:** water out of the nozzle, and onto a fire.
 
+---
+
+## 2026-08-31 (fourteenth) — water
+
+**Scope:** water out of the nozzle, and the bezel on the scroll wheel.
+
+**What was already there:** almost all of it. `Fire.applyAgent` is the single entry point for
+suppression, `shared/suppression.lua` has the rates and the agent matrix, and
+`mi_fire:server:hoseWater` already validated the holder, capped the flow, drew the tank, warned
+when it went soft, and routed everything through the matrix. The client already worked out where
+the player was aiming.
+
+Two things were missing, and neither was the hard part.
+
+**Changed:**
+
+- `client/modules/hose/init.lua` — water flows while the trigger is held; a visible stream; the
+  scroll wheel works the bezel.
+- `config/hose.lua` — `visuals.stream`.
+- `shared/hose.lua` — `Hose.stepPattern`.
+- `server/modules/hose/init.lua` — the pattern event takes a direction.
+- `/fire nozzlestream` — aim the particle.
+
+**Decisions:**
+
+- **Water flows while the trigger is held, and not otherwise.** It used to flow continuously for
+  anyone holding a charged line, which drained a thousand gallon tank at a rig nobody was
+  standing near, and made the nozzle something you carried rather than something you worked. The
+  bale on a real nozzle is exactly this.
+
+  The disabled attack control is checked as well as the enabled one, because aiming disables the
+  plain control in some states and a nozzle that stopped flowing the moment you aimed it would
+  be a puzzling bug to be handed.
+
+- **`core` / `water_cannon_jet`, taken from something already running.** The water cannon rigs on
+  this machine drive it at scale 2.0 with an offset and a rotation. Same rule as the fire
+  particle pairs and the roll animation: take the one that works somewhere over the one whose
+  name sounds right. Attached to the weapon entity rather than the ped, so it follows the nozzle
+  through every stance without anything tracking it.
+
+- **The bezel clamps; the command wraps.** Scrolling past a wide fog and arriving back at a
+  straight stream is not something a nozzle does, and on a fireground it is a faceful of steam.
+  The `/fire` command still wraps, because a command has nowhere to show which end you are at and
+  stopping dead reads as broken.
+
+- **The stepping moved into `shared/hose.lua`.** The interesting behaviour is entirely at the
+  ends, and inside a net event handler none of it could be tested. Ten assertions now cover both
+  stops, the wrap, a smooth bore with nothing to turn, a missing nozzle, and a pattern name that
+  does not match anything.
+
+- **The scroll wheel is disabled while the line is open.** Those controls are weapon switching on
+  a default bind, so without it adjusting the fog also puts a pistol in your hands.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1094 passed, 0 failed** (was 1084).
+- **Not** tested in game. The particle's rotation is a guess and is the thing most likely to be
+  wrong -- `/fire nozzlestream nudge rz 90` until it points the right way.
+
+**Open:**
+
+- Aim the stream. Which way a particle emits is not readable from anything.
+- Whether scroll up should narrow or widen. One line to flip.
+- `HOSE-010`, `HOSE-011`, `SCORCH-002` unchanged.
+
+**Next:** put it on an actual fire and watch the intensity come down.
+

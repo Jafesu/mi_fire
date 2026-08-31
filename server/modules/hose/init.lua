@@ -782,7 +782,8 @@ end)
 ---
 --- Server-side because pattern changes what the water does, and what the water does is fire
 --- state.
-RegisterNetEvent('mi_fire:server:cycleNozzlePattern', function()
+---@param direction integer|nil -1 to tighten toward a straight stream, 1 to open the fog. nil cycles.
+RegisterNetEvent('mi_fire:server:cycleNozzlePattern', function(direction)
     local source = source
     local line = HoseServer.lineFor(source)
     if not line or line.nozzleHolder ~= source then return end
@@ -793,14 +794,15 @@ RegisterNetEvent('mi_fire:server:cycleNozzlePattern', function()
             'A smooth bore has one pattern -- that is rather the point of it', 'inform')
     end
 
-    local current = line.pattern or nozzle.defaultPattern or nozzle.patterns[1]
-    local index = 1
+    -- The stepping itself lives in `shared/hose.lua`, where the ends can be tested.
+    local wanted = MIFire.Hose.stepPattern(nozzle, line.pattern, direction)
 
-    for i = 1, #nozzle.patterns do
-        if nozzle.patterns[i] == current then index = i break end
-    end
+    -- nil means the bezel is already against its stop, which is not worth a message: a
+    -- firefighter scrolling at the end of the travel can feel it, and saying so every notch
+    -- would bury the pattern name they actually want to read.
+    if not wanted then return end
 
-    line.pattern = nozzle.patterns[(index % #nozzle.patterns) + 1]
+    line.pattern = wanted
     sync(line)
 
     TriggerClientEvent('mi_fire:client:notify', source,

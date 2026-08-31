@@ -711,6 +711,49 @@ subcommands.nozzlegrip = function(source, args)
     reply(source, 'applied -- look at your hands')
 end
 
+--- `/fire nozzlestream ...` -- aim the water.
+---
+---     /fire nozzlestream show
+---     /fire nozzlestream nudge <x|y|z|rx|ry|rz|scale> <amount>
+---     /fire nozzlestream off
+---
+--- Which way a particle emits is not readable from the effect or the model, so it gets found by
+--- looking, the same as the grip did.
+subcommands.nozzlestream = function(source, args)
+    if source == 0 then
+        return reply(source, 'the console cannot see a particle; run this in game', 'error')
+    end
+
+    local action = args[2]
+
+    if action == 'off' or action == 'reset' then
+        TriggerClientEvent('mi_fire:client:nozzleStream', source, 'off')
+        return reply(source, 'stream override cleared')
+    end
+
+    if not action or action == 'show' then
+        TriggerClientEvent('mi_fire:client:nozzleStream', source, 'show')
+        return reply(source, 'hold the trigger to see it: /fire nozzlestream nudge rz 90')
+    end
+
+    if action == 'nudge' then
+        local axis = args[3]
+        local amount = tonumber(args[4])
+
+        if not amount then
+            return reply(source,
+                'usage: /fire nozzlestream nudge <x|y|z|rx|ry|rz|scale> <amount>. '
+                .. 'Try 90 for a rotation until it points the right way, then 0.05 to place it.',
+                'error')
+        end
+
+        TriggerClientEvent('mi_fire:client:nozzleStream', source, 'nudge', axis, amount)
+        return reply(source, ('%s %+g -- hold the trigger'):format(tostring(axis), amount))
+    end
+
+    reply(source, ('"%s" is not one of show, nudge, off'):format(tostring(action)), 'error')
+end
+
 --- `/fire perms` -- why you can or cannot use these commands.
 ---
 --- Deliberately reachable by anyone: someone who cannot run the commands is exactly who

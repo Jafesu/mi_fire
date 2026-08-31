@@ -233,6 +233,10 @@ local BONES = { right = 57005, left = 18905 }
 ---@type table<string, table|nil>
 local grips = { carry = nil, aim = nil }
 
+--- Where the stream comes out, while it is being found. Saved with the grips.
+---@type table|nil
+local streamOverride = nil
+
 --- What was last handed to `AttachEntityToEntity`, so it is not handed over again every frame.
 local appliedKey = nil
 local appliedTo = nil
@@ -277,7 +281,9 @@ end
 --- written down means doing all of it again. Stored per client because it is a local
 --- preference being discovered, not server state.
 local function saveGrips()
-    local ok, encoded = pcall(json.encode, grips)
+    local ok, encoded = pcall(json.encode, {
+        carry = grips.carry, aim = grips.aim, stream = streamOverride,
+    })
     if ok and encoded then SetResourceKvp(GRIP_KVP, encoded) end
 end
 
@@ -289,6 +295,7 @@ local function loadGrips()
     if ok and type(decoded) == 'table' then
         grips.carry = decoded.carry
         grips.aim = decoded.aim
+        streamOverride = decoded.stream
     end
 end
 
@@ -813,42 +820,209 @@ local function aimPoint(reach)
     return (hit == 1 or hit == true) and endCoords or target
 end
 
+--- The scroll wheel, on a default bind.
+---
+--- `INPUT_SELECT_PREV_WEAPON` tightens toward a straight stream and `INPUT_SELECT_NEXT_WEAPON`
+--- opens the fog, so scrolling up narrows and reaches further. Swap the two numbers if that
+--- feels backwards -- it is the kind of thing nobody agrees on and one line to change.
+local PATTERN_NARROW = 15
+local PATTERN_WIDEN = 14
+
+--- The stream, as a particle.
+---
+--- Attached to the weapon entity rather than the ped, so it follows the nozzle through every
+--- stance and every grip change without anything having to track it.
+local streamHandle = nil
+local streamAssetAsked = false
+
+---@return table
+local function streamCfg()
+    local base = MIFireHose.visuals.stream or {}
+    local over = streamOverride or {}
+
+    return {
+        asset = base.asset or 'core',
+        name = base.name or 'water_cannon_jet',
+        scale = over.scale or base.scale or 1.2,
+        x = over.x or base.x or 0.0, y = over.y or base.y or 0.0, z = over.z or base.z or 0.0,
+        rx = over.rx or base.rx or 0.0, ry = over.ry or base.ry or 0.0,
+        rz = over.rz or base.rz or 0.0,
+    }
+end
+
+local function stopStream()
+    if streamHandle then
+        StopParticleFxLooped(streamHandle, 0)
+        streamHandle = nil
+    end
+end
+
+---@param ped integer
+local function startStream(ped)
+    local cfg = streamCfg()
+
+    if not HasNamedPtfxAssetLoaded(cfg.asset) then
+        -- Asked for once rather than every frame. A missing asset is a missing asset, and
+        -- hammering the request only fills the log.
+        if not streamAssetAsked then
+            RequestNamedPtfxAsset(cfg.asset)
+            streamAssetAsked = true
+        end
+        return
+    end
+
+    local object = GetCurrentPedWeaponEntityIndex(ped)
+    if not object or object == 0 or not DoesEntityExist(object) then return end
+
+    UseParticleFxAssetNextCall(cfg.asset)
+
+    streamHandle = StartParticleFxLoopedOnEntity(cfg.name, object,
+        cfg.x, cfg.y, cfg.z, cfg.rx, cfg.ry, cfg.rz, cfg.scale, false, false, false)
+end
+
 --- Put water on the fire.
 ---
 --- The client reports where it is aiming and the server decides what that does, because
 --- suppression is fire state and fire state is the server's. The worst a forged aim achieves
 --- is putting water somewhere the player is not looking.
+---
+--- **Water flows while the trigger is held, and not otherwise.** It used to flow continuously
+--- for anyone holding a charged line, which drained a thousand gallon tank at a rig nobody was
+--- standing near -- and made the nozzle a thing you carried rather than a thing you worked. The
+--- bale on a real nozzle is exactly this: water when you open it.
 CreateThread(function()
     while not MIFire.ready do Wait(250) end
 
+    local lastSend = 0
+
     while true do
         local line = mine and lines[mine]
-        -- `usable` is the pump's verdict: a line below a third of its rated nozzle pressure
-        -- is soft, and a soft line puts water on the floor rather than on the fire.
-        local flowing = line and line.state == 'charged' and (line.gpm or 0) > 0
+
+        -- `usable` is the pump's verdict: a line below a third of its rated nozzle pressure is
+        -- soft, and a soft line puts water on the floor rather than on the fire.
+        local ready = line and line.state == 'charged' and (line.gpm or 0) > 0
             and line.usable ~= false
             and line.nozzleHolder == GetPlayerServerId(PlayerId())
+            and nozzleEquipped
 
-        Wait(flowing and 500 or 1000)
+        -- Only worth watching a control every frame while there is something to open.
+        Wait(ready and 0 or 500)
 
-        if flowing then
-            local nozzle = MIFireHose.nozzles[line.nozzle or 'fog']
-            local pattern = line.pattern or (nozzle and nozzle.defaultPattern) or 'straight'
-            local reach = nozzle and nozzle.reach and nozzle.reach[pattern] or 15.0
+        if not ready then
+            stopStream()
+            streamAssetAsked = false
+        else
+            -- Disabled as well as enabled: aiming a weapon disables the plain attack control in
+            -- some states, and a nozzle that stops flowing the moment you aim it would be a
+            -- puzzling bug to be handed.
+            local open = IsControlPressed(0, 24) or IsDisabledControlPressed(0, 24)
 
-            local point = aimPoint(reach)
+            -- Working the bezel: scroll while the line is open.
+            --
+            -- Only while it is open, because that is when a firefighter would be doing it and
+            -- because it leaves the scroll wheel alone the rest of the time. The weapon-switch
+            -- controls are the scroll wheel on a default bind, so they are disabled here --
+            -- otherwise adjusting the fog also puts a pistol in your hands.
+            if open then
+                DisableControlAction(0, PATTERN_NARROW, true)
+                DisableControlAction(0, PATTERN_WIDEN, true)
 
-            if point then
-                -- Half a second of flow, since that is the tick. Efficiency is the pattern's:
-                -- a wide fog puts far less water on the seat than a straight stream.
-                local efficiency = nozzle and Hose.patternEfficiency(nozzle, pattern) or 1.0
+                -- Just-pressed rather than pressed, so one notch of the wheel is one step
+                -- rather than however many frames the notch lasted.
+                if IsDisabledControlJustPressed(0, PATTERN_NARROW) then
+                    TriggerServerEvent('mi_fire:server:cycleNozzlePattern', -1)
+                elseif IsDisabledControlJustPressed(0, PATTERN_WIDEN) then
+                    TriggerServerEvent('mi_fire:server:cycleNozzlePattern', 1)
+                end
+            end
 
-                TriggerServerEvent('mi_fire:server:hoseWater', {
-                    x = point.x, y = point.y, z = point.z,
-                }, line.gpm * efficiency, 0.5)
+            if open and not streamHandle then
+                startStream(cache.ped)
+            elseif not open and streamHandle then
+                stopStream()
+            end
+
+            local now = GetGameTimer()
+
+            if open and now - lastSend >= 400 then
+                local seconds = math.min((now - lastSend) / 1000.0, 2.0)
+                lastSend = now
+
+                local nozzle = MIFireHose.nozzles[line.nozzle or 'fog']
+                local pattern = line.pattern or (nozzle and nozzle.defaultPattern) or 'straight'
+                local reach = nozzle and nozzle.reach and nozzle.reach[pattern] or 15.0
+
+                local point = aimPoint(reach)
+
+                if point then
+                    -- Efficiency is the pattern's: a wide fog puts far less water on the seat
+                    -- than a straight stream.
+                    local efficiency = nozzle and Hose.patternEfficiency(nozzle, pattern) or 1.0
+
+                    TriggerServerEvent('mi_fire:server:hoseWater', {
+                        x = point.x, y = point.y, z = point.z,
+                    }, line.gpm * efficiency, seconds)
+                end
+
+            elseif not open then
+                -- So the first press after a pause is charged for its own interval rather than
+                -- for however long the nozzle sat shut.
+                lastSend = now
             end
         end
     end
+end)
+
+--- `/fire nozzlestream ...` -- aim the water, without a restart.
+---
+--- Which way a particle emits cannot be read off the effect, the model, or anything else, so
+--- this is the same story as the grip: it gets found by looking. Persisted for the same reason
+--- too -- a crash mid-tuning should not cost the work.
+RegisterNetEvent('mi_fire:client:nozzleStream', function(action, axis, amount)
+    local function say(text)
+        TriggerEvent('chat:addMessage', { args = { 'mi_fire', text } })
+        print('[mi_fire] ' .. text)
+    end
+
+    local function report()
+        local c = streamCfg()
+        say(("stream = { asset = '%s', name = '%s', scale = %.2f, x = %.3f, y = %.3f, z = %.3f, rx = %.1f, ry = %.1f, rz = %.1f },")
+            :format(c.asset, c.name, c.scale, c.x, c.y, c.z, c.rx, c.ry, c.rz))
+    end
+
+    if action == 'off' then
+        streamOverride = nil
+        saveGrips()
+        stopStream()
+        return say('stream override cleared -- config/hose.lua applies')
+    end
+
+    if action == 'show' then return report() end
+
+    local c = streamCfg()
+    local updated = {
+        scale = c.scale,
+        x = c.x, y = c.y, z = c.z, rx = c.rx, ry = c.ry, rz = c.rz,
+    }
+
+    if action == 'nudge' then
+        if updated[axis] == nil then
+            return say(('"%s" is not one of x, y, z, rx, ry, rz, scale'):format(tostring(axis)))
+        end
+
+        updated[axis] = updated[axis] + amount
+
+        if axis == 'rx' or axis == 'ry' or axis == 'rz' then
+            updated[axis] = updated[axis] % 360
+        end
+    end
+
+    streamOverride = updated
+    saveGrips()
+
+    -- Restarted rather than adjusted: a looped particle keeps the offsets it was started with.
+    stopStream()
+    report()
 end)
 
 -- ---------------------------------------------------------------------------
@@ -1602,6 +1776,13 @@ AddEventHandler('onResourceStop', function(resource)
         clearNozzleHold(cache.ped)
     end
     setAimLock(false)
+
+    -- A looped particle outlives the resource with nothing left to stop it, and a permanent
+    -- jet of water hanging in the air is a restart for everyone who can see it.
+    if streamHandle then
+        StopParticleFxLooped(streamHandle, 0)
+        streamHandle = nil
+    end
 end)
 
 --- The pump panel, until Phase 4's NUI replaces it.

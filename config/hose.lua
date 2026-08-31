@@ -398,6 +398,31 @@ MIFireHose.visuals = {
     --- `conventions_spec` both read it, so the next borrow has to be declared.
     borrowed = {},
 
+    --- The stream itself.
+    ---
+    --- `core` / `water_cannon_jet` is the base game's own water cannon jet, and it is not a
+    --- guess: it is what the water cannon rigs on this machine use, at scale 2.0, driven with an
+    --- offset and a rotation exactly like this. Same rule as the fire particle pairs and the roll
+    --- animation -- take the one that is already working somewhere rather than the one whose
+    --- name sounds right.
+    ---
+    --- Attached to the weapon entity rather than the ped, so it follows the nozzle through every
+    --- stance without anything having to track it.
+    ---
+    --- The offset is in the **model's** space: the origin is the bale handle, the barrel axis
+    --- runs 0.128 below it, and the tip is 0.139 forward. Rotation is the awkward part, because
+    --- which way a particle emits is not something you can read off anything -- tune it with
+    --- `/fire nozzlestream`.
+    stream = {
+        asset = 'core',
+        name = 'water_cannon_jet',
+        scale = 1.2,
+
+        -- At the tip, on the barrel axis.
+        x = 0.0, y = 0.139, z = -0.128,
+        rx = 0.0, ry = 0.0, rz = 0.0,
+    },
+
     couplingProp = 'prop_fire_hosebox_01',
     reelProp = 'prop_fire_hosereel',
 

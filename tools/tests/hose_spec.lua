@@ -16,6 +16,43 @@ return function(t)
 
     -- -----------------------------------------------------------------------
 
+    t.describe('the bezel has ends')
+
+    -- The point of this function is what happens at the stops. Opening a fog fully and finding
+    -- it back at a straight stream is not something a nozzle does, and it is exactly the bug a
+    -- wrapping cycle gives you the moment it is driven from a scroll wheel instead of a command.
+    do
+        local fog = { patterns = { 'straight', 'narrow', 'wide' }, defaultPattern = 'straight' }
+
+        t.equal(Hose.stepPattern(fog, 'straight', 1), 'narrow', 'opening the fog goes one step')
+        t.equal(Hose.stepPattern(fog, 'narrow', 1), 'wide', 'and another')
+        t.equal(Hose.stepPattern(fog, 'wide', 1), nil,
+            'and stops at wide rather than wrapping round to a straight stream')
+
+        t.equal(Hose.stepPattern(fog, 'wide', -1), 'narrow', 'tightening goes back')
+        t.equal(Hose.stepPattern(fog, 'straight', -1), nil, 'and stops at straight')
+
+        t.describe('but a plain cycle still wraps')
+
+        -- The command has nowhere to show which end you are at, so stopping dead reads as broken.
+        t.equal(Hose.stepPattern(fog, 'wide', nil), 'straight', 'cycling past wide comes round')
+
+        t.describe('and a smooth bore has nothing to turn')
+
+        local smooth = { patterns = { 'solid' }, defaultPattern = 'solid' }
+        t.equal(Hose.stepPattern(smooth, 'solid', 1), nil, 'one pattern cannot be stepped')
+        t.equal(Hose.stepPattern(smooth, 'solid', nil), nil, 'nor cycled')
+
+        t.equal(Hose.stepPattern(nil, 'straight', 1), nil, 'and a missing nozzle is not a crash')
+
+        -- An unknown current pattern should not strand the bezel. It falls back to the first,
+        -- so a line whose pattern was renamed in config still turns.
+        t.equal(Hose.stepPattern(fog, 'nonsense', 1), 'narrow',
+            'an unrecognised pattern starts from the beginning rather than sticking')
+    end
+
+    -- -----------------------------------------------------------------------
+
     t.describe('a bigger line costs more people')
 
     t.ok(Hose.crewRequired(big) > Hose.crewRequired(attack),

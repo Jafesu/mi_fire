@@ -80,6 +80,7 @@ server_scripts {
     'server/modules/exposure/init.lua',
     'server/modules/smoke/init.lua',
     'server/modules/scorch/init.lua',
+    'server/modules/hose/init.lua',
     'server/modules/admin/init.lua',
     'server/api/exports.lua',
 }

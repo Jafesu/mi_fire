@@ -220,6 +220,43 @@ MIFireHose.work = {
     dragSpeed = 1.1,
 }
 
+-- ---------------------------------------------------------------------------
+-- What a hose looks like
+-- ---------------------------------------------------------------------------
+
+--- No custom asset is needed, and that is worth stating because it is not obvious.
+---
+--- The line itself is a GTA **rope**, not a model: `AddRope` renders a physical, simulated,
+--- collidable line that sags under its own weight and follows both ends. Nothing anyone could
+--- author as a prop would behave better, and a prop would need a compile step this project
+--- has no way to run.
+---
+--- Every name here is verified in something already running on this machine rather than taken
+--- from a list -- rope type 4 is what the fire hose resource on this drive uses, and the props
+--- are base game. Same rule as the particle pairs and the roll animation, for the same reason:
+--- a wrong name here fails silently.
+MIFireHose.visuals = {
+    --- Rope type. 4 is the one a working hose resource uses; 7 is thicker, for LDH.
+    ropeType = 4,
+    ropeTypeLarge = 7,
+
+    --- Diameter above which the thicker rope is used, in inches.
+    largeAbove = 2.5,
+
+    --- Slack, as a fraction of the span. A hose lying on the ground is not a taut cable, and
+    --- a line with no slack in it reads as a tow rope.
+    slack = 0.18,
+
+    --- Props. Base game, all four confirmed present in resources on this machine.
+    nozzleProp = 'prop_fire_hosereel_l1',
+    couplingProp = 'prop_fire_hosebox_01',
+    reelProp = 'prop_fire_hosereel',
+
+    --- How often a laid line's shape is re-synced to other players, in ms. A rope is
+    --- simulated locally, so this only has to agree about the *ends*.
+    syncMs = 500,
+}
+
 --- Maximum lengths a single line may be built from, so nobody lays a mile of hose off one
 --- discharge and stalls the water graph.
 MIFireHose.maxSections = 20

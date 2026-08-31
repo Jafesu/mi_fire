@@ -201,4 +201,59 @@ return function(t)
         'and burst timings, so one sound file can cover both phases')
     t.ok(audio.burst.gapMsAtFull < audio.burst.gapMsAtStart,
         'with the gap shortening as it escalates, so the chirp speeds up')
+
+    -- -----------------------------------------------------------------------
+
+    t.describe('a downed wearer alarms far sooner')
+
+    -- Reported from play: going down and waiting produced silence for long enough that the
+    -- device may as well not have been there. A real PASS genuinely does take its full
+    -- thirty-odd seconds -- it cannot tell you are down -- but thirty seconds is most of a
+    -- bleed-out timer, so this is a deliberate departure.
+    local cfg = MIFireScba.pass
+
+    ---@param downed boolean
+    ---@return number seconds until full alarm
+    local function secondsToFullAlarm(downed)
+        local state = Pass.newState()
+        local elapsed = 0.0
+
+        while elapsed < 300 do
+            Pass.step(state, 0.5, { armed = true, moved = false, downed = downed }, cfg)
+            elapsed = elapsed + 0.5
+            if state.phase == Pass.Phase.FULL then return elapsed end
+        end
+
+        return elapsed
+    end
+
+    local standing = secondsToFullAlarm(false)
+    local down = secondsToFullAlarm(true)
+
+    t.ok(down < standing,
+        ('a downed firefighter alarms sooner than one merely standing still (%.0fs vs %.0fs)')
+            :format(down, standing))
+
+    t.ok(down <= 20,
+        'and soon enough to be worth having -- a mayday nobody hears for half a minute is '
+        .. 'not a mayday')
+
+    t.ok(standing >= cfg.preAlarmSeconds,
+        'while standing still still takes the full realistic time')
+
+    t.describe('and the shortcut is configurable away')
+
+    local realistic = MIFire.Util.merge(cfg, {
+        downed = { preAlarmSeconds = cfg.preAlarmSeconds, fullAlarmSeconds = cfg.fullAlarmSeconds },
+    })
+
+    local state = Pass.newState()
+    local elapsed = 0.0
+    while elapsed < 300 and state.phase ~= Pass.Phase.FULL do
+        Pass.step(state, 0.5, { armed = true, moved = false, downed = true }, realistic)
+        elapsed = elapsed + 0.5
+    end
+
+    t.ok(elapsed >= cfg.preAlarmSeconds,
+        'a server that wants the accurate behaviour can have it back')
 end

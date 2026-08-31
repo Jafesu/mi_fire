@@ -89,6 +89,19 @@ function Pass.step(state, dt, input, config)
     -- is the case the device exists for.
     local moving = input.moved and not input.downed
 
+    -- A real PASS has no idea you are down -- it only knows you stopped moving, so it takes
+    -- its full thirty-odd seconds either way. That is accurate and useless: thirty seconds
+    -- is most of a bleed-out timer, and the entire point of the device is that it summons
+    -- help. When the wearer is down it runs on shortened timings instead, which is the one
+    -- place this deliberately leaves realism behind and says so.
+    local preAlarm = config.preAlarmSeconds
+    local fullAlarm = config.fullAlarmSeconds
+
+    if input.downed and config.downed then
+        preAlarm = config.downed.preAlarmSeconds or preAlarm
+        fullAlarm = config.downed.fullAlarmSeconds or fullAlarm
+    end
+
     if moving then
         state.motionless = 0.0
     else
@@ -101,7 +114,7 @@ function Pass.step(state, dt, input, config)
     end
 
     if state.phase == Pass.Phase.SENSING then
-        if state.motionless >= config.preAlarmSeconds then
+        if state.motionless >= preAlarm then
             state.phase = Pass.Phase.PRE_ALARM
             state.inPhase = 0.0
         end
@@ -113,7 +126,7 @@ function Pass.step(state, dt, input, config)
             state.inPhase = 0.0
         else
             state.inPhase = state.inPhase + dt
-            if state.inPhase >= config.fullAlarmSeconds then
+            if state.inPhase >= fullAlarm then
                 state.phase = Pass.Phase.FULL
                 state.inPhase = 0.0
             end

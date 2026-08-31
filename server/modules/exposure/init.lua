@@ -178,7 +178,21 @@ local function tickPlayer(source, dt)
                 player.burning = true
                 player.burningSince = os.time()
                 payload.ignited = true
-                Util.debug('exposure', '%s caught fire', tostring(source))
+
+                local capacity = tier.integrity or 0
+                Util.debug('exposure', '%s caught fire wearing %s (%.0f/%.0f integrity)',
+                    tostring(source), gearEntry.tier or 'nothing', gearEntry.integrity, capacity)
+
+                -- Igniting on a healthy set is a contradiction: the threshold exists so
+                -- that catching fire means the gear has failed. If this fires, the tier
+                -- the exposure model resolved is not the one the wearer believes they have
+                -- on, and no amount of tuning will fix it.
+                if capacity > 0 and gearEntry.integrity > capacity * 0.5 then
+                    Util.warn('%s ignited at %.0f%% gear integrity wearing %s -- the tier '
+                        .. 'being resolved does not match what they are wearing',
+                        tostring(source), gearEntry.integrity / capacity * 100,
+                        tostring(gearEntry.tier))
+                end
             end
         end
 

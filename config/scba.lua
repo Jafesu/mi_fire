@@ -168,6 +168,19 @@ MIFireScba.pass = {
     --- Seconds motionless before the escalating pre-alarm chirp starts.
     preAlarmSeconds = 25.0,
 
+    --- Timings used instead when the wearer is down -- unconscious, in last stand, or
+    --- ragdolled.
+    ---
+    --- A real PASS cannot tell. It only knows you stopped moving, so it takes the full
+    --- thirty-odd seconds whoever you are. Accurate, and useless: that is most of a
+    --- bleed-out timer spent silent, and summoning help is the entire purpose of the
+    --- device. Set both to the values above if you would rather have the realistic
+    --- version.
+    downed = {
+        preAlarmSeconds = 5.0,
+        fullAlarmSeconds = 5.0,
+    },
+
     --- Further seconds of pre-alarm before full alarm. Movement clears the pre-alarm;
     --- it does not clear a full alarm, which needs a manual reset on the device.
     fullAlarmSeconds = 12.0,

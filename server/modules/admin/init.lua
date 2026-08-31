@@ -409,8 +409,44 @@ subcommands.gear = function(source)
     if source == 0 then
         return reply(source, 'the console has no client to ask; run this in game', 'error')
     end
+
+    -- The server's own view first. The client and the server can disagree about what you
+    -- are wearing -- that disagreement is exactly the bug class this exists for, and asking
+    -- only the client cannot see it.
+    local State = MIFire.State
+    local tier, entry = State.getGearTier(source)
+    local capacity = tier and tier.integrity or 0
+
+    local lines = {
+        '--- what the SERVER thinks you are wearing ---',
+        ('tier: %s   integrity: %.1f / %.1f   coverage: %.0f%%'):format(
+            entry.tier or 'none', entry.integrity or 0, capacity,
+            (entry.coverage or 1.0) * 100),
+    }
+
+    if capacity <= 0 then
+        lines[#lines + 1] = '  -> NO PROTECTION. A tier with no integrity pool is always '
+            .. 'ignitable, so you will catch fire almost at once.'
+    else
+        lines[#lines + 1] = ('  fireResist %.2f, ignites below %.0f (%.0f%%), currently %s')
+            :format(tier.fireResist or 0,
+                capacity * (tier.ignitionThreshold or 0), (tier.ignitionThreshold or 0) * 100,
+                MIFire.Exposure.canIgnite(entry.integrity or 0, tier)
+                    and 'IGNITABLE' or 'not ignitable')
+    end
+
+    local scba = State.getScba(source)
+    lines[#lines + 1] = ('scba: worn=%s active=%s armed=%s air=%.0fs%s'):format(
+        tostring(scba.worn), tostring(scba.active), tostring(scba.passArmed == true),
+        scba.air or 0, scba.fromClothing and ' (from clothing)' or '')
+
+    local down, why = MIFire.Medical.isDown(source)
+    lines[#lines + 1] = ('down: %s%s'):format(tostring(down), why and (' (' .. why .. ')') or '')
+
+    replyList(source, lines)
+
     TriggerClientEvent('mi_fire:client:diagnoseGear', source)
-    reply(source, 'gear diagnosis printed to your chat and F8 console')
+    reply(source, 'client half printed to your chat and F8 console')
 end
 
 --- `/fire perms` -- why you can or cannot use these commands.

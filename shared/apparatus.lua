@@ -124,7 +124,11 @@ function Apparatus.validatePort(port, portTypes, index)
     -- An offset this far from the vehicle origin is not a port on the truck, it is a typo or
     -- a world coordinate pasted in by mistake. Both are worth catching at boot rather than
     -- discovering when a hose connects to a point in the sky.
-    local reach = bone and 3.0 or 20.0
+    -- A bone nudge should be centimetres, not metres. 1.5m allows for a bone at a panel
+    -- centre with the port at its edge, and rejects anything that means the wrong bone was
+    -- picked -- which is the mistake this catches, since a wrong bone still resolves to a
+    -- real point on the truck and looks fine until a hose connects a metre off.
+    local reach = bone and 1.5 or 20.0
     if math.abs(port.x) > reach or math.abs(port.y) > reach or math.abs(port.z) > reach then
         local worst = math.max(math.abs(port.x), math.abs(port.y), math.abs(port.z))
 

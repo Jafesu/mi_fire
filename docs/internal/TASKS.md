@@ -1,6 +1,24 @@
-### `ASSET-001` — a nozzle of our own
+### `ASSET-001` — a nozzle of our own, half done
 
-The nozzle is a base game prop. Adequate, not right, and the replacement has to be **made**.
+**The model exists.** Built from a CAD nozzle, not borrowed from anyone, and the whole recipe is
+in `tools/assets/nozzle/` -- see the README there. `183,404` triangles of millimetre-scale CAD
+down to `8,000`, oriented for GTA, unwrapped, with ambient occlusion baked to a diffuse map, and
+exported through Sollumz to `mi_nozzle.ydr`: `RSC7`, resource version 165, a genuine RAGE
+drawable container. Both halves run headless and are reproducible from the STL.
+
+**It is not yet a weapon in game.** What remains is the wiring, and it is the part already
+written down below:
+
+1. Get the texture to the client -- embedded in the drawable, or a `.ytd` beside it. An
+   unembedded texture renders untextured, which reads as a broken model rather than a missing
+   file.
+2. `weapons.meta` and `weaponarchetypes.meta`. The archetype **is** required here, because this
+   is a new model; a weapon reusing a base game model needs none.
+3. Declare both with `data_file` *and* list them in `files`.
+4. Point `MIFireHose.visuals.nozzleWeapon` at it. One line.
+
+Until then `WEAPON_FIREEXTINGUISHER` stays, and it is a reasonable stand-in: base game, sprays,
+right stance, nothing shipped.
 
 **Nothing from SmartHose can be borrowed. This is settled, not open.** Copying the model and its
 four weapon metas made FiveM refuse to start the resource at all:
@@ -12,8 +30,8 @@ completely unusable anywhere else, which is exactly what escrow is for. Earlier 
 repository said escrow covered the Lua and not the stream folder; that was wrong, and the error
 above is the proof. **Do not try again**, with these or with `Supply-Line`'s water pump.
 
-**The replacement wants to be a weapon, not a prop**, because a nozzle sprays and a prop cannot
-be fired. Everything needed to use one is already written and waiting on the asset:
+**It wants to be a weapon, not a prop**, because a nozzle sprays and a prop cannot be fired.
+Everything needed to *use* one is already written and waiting on the metas:
 
 - `MIFireHose.visuals.nozzleWeapon` takes the name; nothing else changes.
 - `CreateWeaponObject` makes a world object from the hash and attaches it to `SKEL_R_Hand`, so

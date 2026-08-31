@@ -1586,3 +1586,63 @@ straight. Reading it first would have cost ten minutes.
 
 **Next:** the rest of Phase 3 -- appliances and the gated wye -- or Phase 4, which now has its
 panel photographs.
+
+---
+
+## 2026-08-31 — a nozzle of our own
+
+**Scope:** `ASSET-001`. Build a nozzle from a CAD model instead of borrowing one.
+
+**Changed:**
+
+- `tools/assets/nozzle/build_nozzle.py` — CAD STL to game-ready mesh, headless and repeatable.
+- `tools/assets/nozzle/export_ydr.py` — Sollumz shader material, drawable, `.ydr`.
+- `tools/assets/nozzle/README.md` — the source, the run, and the three things that were hard.
+- `config/hose.lua` — the nozzle is `WEAPON_FIREEXTINGUISHER` until the new one is wired.
+
+**Decisions:**
+
+- **The two halves are separate scripts.** The build is pure Blender and always works; the
+  export needs Sollumz. Split so a Sollumz problem never costs the geometry work. They also
+  take different flags, which is not cosmetic — see below.
+
+- **`--factory-startup` on the build, never on the export.** It does not merely disable add-ons,
+  it discards the extension *repository* list, so Sollumz cannot be resolved at all:
+  `extension repository "repo_sollumz_org" doesn't exist`.
+
+- **8,000 triangles, from 183,404.** Keeping 4.4%. GTA handguns sit near 2-4k and rifles near
+  6-10k, so this is the generous end of normal for something held at arm's length. The
+  triangles were not where anyone would guess: a 23 mm ring carried 28,904 of them and the bale
+  handle carried 47,116. Collapse decimation, not planar — planar leaves n-gons and does nothing
+  for the cylinders, which is where the budget actually goes.
+
+- **Ambient occlusion baked to a diffuse map.** An STL has no UVs, no materials and no texture,
+  and a script will not hand-paint one. Contact shading in the flutes, under the bale handle and
+  inside the teeth is most of what makes metal read as solid, and it costs one bake.
+
+- **Orientation was settled by looking, not by reasoning.** Rendered the model with a red cube at
+  +Y and a blue cube at +Z. Two attempts to infer the axes from part centroids gave the wrong
+  answer, because the down-barrel view shows the *far* end filling the silhouette — the end that
+  looks like the tip is the end that is not. Final mapping `(x, y, z) -> (z, y, -x)` at 0.001,
+  written as one matrix because the chained-rotation form was wrong twice and a matrix can be
+  checked against a bounding box by eye.
+
+**Verified:**
+
+- Both scripts run headless end to end on Blender 5.2.1 LTS with Sollumz 2.9.0.
+- `183,404 -> 8,000` triangles; final bounds `(-0.061, -0.150, -0.064) .. (0.061, 0.147, 0.150)`
+  metres, which is a 296 mm nozzle with the tip forward and the handle up.
+- `mi_nozzle.ydr`, 163,065 bytes, magic `RSC7`, resource version 165 — a genuine RAGE drawable
+  container rather than an empty file reported as success.
+- `lua tools/run_tests.lua` — **1014 passed, 0 failed**.
+- **Not** verified in game. The `.ydr` has not been loaded by FiveM, and until the metas exist
+  it cannot be.
+
+**Open:**
+
+- The texture does not reach the client yet: it needs embedding in the drawable or a `.ytd`.
+- `weapons.meta` and `weaponarchetypes.meta` are unwritten. The archetype is genuinely required
+  here because this is a new model.
+- `HOSE-010`, `HOSE-011`, `SCORCH-002` all unchanged.
+
+**Next:** the texture, then the two metas, then one line in `config/hose.lua`.

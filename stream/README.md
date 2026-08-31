@@ -2,10 +2,17 @@
 
 Streamed assets for mi_fire.
 
-> **New files here need `refresh` on the server console, not just a restart.** The asset index
-> is built when a resource is refreshed; restarting one that already exists reuses the index it
-> had. `refresh` then `ensure mi_fire`. This is the usual reason a model that is plainly sitting
-> in this folder "would not load".
+> **New files here need two things, and the second is the one people miss.**
+>
+> On the server: `refresh`, then `ensure mi_fire`. The asset index is built on refresh;
+> restarting a resource that already exists reuses the index it had.
+>
+> On the client: **reconnect**. A client keeps the asset list it was given when it joined, so a
+> server-side refresh does not reach anyone already in the server. F8 → `reconnect` is enough;
+> a full game restart is slower and does the same thing.
+>
+> If a model survives both, it is not being streamed at all — check the filename matches the
+> model name exactly, and that both the `.ydr` and its `.ytd` are present.
 
 **What is in here right now is borrowed and is not in the repository.**
 

@@ -97,29 +97,38 @@ local function attachNozzle(ped)
 
     local model = joaat(name)
 
-    -- Two different failures that look identical from the outside, and only one of them is
-    -- worth acting on.
+    -- `IsModelInCdimage` is asked but not obeyed.
     --
-    -- A model the game has never heard of is usually a streamed asset the server has not
-    -- indexed yet: dropping files into `stream/` and restarting the resource is not enough,
-    -- because the index is built when the resource is *refreshed*. `refresh` then
-    -- `ensure mi_fire` is the fix, and it is not obvious from "would not load".
-    if not IsModelInCdimage(model) and not IsModelValid(model) then
-        Util.warn('nozzle prop "%s" is not in the game files. If it was just added to '
-            .. 'stream/, run "refresh" on the server console and then "ensure mi_fire" -- a '
-            .. 'restart alone does not index new stream assets.', name)
-        return nil
-    end
+    -- It answers about the game's own archetypes, and a streamed asset can be perfectly
+    -- loadable while reporting false there -- which it did, and the check then refused to even
+    -- try. Worth recording in the message, because it distinguishes "the client has never
+    -- heard of this" from "the client has it and it would not load", but the load is attempted
+    -- either way and the load is what decides.
+    local known = IsModelInCdimage(model) or IsModelValid(model)
 
     RequestModel(model)
+
     local waited = 0
-    while not HasModelLoaded(model) and waited < 3000 do
+    while not HasModelLoaded(model) and waited < 5000 do
         Wait(50)
         waited = waited + 50
     end
 
     if not HasModelLoaded(model) then
-        Util.warn('nozzle prop "%s" exists but would not load in three seconds', name)
+        if known then
+            Util.warn('nozzle prop "%s" is a known model but would not load in five seconds',
+                name)
+        else
+            -- Almost always this: the client is holding the asset list it was given when it
+            -- connected. Adding files to `stream/` and restarting the resource does not send
+            -- them to somebody already in the server. **Reconnect** -- F8, then `reconnect` --
+            -- rather than restarting the game, which is slower and does the same thing.
+            Util.warn('nozzle prop "%s" is unknown to this client. Reconnect (F8 -> '
+                .. '"reconnect") -- a client keeps the asset list it was given when it joined, '
+                .. 'so a server-side refresh does not reach it. If it survives a reconnect, '
+                .. 'the model is not being streamed at all.', name)
+        end
+
         return nil
     end
 
@@ -204,7 +213,8 @@ local function draw(id, line)
 
     -- Started short and paid out. A rope created at its full two hundred feet between two
     -- points five metres apart is a heap; one created at exactly the span is a tow cable.
-    local initial = MIFireHose.visuals.initialLength or 12.0
+    -- Vertex count follows length, so a short rope is a rope with nothing in the middle.
+    local initial = MIFireHose.visuals.initialLength or 25.0
 
     local rope = AddRope(from.x, from.y, from.z, 0.0, 0.0, 0.0,
         maxLength, ropeType, math.min(initial, maxLength), 0.5, 1.0,
@@ -223,18 +233,25 @@ local function draw(id, line)
     drawn[id].vehicle = vehicle
     drawn[id].pending = true
 
-    -- A rope has no vertices until it has been simulated once.
+    -- A rope has no vertices until it has been simulated once, and it needs enough of them to
+    -- have a *middle*.
+    --
+    -- Four is not enough: the hand takes vertex 0 and the coupling takes the last three, which
+    -- pins every vertex there is. A fully pinned rope has no freedom, so it draws taut and
+    -- shakes as the pins disagree by a centimetre each frame -- which is what "spazzing out"
+    -- was. Eight leaves four in the middle to hang.
     local vertices = 0
     local waited = 0
 
-    while vertices < 4 and waited < 500 do
+    while vertices < 8 and waited < 500 do
         Wait(0)
         vertices = GetRopeVertexCount(rope) or 0
         waited = waited + 16
     end
 
-    if vertices < 4 then
-        Util.warn('rope for line %s never simulated; not drawing it', id)
+    if vertices < 8 then
+        Util.warn('rope for line %s came back with %d vertices, too few to hang; '
+            .. 'raise MIFireHose.visuals.initialLength', id, vertices)
         if DoesRopeExist(rope) then DeleteRope(rope) end
         drawn[id] = nil
         return
@@ -405,20 +422,34 @@ CreateThread(function()
                         local last = entry.vertices - 1
 
                         PinRopeVertex(entry.rope, last, from.x, from.y, from.z)
+
+                        -- One more, a little way out along the outlet, so the hose leaves the
+                        -- fitting straight. Three was over-constraining a short rope; two ends
+                        -- and one guide is enough to set the direction and still leave a
+                        -- middle to hang.
                         PinRopeVertex(entry.rope, last - 1,
-                            from.x + axis.x * 0.25, from.y + axis.y * 0.25, from.z + axis.z * 0.25)
-                        PinRopeVertex(entry.rope, last - 2,
-                            from.x + axis.x * 0.5, from.y + axis.y * 0.5, from.z + axis.z * 0.5)
+                            from.x + axis.x * 0.3, from.y + axis.y * 0.3, from.z + axis.z * 0.3)
 
                         -- Pay the line out as the crew walks and haul it in as they return,
                         -- capped at what is on the bed.
-                        local slack = 1.0 + (MIFireHose.visuals.slack or 0.35)
-                        local wanted = math.min(entry.maxLength,
-                            math.max(2.0, #(from - hand) * slack))
+                        --
+                        -- Not every frame. A walking ped's hand moves several centimetres a
+                        -- frame, so the distance never settles, and reshaping a rope four
+                        -- times a second is plenty -- doing it sixty is its own source of
+                        -- shaking.
+                        local now = GetGameTimer()
 
-                        if math.abs(wanted - (entry.length or 0)) > 0.3 then
-                            RopeForceLength(entry.rope, wanted)
-                            entry.length = wanted
+                        if now - (entry.lengthAt or 0) > 250 then
+                            entry.lengthAt = now
+
+                            local slack = 1.0 + (MIFireHose.visuals.slack or 0.35)
+                            local wanted = math.min(entry.maxLength,
+                                math.max(4.0, #(from - hand) * slack))
+
+                            if math.abs(wanted - (entry.length or 0)) > 1.0 then
+                                RopeForceLength(entry.rope, wanted)
+                                entry.length = wanted
+                            end
                         end
                     end
                 end

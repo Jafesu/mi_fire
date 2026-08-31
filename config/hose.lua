@@ -261,7 +261,10 @@ MIFireHose.visuals = {
     --- Short. A rope created at its full two hundred feet between two points five metres apart
     --- is a heap rather than a hose; this is the length it has while the crew is still at the
     --- rig, and it grows as they walk.
-    initialLength = 12.0,
+    --- Raised from 12: vertex count follows length, and a rope with only four vertices has
+    --- every one of them pinned -- the hand takes the first and the coupling takes the last
+    --- two, leaving no middle to hang. It drew taut and shook as the pins disagreed.
+    initialLength = 25.0,
 
     --- Slack, as a fraction of the distance between the two ends.
     ---

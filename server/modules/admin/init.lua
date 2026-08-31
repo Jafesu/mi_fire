@@ -622,10 +622,16 @@ end
 --- the same job live, and it prints the config line to paste back when it looks right.
 ---
 ---     /fire nozzlegrip show                  what it is now
+---     /fire nozzlegrip aim                   hold the aim pose and edit that placement
+---     /fire nozzlegrip carry                 let go, and edit the carrying placement
 ---     /fire nozzlegrip nudge <axis> <amount> one axis at a time: x y z rx ry rz
 ---     /fire nozzlegrip bone <left|right>     which hand
 ---     /fire nozzlegrip <x> <y> <z> <rx> <ry> <rz>   all six at once
 ---     /fire nozzlegrip off                   hand placement back to the game
+---
+--- `aim` holds the aim control down, because tuning the aiming placement otherwise means
+--- holding right mouse, typing, releasing to look, and re-aiming -- per nudge, of which there
+--- are dozens.
 ---
 --- Per-axis because finding a placement means changing one thing and seeing what moved.
 --- Retyping six numbers to alter one of them is how people stop bothering.
@@ -643,7 +649,16 @@ subcommands.nozzlegrip = function(source, args)
 
     if not action or action == 'show' then
         TriggerClientEvent('mi_fire:client:nozzleGrip', source, 'show')
-        return reply(source, 'nudge one axis at a time: /fire nozzlegrip nudge z 0.02')
+        return reply(source,
+            'nudge one axis at a time: /fire nozzlegrip nudge z 0.02. '
+            .. '"aim" holds the aim pose so you can tune it without holding the button.')
+    end
+
+    if action == 'aim' or action == 'carry' then
+        TriggerClientEvent('mi_fire:client:nozzleGrip', source, action)
+        return reply(source, action == 'aim'
+            and 'holding aim -- nudges now edit the aiming placement'
+            or 'aim released -- nudges now edit the carrying placement')
     end
 
     if action == 'bone' then
@@ -680,7 +695,7 @@ subcommands.nozzlegrip = function(source, args)
 
         if not value then
             return reply(source,
-                ('"%s" is neither a number nor one of show, nudge, bone, off')
+                ('"%s" is neither a number nor one of show, aim, carry, nudge, bone, off')
                     :format(tostring(args[i])), 'error')
         end
 

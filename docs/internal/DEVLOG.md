@@ -2236,3 +2236,40 @@ unasked.
 - The aiming placement has never been set.
 - Still nothing fired.
 
+---
+
+## 2026-08-31 (twelfth) — hold the aim, so the aim can be tuned
+
+**Scope:** tuning the aiming placement was unworkable by hand.
+
+**Changed:**
+
+- `client/modules/hose/init.lua`, `server/modules/admin/init.lua` — `/fire nozzlegrip aim` and
+  `carry`.
+
+**Decisions:**
+
+- **`aim` holds the aim control down.** Editing the aiming placement otherwise means holding
+  right mouse, typing a command, releasing to read the result, and re-aiming -- per nudge, of
+  which there are dozens. `SetControlNormal(0, 25, 1.0)` every frame is how a control is held
+  from script; there is no set-and-forget native.
+
+  The stance switch and the pose lock are the same action on purpose. Two commands -- one to
+  choose which placement you are editing and another to hold the pose -- is two things to get out
+  of step, and the failure would be editing one set while looking at the other.
+
+- **It releases itself.** Dropping the line, or the resource stopping, clears the lock. A player
+  left holding the aim control with nothing in their hands has no way to work out why they are
+  stuck, and would reasonably blame the server rather than a tuning command they ran ten minutes
+  earlier.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1055 passed, 0 failed**.
+- **Not** tested in game.
+
+**Open:**
+
+- Both placements still unset.
+- Still nothing fired.
+

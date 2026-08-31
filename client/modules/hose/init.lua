@@ -239,9 +239,36 @@ local appliedTo = nil
 
 local GRIP_KVP = 'mi_fire:nozzlegrip'
 
+--- Holds the aim pose so it can be tuned with both hands free.
+---
+--- Tuning the aiming placement otherwise means holding right mouse, typing a command, releasing
+--- to read the result, and re-aiming -- per nudge, of which there are dozens. So the aim control
+--- gets held down for us instead.
+---
+--- `INPUT_AIM` is control 25. Pressing it every frame is how you hold a control from script;
+--- there is no "set and forget" native for it.
+local AIM_CONTROL = 25
+local aimLock = false
+
 ---@return string
 local function aimingNow()
+    if aimLock then return 'aim' end
     return IsPlayerFreeAiming(PlayerId()) and 'aim' or 'carry'
+end
+
+---@param on boolean
+local function setAimLock(on)
+    if aimLock == on then return end
+    aimLock = on
+
+    if not on then return end
+
+    CreateThread(function()
+        while aimLock do
+            SetControlNormal(0, AIM_CONTROL, 1.0)
+            Wait(0)
+        end
+    end)
 end
 
 --- Survives a restart, and more to the point a crash.
@@ -576,6 +603,10 @@ local function reconcileNozzle()
         end
 
     elseif nozzleEquipped or heldNozzle then
+        -- Whatever was being tuned, it is over: a player left holding the aim control with
+        -- nothing in their hands cannot work out why they are stuck.
+        setAimLock(false)
+
         if nozzleEquipped then
             unequipNozzle(cache.ped)
             clearNozzleHold(cache.ped)
@@ -1431,17 +1462,33 @@ RegisterNetEvent('mi_fire:client:nozzleGrip', function(action, axis, amount)
     end
 
     local function report()
-        say(('editing the %s placement (aim to switch)'):format(aimingNow()))
+        say(('editing the %s placement (%s)'):format(aimingNow(),
+            aimLock and 'aim held -- "carry" to let go' or 'aim, or "aim", to switch'))
         say(line('nozzleGrip', grips.carry))
         say(line('nozzleGripAiming', grips.aim))
     end
 
     if action == 'off' then
         grips.carry, grips.aim = nil, nil
+        setAimLock(false)
         saveGrips()
         applyNozzleGrip(cache.ped, true)
         say('cleared both placements -- back to the game\'s own')
         return
+    end
+
+    if action == 'aim' or action == 'carry' then
+        setAimLock(action == 'aim')
+        applyNozzleGrip(cache.ped, true)
+
+        if action == 'aim' then
+            say('aim held -- nudges now edit the aiming placement. '
+                .. '"/fire nozzlegrip carry" to let go.')
+        else
+            say('aim released -- nudges now edit the carrying placement')
+        end
+
+        return report()
     end
 
     if action == 'show' then
@@ -1541,6 +1588,7 @@ AddEventHandler('onResourceStop', function(resource)
         unequipNozzle(cache.ped)
         clearNozzleHold(cache.ped)
     end
+    setAimLock(false)
 end)
 
 --- The pump panel, until Phase 4's NUI replaces it.

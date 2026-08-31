@@ -2081,3 +2081,58 @@ diagnostic that caught it was luck.
 
 **Next:** the grip, then water.
 
+---
+
+## 2026-08-31 (ninth) — the animation meta, shipped as a deliberate experiment
+
+**Scope:** the minigun stance, done the way the game actually does it.
+
+**Changed:**
+
+- `data/weaponanimations.meta` — one entry, `WEAPON_MINOZZLE`, mapped to the minigun's clip sets.
+- `fxmanifest.lua` — declared with `data_file` and listed in `files`.
+- All three metas — double hyphens removed from comments.
+- `conventions_spec` — shipped game data must be well-formed XML.
+
+**Decisions:**
+
+- **This is the correct fix, and it is a gamble.** Mapping a weapon to a stance is what
+  `weaponanimations.meta` is for; three attempts to force it with natives all T-posed. The
+  gamble is that `CWeaponAnimationsSets` is a single global structure and nobody here knows
+  whether FiveM merges a second one or replaces it outright.
+
+  If it merges, only the nozzle is affected. If it replaces, every weapon not listed in our file
+  loses its animations, server-wide. The evidence on this machine points at replacement -- both
+  other resources that ship one carry a full 13,000 line copy of the vanilla data, which is only
+  necessary if it replaces -- but they may equally have copied that from a tutorial without
+  testing. Taken with the user, who owns the server and can restart it, and the revert is one
+  line in the manifest.
+
+  **What to check:** draw a pistol, a rifle, and anything from ThrowBag. Fine means it merges.
+  Wrong means it replaces, and revert.
+
+- **A double hyphen is illegal inside an XML comment, and all three metas had one.** The comments
+  in these files are long prose, where `--` is the natural way to punctuate an aside. Every one
+  of them was invalid XML on first write and would have been handed to the game that way.
+
+  Worth a test rather than a fix because of the cost. These files are not read by this resource;
+  they go to the game, which parses them itself and is not obliged to explain a refusal. A weapon
+  that silently never appears -- or a weapon file that takes other weapons down with it -- is a
+  long way from an unclosed comment in a paragraph nobody was reading. `conventions_spec` now
+  walks every comment in every shipped meta, mutation tested by putting a hyphen back.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1055 passed, 0 failed** (was 1045).
+- All three metas parse as XML under a real parser, not just the new Lua check.
+- The XML check was mutation tested: a reintroduced `--` fails by file name.
+- **Not** tested in game. This is the run that decides whether the file merges.
+
+**Open:**
+
+- The experiment itself. Revert is one `data_file` line.
+- `/fire nozzlegrip` still unrun.
+- Still nothing fired.
+
+**Next:** whether other weapons survive.
+

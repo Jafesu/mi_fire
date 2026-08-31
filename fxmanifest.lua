@@ -121,11 +121,23 @@ dependencies {
 data_file 'WEAPONINFO_FILE' 'data/weapons.meta'
 data_file 'WEAPON_METADATA_FILE' 'data/weaponarchetypes.meta'
 
+--- How the nozzle is held. **Experimental -- this line is the revert switch.**
+---
+--- `CWeaponAnimationsSets` is a single global structure, and nobody here is certain whether
+--- FiveM merges a second one into the game's or replaces it outright. If it merges, only
+--- WEAPON_MINOZZLE is affected. If it replaces, every weapon not listed in our file loses its
+--- animations -- server-wide and very visible.
+---
+--- Delete this line and the matching entry in `files` to undo it completely. The stance falls
+--- back to the weapon's own, which is the fire extinguisher's, and that works.
+data_file 'WEAPON_ANIMATIONS_FILE' 'data/weaponanimations.meta'
+
 ui_page 'web/index.html'
 
 files {
     'data/weapons.meta',
     'data/weaponarchetypes.meta',
+    'data/weaponanimations.meta',
     'install/migrations/*.sql',
     'web/index.html',
     'web/sounds.js',

@@ -6,7 +6,7 @@
   This is what makes `w_mi_nozzle` exist as far as the game is concerned. A weapon model without
   one is inert: `CreateWeaponObject` returns 0 and the client looks exactly as though the .ydr
   were missing, however many times anyone reconnects. That symptom cost a round of testing once
-  already -- see ASSET-001.
+  already – see ASSET-001.
 
   An archetype is only needed because this is a *new* model. A weapon that reuses a base game
   model needs none.

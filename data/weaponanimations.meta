@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+  How WEAPON_MINOZZLE is held.
+
+  A nozzle on a charged line is braced at the waist in both hands, which is the minigun stance.
+  Mapping a weapon to a stance is exactly what this file is for, and it is the correct fix after
+  three attempts to force it with natives all failed:
+
+      SetPedMovementClipset(ped, 'weapons@heavy@minigun')   T-pose
+      SetPedStrafeClipset(ped, 'weapons@heavy@minigun')     holds right, T-poses on walking
+      both together                                          still T-poses on walking
+
+  The clip set names below are the minigun's own, taken from the game's data. The name was never
+  the problem – the natives simply do not reproduce what the weapon animation system does with
+  it, which is unsurprising once you see that a weapon entry sets a motion clip set, a weapon
+  clip set, a filter, and jump and fall clip sets together.
+
+  ============================================================================================
+  THIS FILE IS AN EXPERIMENT, AND IT MAY BREAK EVERY OTHER WEAPON ON THE SERVER.
+  ============================================================================================
+
+  `CWeaponAnimationsSets` is a single global structure. If FiveM **merges** this into the game's
+  set, only WEAPON_MINOZZLE is affected and everything else is untouched. If it **replaces** it,
+  every weapon that is not listed here loses its animations – which is very visible and affects
+  everyone.
+
+  The evidence on this machine points at replacement: both other resources here that ship one of
+  these (SmartHose, ThrowBag) carry a full 13,000 line copy of the vanilla data with their own
+  entry added, which is only necessary if the file replaces. They may equally have copied that
+  approach from a tutorial without testing it. Nobody seems to know, so this settles it.
+
+  TO REVERT: delete the `data_file 'WEAPON_ANIMATIONS_FILE'` line from `fxmanifest.lua` and its
+  entry in `files`, then restart the resource. Nothing else depends on this file – the stance
+  falls back to the weapon's default, which is the fire extinguisher's, and that works.
+
+  WHAT TO CHECK, beyond whether the nozzle looks right: draw a pistol, a rifle, and anything from
+  ThrowBag. If those are fine, it merges. If they T-pose or hold wrongly, it replaces – revert.
+-->
+<CWeaponAnimationsSets>
+  <WeaponAnimationsSets>
+    <Item key="Default">
+      <Fallback />
+      <WeaponAnimations>
+        <Item key="WEAPON_MINOZZLE">
+          <CoverMovementClipSetHash />
+          <CoverMovementExtraClipSetHash />
+          <CoverAlternateMovementClipSetHash />
+          <CoverWeaponClipSetHash />
+          <MotionClipSetHash>weapons@heavy@minigun</MotionClipSetHash>
+          <MotionFilterHash>BothArms_filter</MotionFilterHash>
+          <MotionCrouchClipSetHash />
+          <MotionStrafingClipSetHash />
+          <MotionStrafingStealthClipSetHash />
+          <MotionStrafingUpperBodyClipSetHash />
+          <WeaponClipSetHash>weapons@heavy@minigun</WeaponClipSetHash>
+          <WeaponClipSetStreamedHash />
+          <WeaponClipSetHashInjured />
+          <WeaponClipSetHashStealth />
+          <WeaponClipSetHashHiCover />
+          <AlternativeClipSetWhenBlocked />
+          <ScopeWeaponClipSet />
+          <AlternateAimingStandingClipSetHash />
+          <AlternateAimingCrouchingClipSetHash />
+          <FiringVariationsStandingClipSetHash />
+          <FiringVariationsCrouchingClipSetHash />
+          <AimTurnStandingClipSetHash />
+          <AimTurnCrouchingClipSetHash />
+          <MeleeClipSetHash />
+          <MeleeVariationClipSetHash />
+          <MeleeTauntClipSetHash />
+          <MeleeSupportTauntClipSetHash />
+          <MeleeStealthClipSetHash />
+          <ShellShockedClipSetHash />
+          <JumpUpperbodyClipSetHash>MOVE_JUMP@WEAPONS@RIFLE</JumpUpperbodyClipSetHash>
+          <FallUpperbodyClipSetHash>MOVE_FALL@WEAPONS@RIFLE</FallUpperbodyClipSetHash>
+          <FromStrafeTransitionUpperBodyClipSetHash>weapons@rifle@</FromStrafeTransitionUpperBodyClipSetHash>
+          <SwapWeaponFilterHash />
+          <SwapWeaponInLowCoverFilterHash />
+          <AnimFireRateModifier value="1.000000" />
+          <AnimBlindFireRateModifier value="1.000000" />
+          <AnimWantingToShootFireRateModifier value="-1.000000" />
+          <UseFromStrafeUpperBodyAimNetwork value="true" />
+          <AimingDownTheBarrel value="false" />
+          <WeaponSwapData ref="SWAP_DEFAULT" />
+          <AimGrenadeThrowNormalClipsetHash />
+          <AimGrenadeThrowAlternateClipsetHash />
+        </Item>
+      </WeaponAnimations>
+    </Item>
+  </WeaponAnimationsSets>
+</CWeaponAnimationsSets>

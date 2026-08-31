@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <!--
-  WEAPON_MINOZZLE -- the fire hose nozzle.
+  WEAPON_MINOZZLE – the fire hose nozzle.
 
   A weapon rather than a prop, because a nozzle sprays and a prop cannot be fired. Being a
   weapon is also what supplies the two-handed stance and the aiming, which is what holding a
   charged line actually looks like.
 
-  Everything about how it behaves is inherited from the base game fire extinguisher --
+  Everything about how it behaves is inherited from the base game fire extinguisher –
   AMMO_FIREEXTINGUISHER, FIRE_EXT_STRAFE, GROUP_FIREEXTINGUISHER, DamageType
   FIRE_EXTINGUISHER, FireType VOLUMETRIC_PARTICLE. Those are Rockstar's own identifiers, so
   this file defines a new weapon without carrying anyone else's content. The only thing that is

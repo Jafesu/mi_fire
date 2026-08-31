@@ -287,6 +287,63 @@ return function(t)
 
     -- -----------------------------------------------------------------------
 
+    t.describe('shipped game data is well-formed XML')
+
+    -- A double hyphen is illegal inside an XML comment, and the comments in these files are
+    -- long and full of prose, where "--" is the natural way to punctuate an aside. Every meta
+    -- here failed on it at first write.
+    --
+    -- It is worth a test because of what an invalid meta costs. These files are not read by
+    -- this resource -- they are handed to the game, which parses them itself and is not obliged
+    -- to explain a refusal. A weapon that does not appear, or worse a weapon file that takes
+    -- other weapons down with it, is a long way from an unclosed comment in a paragraph nobody
+    -- was reading.
+    do
+        local metas = {
+            'data/weapons.meta',
+            'data/weaponarchetypes.meta',
+            'data/weaponanimations.meta',
+        }
+
+        for _, path in ipairs(metas) do
+            local source = read(path)
+
+            t.ok(source ~= nil, ('%s exists'):format(path))
+
+            if source then
+                t.ok(source:find('^%s*<%?xml', 1) ~= nil,
+                    ('%s starts with an XML declaration'):format(path))
+
+                -- Walk the comments and check the inside of each.
+                local bad = nil
+                local pos = 1
+
+                while true do
+                    local openAt = source:find('<!--', pos, true)
+                    if not openAt then break end
+
+                    local closeAt = source:find('-->', openAt + 4, true)
+                    if not closeAt then
+                        bad = 'unterminated comment'
+                        break
+                    end
+
+                    local body = source:sub(openAt + 4, closeAt - 1)
+                    if body:find('--', 1, true) then
+                        bad = 'a double hyphen inside a comment'
+                        break
+                    end
+
+                    pos = closeAt + 3
+                end
+
+                t.equal(bad, nil, ('%s has no illegal comment content'):format(path))
+            end
+        end
+    end
+
+    -- -----------------------------------------------------------------------
+
     t.describe('the nozzle weapon agrees across every file that names it')
 
     -- Four files have to say the same thing for a custom weapon to load, and nothing in Lua

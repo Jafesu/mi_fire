@@ -130,7 +130,21 @@
           <FirstPersonBulletBendingZoomedRadius value="0.000000" />
           <Fx>
             <EffectGroup>WEAPON_EFFECT_GROUP_PISTOL_SMALL</EffectGroup>
-            <FlashFx />
+
+            <!--
+              FireType VOLUMETRIC_PARTICLE **requires** this to name a real particle, and leaving
+              it empty crashes the game on the first trigger pull. Natively, with no script error
+              and no warning: the game goes looking for a particle that is not there.
+
+              It was empty here on the reasoning that mi_fire draws its own water and the weapon
+              therefore needed no effect of its own. That reasoning was wrong, and it cost a
+              crash that looked for a while like it belonged to the water code.
+
+              `weap_extinguisher` is the base game's extinguisher spray. The two chance values
+              below are zero, so it never actually renders – the field has to be populated
+              regardless of whether it is ever used, which is the whole trap.
+            -->
+            <FlashFx>weap_extinguisher</FlashFx>
             <FlashFxAlt />
             <MuzzleSmokeFx />
             <MuzzleSmokeFxMinLevel value="0.000000" />
@@ -138,7 +152,7 @@
             <MuzzleSmokeFxDecPerSec value="0.000000" />
             <ShellFx />
             <TracerFx />
-            <PedDamageHash>NONE</PedDamageHash>
+            <PedDamageHash>BulletSmall</PedDamageHash>
             <TracerFxChanceSP value="0.000000" />
             <TracerFxChanceMP value="0.000000" />
             <FlashFxChanceSP value="0.000000" />

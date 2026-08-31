@@ -2505,3 +2505,69 @@ settles the last doubt about that file.
 - The bisect still has to be run. `/fire nozzlestream off` and pull the trigger: still crashing
   means the particle is innocent and the answer is in the water event or the control handling.
 
+---
+
+## 2026-08-31 (seventeenth) — the crash was an empty FlashFx
+
+**Scope:** found, and it was in `data/weapons.meta` the whole time.
+
+**What actually settled it:** the observation that it crashes with an **uncharged, uncoupled**
+line. That single fact demolished two days of reasoning in one sentence. The water thread requires
+`state == 'charged'`, `gpm > 0`, `usable` and being the nozzle holder before it does anything at
+all -- so with an uncharged line there is no particle, no raycast, no water event and no control
+handling. None of the code being investigated was running.
+
+Which left only one thing that happens on a click with a nozzle in hand: **firing the weapon**.
+
+**The bug:**
+
+```xml
+<FireType>VOLUMETRIC_PARTICLE</FireType>
+...
+<FlashFx />          <!-- empty -->
+```
+
+`VOLUMETRIC_PARTICLE` emits a particle on every shot and takes its name from `FlashFx`. Empty
+sends the game looking for something that is not there, and it goes down natively on the first
+trigger pull. The working reference has `<FlashFx>weap_extinguisher</FlashFx>` -- with both
+chance values at zero, so it never renders. **The field has to be populated whether or not it is
+ever used**, which is the entire trap.
+
+It was left empty deliberately, on the reasoning that mi_fire draws its own water and the weapon
+needed no effect of its own. That reasoning was wrong, and it was written into a comment as if it
+were considered.
+
+**Three wrong guesses, and what each cost:**
+
+1. The particle on the weapon entity. Plausible, well argued, and irrelevant -- it cannot run on
+   an uncharged line.
+2. The raycast. Ruled out correctly, by finding the same native already proven in
+   `client/modules/placement/init.lua`.
+3. Everything downstream of the trigger. All of it in the water path, none of it reachable.
+
+The dump was read properly and said "native, no script error", which was true and pointed
+nowhere, because *every* candidate was native. What was missing was not more analysis of the
+dump; it was the one observation that narrows the set -- and it came from the person who could
+press the button.
+
+**Kept anyway:** the particle now attaches to the hand bone rather than the weapon entity, and a
+-1 bone index cannot reach the native. Neither was the crash, both are better.
+
+**Changed:**
+
+- `data/weapons.meta` — `FlashFx` names a particle; `PedDamageHash` matches the reference.
+- `tools/tests/conventions_spec.lua` — a volumetric weapon must name the particle it fires.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1096 passed, 0 failed**.
+- Mutation tested: restoring `<FlashFx />` fails both new assertions by name. The test catches
+  the exact form that crashed.
+- The XML comment written *for this fix* contained a double hyphen and was invalid until the
+  existing check caught it, which is a reasonable advert for that test.
+
+**Open:**
+
+- Whether it actually stops crashing. Nothing here is verified in game.
+- The stream particle offsets are still zero and unfound.
+

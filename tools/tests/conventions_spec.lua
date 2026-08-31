@@ -385,6 +385,40 @@ return function(t)
 
     -- -----------------------------------------------------------------------
 
+    t.describe('a volumetric weapon names the particle it fires')
+
+    -- This one crashed the game. `FireType VOLUMETRIC_PARTICLE` makes the game emit a particle
+    -- on every shot, and it takes the name from `FlashFx`. An empty `FlashFx` sends it looking
+    -- for something that is not there, and it goes down natively on the first trigger pull --
+    -- no script error, no warning, nothing in the log but a stack of game addresses.
+    --
+    -- It was left empty deliberately, on the reasoning that mi_fire draws its own water and the
+    -- weapon needed no effect of its own. The field has to be populated whether or not it ever
+    -- renders; the two chance values beside it are what decide that.
+    --
+    -- Nothing else in this repository could have caught it: the XML is valid, the weapon loads,
+    -- and the fault only appears when someone pulls the trigger.
+    do
+        local weapons = read('data/weapons.meta') or ''
+        local fireType = weapons:match('<FireType>([%w_]+)</FireType>')
+
+        if fireType == 'VOLUMETRIC_PARTICLE' then
+            local flash = weapons:match('<FlashFx>([^<]*)</FlashFx>')
+
+            t.ok(flash ~= nil and flash:gsub('%s', '') ~= '',
+                'FireType VOLUMETRIC_PARTICLE has a FlashFx particle to fire')
+        end
+
+        -- A self-closing `<FlashFx />` is the shape the empty one actually took, and it would
+        -- slip past a match on the paired form above.
+        if fireType == 'VOLUMETRIC_PARTICLE' then
+            t.equal(weapons:find('<FlashFx%s*/>'), nil,
+                'and it is not the self-closing empty form')
+        end
+    end
+
+    -- -----------------------------------------------------------------------
+
     t.describe('the nozzle weapon agrees across every file that names it')
 
     -- Four files have to say the same thing for a custom weapon to load, and nothing in Lua

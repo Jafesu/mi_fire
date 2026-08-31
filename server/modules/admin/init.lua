@@ -549,12 +549,17 @@ subcommands.hose = function(source, args)
                 line.crewRequired or 1, line.gpm or 0, tostring(line.sourceNet))
     end
 
-    if #rows == 0 then return reply(source, 'no lines out') end
+    table.insert(rows, 1, '--- what the SERVER holds ---')
+
+    if #rows == 1 then rows[#rows + 1] = '  no lines out' end
 
     rows[#rows + 1] = 'fire hose drop   -- put your own line down'
     rows[#rows + 1] = 'fire hose clear  -- remove every line'
 
     replyList(source, rows)
+
+    -- The client's half, in the same block. The two disagreeing is the whole bug class here.
+    TriggerClientEvent('mi_fire:client:diagnoseHoses', source)
 end
 
 --- `/fire perms` -- why you can or cannot use these commands.

@@ -56,7 +56,24 @@ local function publicOf(line)
         sourceNet = line.sourceNet,
         sourcePort = line.sourcePort,
         nozzleHolder = line.nozzleHolder,
-        crew = line.crew,
+
+        -- A **list** of server ids, not the set the server keeps. `{ [3] = true }` is a table
+        -- with a sparse integer key, and how that survives the trip to a client depends on
+        -- which key it happens to be -- a single entry keyed 1 can arrive as an array. A list
+        -- of numbers has one meaning.
+        crew = (function()
+            local ids = {}
+            for id in pairs(line.crew or {}) do ids[#ids + 1] = id end
+            table.sort(ids)
+            return ids
+        end)(),
+
+        crewCount = (function()
+            local count = 0
+            for _ in pairs(line.crew or {}) do count = count + 1 end
+            return count
+        end)(),
+
         crewRequired = line.crewRequired,
         anchors = line.anchors,
     }

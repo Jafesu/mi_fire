@@ -40,6 +40,22 @@ local drawn = {}
 --- The line this client is on, if any.
 local mine = nil
 
+--- Is this server id on this line?
+---
+--- `crew` arrives as a list rather than a set, so this is a scan. Crews are three or four
+--- people; the alternative was a table whose keys change shape depending on which server ids
+--- happen to be in it.
+---@param line table
+---@param serverId integer
+---@return boolean
+local function onCrew(line, serverId)
+    for i = 1, #(line.crew or {}) do
+        if line.crew[i] == serverId then return true end
+    end
+
+    return false
+end
+
 local texturesLoaded = false
 
 -- ---------------------------------------------------------------------------
@@ -328,7 +344,7 @@ RegisterNetEvent('mi_fire:client:hoseLine', function(id, line)
     local previous = lines[id]
     lines[id] = line
 
-    if line.crew and line.crew[GetPlayerServerId(PlayerId())] then
+    if onCrew(line, GetPlayerServerId(PlayerId())) then
         mine = id
     elseif mine == id then
         mine = nil
@@ -548,39 +564,82 @@ CreateThread(function()
     Util.debug('hose', 'hose interactions registered')
 end)
 
---- Backing up someone else's line, and picking up a dropped nozzle.
+--- Working someone else's line.
 ---
---- On the ped rather than on the hose, because a rope is not a targetable entity -- you back
---- up the firefighter, which is also how it works on a real fireground.
+--- On the ped rather than on the hose, because a rope is not a targetable entity -- you back up
+--- the firefighter, which is also how it works on a real fireground.
+---
+--- Note the direction, which is not obvious and was not: **the person without a line targets
+--- the person with one.** Joining a crew is the joiner's act. Someone already on a line who
+--- looks at a colleague sees nothing, because there is nothing for them to do to them.
 CreateThread(function()
     while not MIFire.ready do Wait(250) end
+
+    --- The line a targeted player is on, if any.
+    ---@param entity integer
+    ---@return string|nil id
+    ---@return table|nil line
+    local function lineOf(entity)
+        if not entity or entity == 0 or not IsPedAPlayer(entity) then return nil end
+
+        local index = NetworkGetPlayerIndexFromPed(entity)
+        if not index or index == -1 then return nil end
+
+        local serverId = GetPlayerServerId(index)
+
+        for id, line in pairs(lines) do
+            if onCrew(line, serverId) then return id, line end
+        end
+
+        return nil
+    end
 
     Target.addGlobalPed({
         {
             name = 'mi_fire:backupLine',
             icon = 'people-group',
             label = 'Back up this line',
-            distance = 2.0,
+            distance = 2.5,
             canInteract = function(entity)
                 if mine then return false end
-                if not IsPedAPlayer(entity) then return false end
-
-                local other = GetPlayerServerId(NetworkGetPlayerIndexFromPed(entity))
-
-                for _, line in pairs(lines) do
-                    if line.crew and line.crew[other] then return true end
-                end
-
-                return false
+                return lineOf(entity) ~= nil
             end,
             onSelect = function(data)
-                local other = GetPlayerServerId(NetworkGetPlayerIndexFromPed(data.entity))
+                local id = lineOf(data.entity)
+                if id then TriggerServerEvent('mi_fire:server:joinHoseCrew', id) end
+            end,
+        },
+        {
+            name = 'mi_fire:takeNozzle',
+            icon = 'hand-holding-droplet',
+            label = 'Take the nozzle',
+            distance = 2.5,
+            canInteract = function(entity)
+                local id, line = lineOf(entity)
 
-                for id, line in pairs(lines) do
-                    if line.crew and line.crew[other] then
-                        return TriggerServerEvent('mi_fire:server:joinHoseCrew', id)
-                    end
-                end
+                -- Only when nobody has it. Taking a working nozzle out of someone's hands is
+                -- not a thing you do to a colleague mid-attack.
+                return id ~= nil and line.nozzleHolder == nil
+            end,
+            onSelect = function(data)
+                local id = lineOf(data.entity)
+                if id then TriggerServerEvent('mi_fire:server:takeNozzle', id) end
+            end,
+        },
+    })
+
+    --- Leaving is done to yourself, so it goes on your own ped.
+    Target.addGlobalPed({
+        {
+            name = 'mi_fire:leaveLine',
+            icon = 'right-from-bracket',
+            label = 'Leave this line',
+            distance = 2.5,
+            canInteract = function(entity)
+                return mine ~= nil and entity == cache.ped
+            end,
+            onSelect = function()
+                TriggerServerEvent('mi_fire:server:leaveHose')
             end,
         },
     })
@@ -632,6 +691,46 @@ end)
 ---
 --- The escape hatch for a line that has gone wrong. It does not ask the server first, because
 --- the case it exists for is exactly the one where the two disagree.
+--- What this client believes about hose lines.
+---
+--- The server's list and a client's list disagreeing is the whole bug class here -- "back up
+--- this line" not appearing looked like a rule refusing, and was a table arriving in a shape
+--- the client could not read. Asking only the server could never have shown that.
+RegisterNetEvent('mi_fire:client:diagnoseHoses', function()
+    local me = GetPlayerServerId(PlayerId())
+    local lineCount = 0
+    for _ in pairs(lines) do lineCount = lineCount + 1 end
+
+    local out = {
+        '--- what the CLIENT sees ---',
+        ('you are server id %d; you are on line: %s'):format(me, tostring(mine)),
+        ('lines known: %d, ropes drawn: %d'):format(lineCount, (function()
+            local n = 0
+            for _ in pairs(drawn) do n = n + 1 end
+            return n
+        end)()),
+    }
+
+    for id, line in pairs(lines) do
+        local ids = {}
+        for i = 1, #(line.crew or {}) do ids[#ids + 1] = tostring(line.crew[i]) end
+
+        out[#out + 1] = ('  %s  %s  crew [%s] of %d  nozzle %s  %s')
+            :format(id, line.state, table.concat(ids, ','),
+                line.crewRequired or 0, tostring(line.nozzleHolder),
+                onCrew(line, me) and 'YOU ARE ON IT' or '')
+    end
+
+    if lineCount == 0 then
+        out[#out + 1] = '  none -- if the server says otherwise, the sync is not arriving'
+    end
+
+    for i = 1, #out do
+        TriggerEvent('chat:addMessage', { args = { 'mi_fire', out[i] } })
+        print('[mi_fire] ' .. out[i])
+    end
+end)
+
 RegisterNetEvent('mi_fire:client:clearHoseProps', function()
     for id in pairs(drawn) do undraw(id) end
 

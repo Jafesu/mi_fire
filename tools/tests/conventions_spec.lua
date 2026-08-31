@@ -217,6 +217,31 @@ return function(t)
 
     -- -----------------------------------------------------------------------
 
+    t.describe('admin subcommands read their arguments from the right place')
+
+    -- `/fire` passes the whole line, so `args[1]` is the subcommand name and a subcommand's own
+    -- first argument is `args[2]`. Getting that wrong does not error: the value read is simply
+    -- the subcommand's own name, so every call falls into the usage branch and prints help. It
+    -- looks exactly like mistyping the command, which is why it survived being run and read.
+    do
+        local source = read('server/modules/admin/init.lua') or ''
+        local split = source:find('function Admin.handle', 1, true)
+
+        t.ok(split ~= nil, 'the dispatcher is where it is expected')
+
+        if split then
+            -- Only the dispatcher itself may look at args[1]; it is the one thing that
+            -- legitimately wants the subcommand name.
+            local definitions = source:sub(1, split - 1)
+            local offender = findCode(definitions, 'args%[1%]')
+
+            t.equal(offender, nil,
+                'no subcommand reads args[1] -- that is the subcommand name, not an argument')
+        end
+    end
+
+    -- -----------------------------------------------------------------------
+
     t.describe('the nozzle is equipped, not glued to the hand')
 
     -- `CreateWeaponObject` makes a world object out of a weapon hash and it can be attached to

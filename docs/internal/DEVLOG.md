@@ -2021,3 +2021,63 @@ diagnostic that caught it was luck.
 
 **Next:** water.
 
+---
+
+## 2026-08-31 (eighth) — the grip command never parsed, and the stance is given up on
+
+**Scope:** fifth in-game run. Two failures, one embarrassing and one worth conceding.
+
+**Changed:**
+
+- `server/modules/admin/init.lua` — `nozzlegrip` and `nozzlehold` read `args[2]`, not `args[1]`.
+- `config/hose.lua` — both clipsets off.
+- `tools/tests/conventions_spec.lua` — no subcommand may read `args[1]`.
+
+**Decisions:**
+
+- **`/fire nozzlegrip right 0 0 0 0 0 0` printed its own usage text, every time.** `/fire`
+  passes the whole line, so `args[1]` is the subcommand name and a subcommand's first argument is
+  `args[2]`. Every other subcommand in the file already did this correctly; the two added
+  yesterday did not.
+
+  The reason it survived being written and read is that it cannot error. The value read is simply
+  the string `nozzlegrip`, which fails the `left|right` check, which prints the usage -- which
+  looks exactly like mistyping the command. `conventions_spec` now forbids `args[1]` anywhere
+  outside the dispatcher, and the check was mutation tested: reintroducing it fails by name.
+
+- **The minigun stance is given up on, and both clipsets are off.** What was tried:
+
+  | Attempt | Result |
+  |---|---|
+  | `SetPedMovementClipset` with `weapons@heavy@minigun` | T-pose |
+  | `SetPedStrafeClipset` with the same | holds correctly, T-poses on walking |
+  | Both together | still T-poses on walking |
+
+  The name is not the problem -- it is what the game's own weaponanimations gives the minigun for
+  *both* `MotionClipSetHash` and `WeaponClipSetHash`. The natives do not reproduce what the
+  weapon animation system does with it, and three attempts is enough to stop guessing.
+
+  Without them the weapon's own stance applies, which is the fire extinguisher's: two hands,
+  pointed forward. Not the brace a charged line deserves, but it works. A firefighter holding a
+  nozzle slightly wrong beats one standing in a bind pose.
+
+- **What would actually work is a `weaponanimations.meta` entry**, because that is how the game
+  maps a weapon to a stance in the first place. Still not shipped: that file replaces the whole
+  vanilla animation set rather than merging, which is why both resources here that ship one carry
+  a 13,000 line copy, and a third would fight them -- including ThrowBag, which is installed. That
+  is a trade worth making deliberately, with the user, rather than sprung on a live server.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1045 passed, 0 failed**.
+- The `args[1]` check was mutation tested: putting it back fails the suite by name.
+- **Not** retested in game.
+
+**Open:**
+
+- `/fire nozzlegrip` has never actually run. It should work now.
+- The stance is the extinguisher's until someone decides about `weaponanimations.meta`.
+- Still nothing fired.
+
+**Next:** the grip, then water.
+

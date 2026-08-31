@@ -601,7 +601,8 @@ subcommands.nozzlehold = function(source, args)
         return reply(source, 'the console has no body to pose; run this in game', 'error')
     end
 
-    local clipset = args[1]
+    -- `args[2]`, not `args[1]`: the dispatcher passes the subcommand name as the first entry.
+    local clipset = args[2]
 
     if not clipset then
         return reply(source,
@@ -610,9 +611,9 @@ subcommands.nozzlehold = function(source, args)
             .. 'where names begin move_. "off" puts you back to normal.', 'error')
     end
 
-    TriggerClientEvent('mi_fire:client:nozzleHold', source, clipset, args[2])
+    TriggerClientEvent('mi_fire:client:nozzleHold', source, clipset, args[3])
     reply(source, ('trying "%s" as the %s clipset -- aim, and walk around')
-        :format(clipset, args[2] == 'move' and 'movement' or 'weapon'))
+        :format(clipset, args[3] == 'move' and 'movement' or 'weapon'))
 end
 
 --- `/fire nozzlegrip <left|right> <x> <y> <z> <rx> <ry> <rz>` -- move the nozzle in the hand.
@@ -626,12 +627,15 @@ subcommands.nozzlegrip = function(source, args)
         return reply(source, 'the console has no hands; run this in game', 'error')
     end
 
-    if args[1] == 'off' or args[1] == 'reset' then
+    -- `args[1]` is the subcommand name itself -- the dispatcher passes the whole line. Every
+    -- other subcommand here starts at `args[2]`, and this one did not, so "right" was compared
+    -- against "nozzlegrip" and every call printed the usage text.
+    if args[2] == 'off' or args[2] == 'reset' then
         TriggerClientEvent('mi_fire:client:nozzleGrip', source, nil)
         return reply(source, 'grip override cleared')
     end
 
-    local bone = args[1]
+    local bone = args[2]
 
     if bone ~= 'left' and bone ~= 'right' then
         return reply(source,
@@ -642,13 +646,13 @@ subcommands.nozzlegrip = function(source, args)
 
     local numbers = {}
 
-    for i = 2, 7 do
+    for i = 3, 8 do
         local value = tonumber(args[i])
 
         if not value then
             return reply(source,
                 ('argument %d ("%s") is not a number -- six are needed: x y z rx ry rz')
-                    :format(i, tostring(args[i])), 'error')
+                    :format(i - 1, tostring(args[i])), 'error')
         end
 
         numbers[#numbers + 1] = value

@@ -296,6 +296,32 @@ MIFireHose.visuals = {
     --- equipped and ox_inventory has nothing to strip.
     nozzleWeapon = 'WEAPON_MINOZZLE',
 
+    --- The carrying stance -- and the honest state of it.
+    ---
+    --- **Both clipsets are off, because setting either one T-posed the ped while walking.**
+    --- Without them the weapon's own stance applies, which is the fire extinguisher's: held in
+    --- two hands, pointed forward. Not the minigun brace that a charged line deserves, but it
+    --- works, and a firefighter holding a nozzle slightly wrong beats one in a bind pose.
+    ---
+    --- What was tried, so it is not tried again:
+    ---
+    --- - `SetPedMovementClipset(ped, 'weapons@heavy@minigun')` -- T-pose.
+    --- - `SetPedStrafeClipset(ped, 'weapons@heavy@minigun')` -- holds correctly, T-poses on
+    ---   walking.
+    --- - Both together -- still T-poses on walking.
+    ---
+    --- The name is right: `weapons@heavy@minigun` is what the game's own weaponanimations gives
+    --- the minigun for *both* `MotionClipSetHash` and `WeaponClipSetHash`. The natives simply do
+    --- not reproduce what the weapon animation system does with it.
+    ---
+    --- **The thing that would actually work is a `weaponanimations.meta` entry**, which is how
+    --- the game maps a weapon to its stance in the first place. It is not shipped because that
+    --- file *replaces* the game's whole animation set rather than merging -- which is why both
+    --- resources on this machine that ship one carry a 13,000 line copy of the vanilla data, and
+    --- why a third would fight them. That is a deliberate trade, not an oversight.
+    ---
+    --- `/fire nozzlehold <clipset|off> [move]` still applies one live, if a better name turns up.
+
     --- How a charged line is **held**, as a weapon clipset.
     ---
     --- A nozzle on a charged line is braced at the waist in both hands, which is the minigun
@@ -309,7 +335,8 @@ MIFireHose.visuals = {
     ---
     --- Try alternatives live with `/fire nozzlehold <clipset>`, and undo with
     --- `/fire nozzlehold off`.
-    nozzleStrafeClipset = 'weapons@heavy@minigun',
+    --- **Off, because every attempt at it T-posed.** See the note below.
+    nozzleStrafeClipset = nil,
 
     --- How the firefighter **walks** while carrying it, as a movement clipset.
     ---
@@ -319,7 +346,7 @@ MIFireHose.visuals = {
     --- nothing to fall back on, and walking T-posed.
     ---
     --- Try alternatives with `/fire nozzlehold <clipset> move`.
-    nozzleClipset = 'weapons@heavy@minigun',
+    nozzleClipset = nil,
 
     --- Where the nozzle sits in the hand.
     ---

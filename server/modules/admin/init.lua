@@ -483,12 +483,19 @@ end
 --- and a bad decal type returns 0 and prints nothing -- the same silent failure that made an
 --- invented particle name look like broken rendering for a whole session. So the value gets
 --- authored by looking at it.
-subcommands.decals = function(source)
+subcommands.decals = function(source, args)
     if source == 0 then
         return reply(source, 'the console has no client to draw on; run this in game', 'error')
     end
-    TriggerClientEvent('mi_fire:client:decalTest', source)
-    reply(source, 'candidates laid out ahead of you; they last two minutes')
+    -- `/fire decals sweep` walks a wide range of type IDs rather than the configured
+    -- shortlist. Worth having because "none of my guesses worked" and "the native is
+    -- refusing outright" look identical from the outside, and they need different fixes.
+    local sweep = args[2] == 'sweep'
+
+    TriggerClientEvent('mi_fire:client:decalTest', source, sweep)
+    reply(source, sweep
+        and 'sweeping every plausible type; markers last two minutes'
+        or 'candidates laid out ahead of you -- try "/fire decals sweep" if none appear')
 end
 
 --- `/fire scorch` -- how many burn marks exist, and clear them.
@@ -527,7 +534,7 @@ local USAGE = {
     'fire perms                           -- why you can or cannot use these',
     'fire render                          -- what your client is actually drawing',
     'fire gear                            -- why the truck has no gear options',
-    'fire decals                          -- find a working burn-mark decal type',
+    'fire decals [sweep]                  -- find a working burn-mark decal type',
     'fire scorch [clear]                  -- burn marks: count, or remove them all',
     'fire sizeup [id]                     -- read the smoke',
     'fire vent <action> [id]              -- force_door | take_window | vertical_vent | close_up',

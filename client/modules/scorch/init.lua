@@ -46,14 +46,34 @@ local function draw(id, mark)
 
     -- Projected straight down onto whatever is under the mark, so it takes the shape of the
     -- ground rather than floating at the height the node happened to die at.
+    -- Project onto whatever is actually under the mark. A node can die at head height on a
+    -- staircase, and a decal placed at that z projects onto nothing.
+    local z = mark.coords.z
+    local found, groundZ = GetGroundZFor_3dCoord(
+        mark.coords.x, mark.coords.y, mark.coords.z + 2.0, false)
+    if found then z = groundZ end
+
+    -- Timeout was -1.0 here, meaning "permanent". That is not obviously accepted -- the
+    -- parameter is milliseconds and a negative one may simply be rejected, which returns 0
+    -- exactly like a bad type ID does. A very large positive value asks for the same thing
+    -- without relying on a convention nothing here has confirmed. The server removes marks
+    -- when they are cleaned or age out, so this only has to outlast the lifetime.
+    local timeout = math.max(600000.0, (MIFireScorch.lifetimeMinutes or 180) * 60000.0)
+
+    -- Colour convention is unconfirmed on this build: the parameters are named as
+    -- coefficients but a good deal of working code passes 0-255. `/fire decals` reports
+    -- which this build accepts; `colourScale` applies the answer.
+    local scale = MIFireScorch.colourScale or 1.0
+
     local handle = AddDecal(
         MIFireScorch.decal,
-        mark.coords.x, mark.coords.y, mark.coords.z + 0.5,
+        mark.coords.x, mark.coords.y, z + 0.35,
         0.0, 0.0, -1.0,
         1.0, 0.0, 0.0,
         mark.size, mark.size,
-        colour.r or 0.16, colour.g or 0.15, colour.b or 0.14, alpha,
-        -1.0,          -- never times out on its own; the server decides when it goes
+        (colour.r or 0.16) * scale, (colour.g or 0.15) * scale, (colour.b or 0.14) * scale,
+        alpha * scale,
+        timeout,
         false, false, false)
 
     if handle and handle ~= 0 then
@@ -64,8 +84,11 @@ local function draw(id, mark)
     if not warnedAboutDecal then
         warnedAboutDecal = true
         Util.warn('AddDecal returned 0 for type %s -- no burn marks will appear. '
-            .. 'Run "/fire decals" to find a type that works on this build, then set '
-            .. 'MIFireScorch.decal in config/scorch.lua.', tostring(MIFireScorch.decal))
+            .. 'Run "/fire decals sweep" to find a type this build accepts, then set '
+            .. 'MIFireScorch.decal in config/scorch.lua. If the sweep accepts nothing at '
+            .. 'all, the native is refusing outright rather than rejecting the type, and '
+            .. 'MIFireScorch.enabled should go false until that is understood.',
+            tostring(MIFireScorch.decal))
     end
 end
 
@@ -209,41 +232,119 @@ end)
 --- guessing one that silently draws nothing is a failure mode this project has already paid
 --- for once. Same spirit as the offset finder: author the value by seeing it, not by trusting
 --- a comment.
-RegisterNetEvent('mi_fire:client:decalTest', function()
+--- Find a decal type -- and a parameter convention -- that actually draws on this build.
+---
+--- Rewritten after the first version produced nothing visible, which told us only that
+--- something was wrong and not which thing. There are three independent suspects and
+--- guessing between them is how a session gets burned:
+---
+---   1. the **type ID** does not exist on this build
+---   2. `rCoef/gCoef/bCoef` and `opacity` are **0-255**, not the 0-1 they are named for --
+---      in which case an opacity of 0.85 is 0.3% and invisible rather than absent
+---   3. a `timeout` of -1 is rejected rather than meaning "permanent"
+---
+--- So this sweeps rather than tests a hypothesis. Every accepted type is reported with its
+--- handle, drawn under a numbered marker you can walk to, and laid out in two rows: one in
+--- each colour convention. Whichever row you can see settles suspect 2, and which markers
+--- have something under them settles suspect 1.
+---@param sweep boolean Try a wide range of type IDs rather than the configured candidates.
+local function decalTest(sweep)
     local ped = cache.ped
     local origin = GetEntityCoords(ped)
     local forward = GetEntityForwardVector(ped)
+    local right = vec3(forward.y, -forward.x, 0.0)
 
-    local lines = { 'Decal candidates laid out ahead of you, left to right:' }
+    local types = MIFireScorch.decalCandidates
 
-    for i = 1, #MIFireScorch.decalCandidates do
-        local decal = MIFireScorch.decalCandidates[i]
-
-        -- Two metres apart along your facing, so they do not overlap.
-        local x = origin.x + forward.x * (i * 2.5)
-        local y = origin.y + forward.y * (i * 2.5)
-
-        local handle = AddDecal(decal, x, y, origin.z + 0.5,
-            0.0, 0.0, -1.0, 1.0, 0.0, 0.0,
-            1.8, 1.8,
-            0.16, 0.15, 0.14, 0.9,
-            120.0, false, false, false)
-
-        lines[#lines + 1] = ('  %d. type %s -- %s'):format(
-            i, tostring(decal),
-            (handle and handle ~= 0) and 'placed' or 'REJECTED by the game')
-
-        DrawMarker(2, x, y, origin.z + 1.2, 0, 0, 0, 0, 0, 0,
-            0.3, 0.3, 0.3, 255, 190, 60, 180, false, true, 2, false)
+    if sweep then
+        -- Let the game enumerate rather than trusting a list. Cheap: a rejected type costs
+        -- one native call that returns 0.
+        types = {}
+        for id = 0, 40 do types[#types + 1] = id end
+        for id = 1000, 1035 do types[#types + 1] = id end
     end
 
-    lines[#lines + 1] = 'They last two minutes. Set the one that looks right as '
-        .. 'MIFireScorch.decal in config/scorch.lua.'
+    local lines = {
+        ('Testing %d decal type(s). Two rows: near row uses 0-1 colour values, far row uses '
+            .. '0-255.'):format(#types),
+        'Walk the rows. Whichever you can see tells us which convention this build wants.',
+    }
+
+    local accepted, placed = {}, 0
+
+    for i = 1, #types do
+        local decal = types[i]
+
+        -- Spread along your right so the rows do not overlap, wrapping every 12.
+        local column = (i - 1) % 12
+        local row = math.floor((i - 1) / 12)
+
+        local x = origin.x + right.x * (column * 2.2 - 12.0) + forward.x * (4.0 + row * 3.0)
+        local y = origin.y + right.y * (column * 2.2 - 12.0) + forward.y * (4.0 + row * 3.0)
+
+        local z = origin.z
+        local found, groundZ = GetGroundZFor_3dCoord(x, y, origin.z + 2.0, false)
+        if found then z = groundZ end
+
+        -- Convention A: coefficients, as the parameter names claim.
+        local a = AddDecal(decal, x, y, z + 0.35,
+            0.0, 0.0, -1.0, 1.0, 0.0, 0.0,
+            1.6, 1.6,
+            0.2, 0.2, 0.2, 1.0,
+            600000.0, false, false, false)
+
+        -- Convention B: bytes, as a good deal of working code in the wild passes.
+        local b = AddDecal(decal, x, y + 2.6, z + 0.35,
+            0.0, 0.0, -1.0, 1.0, 0.0, 0.0,
+            1.6, 1.6,
+            255.0, 255.0, 255.0, 255.0,
+            600000.0, false, false, false)
+
+        if (a and a ~= 0) or (b and b ~= 0) then
+            placed = placed + 1
+            accepted[#accepted + 1] = decal
+            lines[#lines + 1] = ('  type %-5s  coef=%s  bytes=%s'):format(
+                tostring(decal),
+                (a and a ~= 0) and 'ok' or '--',
+                (b and b ~= 0) and 'ok' or '--')
+        end
+    end
+
+    if placed == 0 then
+        lines[#lines + 1] = 'NOTHING was accepted. Every AddDecal call returned 0, so this is '
+            .. 'not a type-ID problem -- the native is refusing outright on this build.'
+    else
+        lines[#lines + 1] = ('%d of %d type(s) accepted. Accepted: %s'):format(
+            placed, #types, table.concat(accepted, ', '))
+        lines[#lines + 1] = 'Set the one that looks like scorching as MIFireScorch.decal.'
+    end
 
     for i = 1, #lines do
         TriggerEvent('chat:addMessage', { args = { 'mi_fire', lines[i] } })
         print('[mi_fire] ' .. lines[i])
     end
+
+    -- Markers over every slot for two minutes, so an invisible decal is distinguishable
+    -- from one placed somewhere you are not looking.
+    CreateThread(function()
+        local until_ = GetGameTimer() + 120000
+        while GetGameTimer() < until_ do
+            Wait(0)
+            for i = 1, #types do
+                local column = (i - 1) % 12
+                local row = math.floor((i - 1) / 12)
+                local x = origin.x + right.x * (column * 2.2 - 12.0) + forward.x * (4.0 + row * 3.0)
+                local y = origin.y + right.y * (column * 2.2 - 12.0) + forward.y * (4.0 + row * 3.0)
+
+                DrawMarker(2, x, y, origin.z + 1.4, 0, 0, 0, 0, 0, 0,
+                    0.25, 0.25, 0.25, 255, 190, 60, 140, false, true, 2, false)
+            end
+        end
+    end)
+end
+
+RegisterNetEvent('mi_fire:client:decalTest', function(sweep)
+    decalTest(sweep == true)
 end)
 
 -- ---------------------------------------------------------------------------

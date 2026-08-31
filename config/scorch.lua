@@ -35,6 +35,13 @@ MIFireScorch.decal = 1023
 --- Widened or trimmed freely; the command reads this list.
 MIFireScorch.decalCandidates = { 1023, 1010, 1011, 1012, 1013, 1014, 1015, 4, 5, 9 }
 
+--- Colour scale. 1.0 treats the colour values below as the 0-1 coefficients their parameter
+--- names claim; 255.0 treats them as bytes, which a good deal of working code in the wild
+--- assumes. "/fire decals" reports which convention this build accepted -- set this to match
+--- rather than guessing, because the wrong one draws something invisible rather than nothing,
+--- which is harder to tell apart from a bad type ID than it sounds.
+MIFireScorch.colourScale = 1.0
+
 --- How large a mark a node leaves.
 ---
 --- Scaled by how hard and how long the node burned, so a knockdown in the first thirty

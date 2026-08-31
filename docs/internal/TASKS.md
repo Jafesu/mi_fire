@@ -145,6 +145,19 @@ suppression model, and the supply work for the fire department connection.
 
 ### Pump panel — Phase 4
 
+**Every gauge that has a use is rendered and live.** The user's call, and it decides the shape
+of the work: no decorative faces, no "the three that matter". If a gauge is on the photograph
+and it means something, it is driven by real state.
+
+The consequence worth planning for is that it inverts the usual question. Rather than choosing
+which gauges to build, the job is finding which gauges have a *use we have not modelled* — and
+building the model behind them. Today that list is: intake pressure (nothing behind it but
+cavitation detection), foam level (a number that never moves), the governor (does not exist),
+and engine RPM and temperature (not modelled at all).
+
+**Nobody types a pressure.** The operator works the throttle and pulls the gate handles. One
+throttle for the whole pump; each discharge a handle from shut to wide open.
+
 Designed in full; see [adr/0003](adr/0003-panels-are-data-not-code.md) and
 [APPARATUS.md](APPARATUS.md). **Blocked on reference screenshots** of the in-game panels, which
 the user is capturing. Authoring a layout from guesswork means building it twice.

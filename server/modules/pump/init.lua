@@ -35,11 +35,20 @@ function PumpServer.state(entity)
     if not state then
         state = {
             netId = netId,
-            --- Discharge pressure per port, psi. Nothing is open until an operator opens it,
-            --- which is why a charged line with no pressure set does nothing.
-            discharges = {},
+            --- How far the throttle is open, 0-1. This is the pump's output pressure, and it
+            --- is one number for the whole pump -- because that is what a pump is. Every
+            --- outlet is fed from it.
+            throttle = 0.0,
+
+            --- Gate valve position per port, 0 shut to 1 wide open.
+            ---
+            --- **Not a pressure.** An operator does not type 150 into a discharge; they pull a
+            --- handle. The gauge above it then reads what that outlet is doing, which is the
+            --- pump's pressure less whatever a part-closed gate is throttling away.
+            valves = {},
+
             --- Pressure governor. Holds a setpoint across changes on other discharges, which
-            --- is the whole reason the device exists.
+            --- is the whole reason the device exists. Not implemented yet.
             governor = { mode = 'rpm', setpoint = 0.0 },
             intakePsi = 0.0,
             cavitating = false,
@@ -52,13 +61,48 @@ function PumpServer.state(entity)
     return state
 end
 
---- Set what an outlet is putting out.
+--- What the pump is making, before any valve.
+---
+--- One number for the whole pump, because that is what a pump is: the throttle drives the
+--- impeller and every outlet is fed from the same volute. An operator raising the throttle
+--- raises it for everybody.
+---@param profile table
+---@param throttle number 0-1
+---@return number psi
+function PumpServer.masterPressure(profile, throttle)
+    local maximum = profile.maxDischargePsi or 250.0
+
+    -- Idle is not zero. A pump in gear at idle is already making something, which is why a
+    -- line charges before anyone touches the throttle.
+    local idle = MIFirePump.idlePsi or 40.0
+
+    return idle + (maximum - idle) * math.max(0.0, math.min(1.0, throttle or 0.0))
+end
+
+--- Move the throttle.
 ---@param entity integer
----@param portId string
----@param psi number
+---@param delta number Change in position, -1 to 1.
 ---@return boolean ok
 ---@return string|nil reason
-function PumpServer.setDischarge(entity, portId, psi)
+function PumpServer.throttle(entity, delta)
+    local state = PumpServer.state(entity)
+    if not state then return false, 'that rig has no pump' end
+
+    local tank = MIFire.ApparatusServer.tank(entity)
+    if not tank or not tank.pumpEngaged then return false, 'the pump is not engaged' end
+
+    state.throttle = math.max(0.0, math.min(1.0, state.throttle + (tonumber(delta) or 0.0)))
+
+    return true
+end
+
+--- Open or close a gate.
+---@param entity integer
+---@param portId string
+---@param position number 0 shut, 1 wide open.
+---@return boolean ok
+---@return string|nil reason
+function PumpServer.setValve(entity, portId, position)
     local profile = MIFire.ApparatusServer.profile(entity)
     if not profile then return false, 'that is not fire apparatus' end
 
@@ -71,15 +115,30 @@ function PumpServer.setDischarge(entity, portId, psi)
     local tank = MIFire.ApparatusServer.tank(entity)
     if not tank or not tank.pumpEngaged then return false, 'the pump is not engaged' end
 
-    -- The relief valve is a real limit, not a suggestion. Past it the pump is not making more
-    -- pressure, it is dumping the excess back to intake.
-    local maximum = profile.maxDischargePsi or 250.0
+    state.valves[portId] = math.max(0.0, math.min(1.0, tonumber(position) or 0.0))
 
-    state.discharges[portId] = math.max(0.0, math.min(tonumber(psi) or 0.0, maximum))
+    return true
+end
 
-    return true, (tonumber(psi) or 0) > maximum
-        and ('the relief valve holds this pump at %d psi'):format(maximum)
-        or nil
+--- What one outlet is actually putting out.
+---
+--- A gate valve does not reduce pressure by sitting there -- with nothing flowing, a
+--- part-open gate reads the same as a wide one. It throttles when water is moving through it,
+--- and the loss grows sharply as it closes.
+---
+--- Modelled as a loss proportional to how far shut it is, squared, which is the right shape
+--- even if the coefficient is ours rather than published. **Flagged as a question** in
+--- `docs/guides/pump-operations-explained.md`.
+---@param masterPsi number
+---@param position number
+---@return number psi
+function PumpServer.outletPressure(masterPsi, position)
+    position = math.max(0.0, math.min(1.0, position or 0.0))
+
+    if position <= 0.0 then return 0.0 end
+
+    local shut = 1.0 - position
+    return masterPsi * (1.0 - shut * shut)
 end
 
 ---@param entity integer
@@ -87,7 +146,14 @@ end
 ---@return number psi
 function PumpServer.dischargePsi(entity, portId)
     local state = PumpServer.state(entity)
-    return state and state.discharges[portId] or 0.0
+    if not state then return 0.0 end
+
+    local profile = MIFire.ApparatusServer.profile(entity)
+    if not profile then return 0.0 end
+
+    return PumpServer.outletPressure(
+        PumpServer.masterPressure(profile, state.throttle),
+        state.valves[portId] or 0.0)
 end
 
 -- ---------------------------------------------------------------------------
@@ -118,6 +184,9 @@ local function solvePump(entity, state, lines, dt)
     local tank = MIFire.ApparatusServer.tank(entity)
     if not profile or not tank then return end
 
+    local masterPsi = PumpServer.masterPressure(profile, state.throttle)
+    state.masterPsi = masterPsi
+
     -- --- What each line wants -----------------------------------------------------------
 
     local demands = {}
@@ -127,7 +196,7 @@ local function solvePump(entity, state, lines, dt)
         local size = MIFireHose.sizes[line.diameter] or {}
         local nozzle = MIFireHose.nozzles[line.nozzle or ''] or {}
 
-        local psi = state.discharges[line.sourcePort] or 0.0
+        local psi = PumpServer.outletPressure(masterPsi, state.valves[line.sourcePort] or 0.0)
 
         -- The bail. Closed is closed however much pressure is behind it, which is what lets a
         -- crew move up without shutting the whole line down at the panel.
@@ -160,10 +229,9 @@ local function solvePump(entity, state, lines, dt)
 
     -- --- What the pump can make ---------------------------------------------------------
 
-    local highest = 0.0
-    for portId, psi in pairs(state.discharges) do
-        if psi > highest then highest = psi end
-    end
+    -- Net pressure for the curve is what the pump is making, not what any one outlet reads
+    -- after its gate.
+    local highest = masterPsi
 
     local wanted = 0.0
     for i = 1, #demands do wanted = wanted + demands[i].gpm end
@@ -216,7 +284,9 @@ local function solvePump(entity, state, lines, dt)
         end
 
         line.gpm = gpm
-        line.dischargePsi = state.discharges[line.sourcePort] or 0.0
+        line.dischargePsi = PumpServer.outletPressure(
+            masterPsi, state.valves[line.sourcePort] or 0.0)
+        line.valve = state.valves[line.sourcePort] or 0.0
         line.nozzlePsi = demand.nozzlePsi
         line.losses = demand.losses
 
@@ -276,25 +346,98 @@ end)
 -- Transports
 -- ---------------------------------------------------------------------------
 
-RegisterNetEvent('mi_fire:server:setDischarge', function(netId, portId, psi)
+RegisterNetEvent('mi_fire:server:setValve', function(netId, portId, position)
     local source = source
     if type(portId) ~= 'string' then return end
 
     local entity = NetworkGetEntityFromNetworkId(netId)
     if not entity or entity == 0 then return end
-
     if not MIFire.Permissions.isNear(source, GetEntityCoords(entity), 6.0) then return end
 
-    local ok, note = PumpServer.setDischarge(entity, portId, tonumber(psi) or 0)
+    local ok, why = PumpServer.setValve(entity, portId, tonumber(position) or 0)
 
-    if note then
-        TriggerClientEvent('mi_fire:client:notify', source, note, ok and 'inform' or 'error')
+    if not ok and why then
+        TriggerClientEvent('mi_fire:client:notify', source, why, 'error')
     end
 end)
 
+RegisterNetEvent('mi_fire:server:throttle', function(netId, delta)
+    local source = source
+
+    local entity = NetworkGetEntityFromNetworkId(netId)
+    if not entity or entity == 0 then return end
+    if not MIFire.Permissions.isNear(source, GetEntityCoords(entity), 6.0) then return end
+
+    local ok, why = PumpServer.throttle(entity, tonumber(delta) or 0)
+
+    if not ok and why then
+        TriggerClientEvent('mi_fire:client:notify', source, why, 'error')
+    end
+end)
+
+--- Everything the panel needs to draw itself, for one rig.
+---
+--- Every gauge that has a use is rendered and live, so every gauge that has a use is in here.
+lib.callback.register('mi_fire:pumpState', function(source, netId)
+    local entity = NetworkGetEntityFromNetworkId(netId)
+    if not entity or entity == 0 then return nil end
+
+    local profile = MIFire.ApparatusServer.profile(entity)
+    local state = PumpServer.state(entity)
+    local tank = MIFire.ApparatusServer.tank(entity)
+
+    if not profile or not state or not tank then return nil end
+
+    local outlets = {}
+
+    for _, port in ipairs(profile.ports or {}) do
+        if port.type == 'discharge' then
+            local psi = PumpServer.outletPressure(
+                state.masterPsi or 0.0, state.valves[port.id] or 0.0)
+
+            local line
+            for _, candidate in pairs(MIFire.HoseServer.all()) do
+                if candidate.sourceNet == state.netId and candidate.sourcePort == port.id then
+                    line = candidate
+                    break
+                end
+            end
+
+            outlets[#outlets + 1] = {
+                id = port.id,
+                label = port.label or port.id,
+                size = port.size,
+                valve = state.valves[port.id] or 0.0,
+                psi = psi,
+                gpm = line and line.gpm or 0.0,
+                nozzlePsi = line and line.nozzlePsi or 0.0,
+                condition = line and line.condition or nil,
+                connected = line ~= nil,
+            }
+        end
+    end
+
+    return {
+        label = profile.label,
+        family = profile.panelFamily,
+        engaged = tank.pumpEngaged,
+        throttle = state.throttle,
+        masterPsi = state.masterPsi or 0.0,
+        intakePsi = state.intakePsi or 0.0,
+        totalGpm = state.totalGpm or 0.0,
+        cavitating = state.cavitating or false,
+        overCapacity = state.overCapacity or false,
+        ratedGpm = profile.pumpRatingGpm,
+        maxPsi = profile.maxDischargePsi,
+        tank = { water = tank.water, capacity = tank.capacity },
+        foam = { level = tank.foam, capacity = tank.foamCapacity },
+        outlets = outlets,
+    }
+end)
+
 exports('GetPumpState', function(entity) return PumpServer.state(entity) end)
-exports('SetDischargePressure', function(entity, portId, psi)
-    return PumpServer.setDischarge(entity, portId, psi)
+exports('SetDischargeValve', function(entity, portId, position)
+    return PumpServer.setValve(entity, portId, position)
 end)
 
 MIFire.PumpServer = PumpServer

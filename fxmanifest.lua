@@ -37,6 +37,7 @@ shared_scripts {
     'config/scorch.lua',
     'config/apparatus.lua',
     'config/hose.lua',
+    'config/pump.lua',
 }
 
 client_scripts {

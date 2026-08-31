@@ -702,92 +702,137 @@ end)
 --- The pump panel, until Phase 4's NUI replaces it.
 ---
 --- A menu rather than a panel, deliberately: the real one is authored against the photographs
---- in `docs/Reference/PumpPanels/` and is a project of its own. What this has to do first is
---- prove the hydraulics are worth looking at -- that setting a pressure changes what a crew a
---- hundred feet away is holding.
+--- in `docs/Reference/PumpPanels/` and is a project of its own.
+---
+--- **Nobody types a pressure.** The operator works the throttle and pulls the gates, exactly as
+--- they would on the rig, and the gauges read what that produces. An early version had them
+--- entering a number into each discharge, which is not how a panel works and would have shaped
+--- the real one wrongly.
 ---@param entity integer
 function HoseClient.panel(entity)
     local netId = VehToNet(entity)
-    local profile = apparatus().profile(entity)
-    if not profile then return end
+
+    local state = lib.callback.await('mi_fire:pumpState', false, netId)
+
+    if not state then
+        return lib.notify({ description = 'That rig has no pump', type = 'error' })
+    end
+
+    if not state.engaged then
+        return lib.notify({
+            title = 'Pump not engaged',
+            description = 'Stop the rig and put the pump in gear first',
+            type = 'error',
+        })
+    end
 
     local options = {}
 
-    --- Every line this rig is feeding.
-    local fed = {}
-    for id, line in pairs(lines) do
-        if line.sourceNet == netId then fed[#fed + 1] = { id = id, line = line } end
+    -- --- The master reading ----------------------------------------------------------------
+
+    options[#options + 1] = {
+        title = ('Master discharge -- %.0f psi'):format(state.masterPsi or 0),
+        description = ('throttle %d%%  ·  %.0f gpm total  ·  tank %.0f / %.0f gal%s')
+            :format(math.floor((state.throttle or 0) * 100), state.totalGpm or 0,
+                state.tank.water, state.tank.capacity,
+                state.cavitating and '  ·  CAVITATING' or ''),
+        icon = 'gauge-high',
+        readOnly = true,
+    }
+
+    options[#options + 1] = {
+        title = 'Throttle up',
+        description = 'Raises pressure on every outlet -- there is one pump',
+        icon = 'arrow-up',
+        onSelect = function()
+            TriggerServerEvent('mi_fire:server:throttle', netId, MIFirePump.throttleStep)
+            HoseClient.panel(entity)
+        end,
+    }
+
+    options[#options + 1] = {
+        title = 'Throttle down',
+        icon = 'arrow-down',
+        onSelect = function()
+            TriggerServerEvent('mi_fire:server:throttle', netId, -MIFirePump.throttleStep)
+            HoseClient.panel(entity)
+        end,
+    }
+
+    -- --- The gates ------------------------------------------------------------------------
+
+    for _, outlet in ipairs(state.outlets or {}) do
+        local shut = (outlet.valve or 0) <= 0.01
+
+        local description
+
+        if not outlet.connected then
+            description = 'nothing coupled to it'
+        elseif shut then
+            description = 'gate shut'
+        else
+            description = ('%.0f psi at the gate  ·  %.0f gpm  ·  nozzle %.0f psi (%s)')
+                :format(outlet.psi or 0, outlet.gpm or 0, outlet.nozzlePsi or 0,
+                    outlet.condition or '-')
+        end
+
+        options[#options + 1] = {
+            title = ('%s -- %s'):format(outlet.label,
+                shut and 'shut' or ('%d%% open'):format(math.floor((outlet.valve or 0) * 100))),
+            description = description,
+            icon = shut and 'circle' or 'circle-dot',
+            onSelect = function()
+                local input = lib.inputDialog(outlet.label, {
+                    {
+                        type = 'slider',
+                        label = 'Gate',
+                        description = 'How far the handle is pulled',
+                        min = 0,
+                        max = 100,
+                        default = math.floor((outlet.valve or 0) * 100),
+                        step = 10,
+                    },
+                })
+
+                if input then
+                    TriggerServerEvent('mi_fire:server:setValve',
+                        netId, outlet.id, (input[1] or 0) / 100.0)
+                end
+
+                HoseClient.panel(entity)
+            end,
+        }
     end
 
-    for i = 1, #fed do
-        local id, line = fed[i].id, fed[i].line
-        local size = MIFireHose.sizes[line.diameter] or {}
-        local label = line.sourcePort or id
+    -- --- Lines waiting for water ------------------------------------------------------------
 
-        if line.state == 'connected' then
+    for id, line in pairs(lines) do
+        if line.sourceNet == netId and line.state == 'connected' then
             options[#options + 1] = {
-                title = ('Charge %s'):format(label),
-                description = ('%s, %d length(s) -- dry')
-                    :format(size.label or line.diameter, line.sections or 1),
+                title = ('Charge %s'):format(line.sourcePort or id),
+                description = 'Fill the line. Then open its gate.',
                 icon = 'droplet',
                 onSelect = function()
                     TriggerServerEvent('mi_fire:server:chargeHose', id, true)
+                    HoseClient.panel(entity)
                 end,
             }
 
-        elseif line.state == 'charged' then
-            -- Everything a pump operator reads off a discharge gauge, in one line: what they
-            -- are sending, what is arriving at the tip, what it is flowing, and whether the
-            -- crew on the end has a working line or a soft one.
-            local losses = line.losses or {}
-
+        elseif line.sourceNet == netId and line.state == 'charged' then
             options[#options + 1] = {
-                title = ('%s -- %.0f gpm, %s'):format(label, line.gpm or 0,
-                    line.condition or 'no water'),
-                description = ('nozzle %.0f psi  ·  friction %.0f  ·  elevation %.0f')
-                    :format(line.nozzlePsi or 0, losses.friction or 0, losses.elevation or 0),
-                icon = 'gauge',
-                onSelect = function()
-                    local input = lib.inputDialog(('Discharge pressure -- %s'):format(label), {
-                        {
-                            type = 'slider',
-                            label = 'PSI',
-                            min = 0,
-                            max = math.floor(profile.maxDischargePsi or 250),
-                            default = math.floor(line.dischargePsi or 100),
-                            step = 5,
-                        },
-                    })
-
-                    if input then
-                        TriggerServerEvent('mi_fire:server:setDischarge',
-                            netId, line.sourcePort, input[1])
-                    end
-                end,
-            }
-
-            options[#options + 1] = {
-                title = ('Shut down %s'):format(label),
+                title = ('Shut down %s'):format(line.sourcePort or id),
                 icon = 'droplet-slash',
                 onSelect = function()
                     TriggerServerEvent('mi_fire:server:chargeHose', id, false)
+                    HoseClient.panel(entity)
                 end,
             }
         end
     end
 
-    if #options == 0 then
-        options[#options + 1] = {
-            title = 'Nothing connected',
-            description = 'Pull a line and couple it before there is anything to charge',
-            icon = 'circle-info',
-            disabled = true,
-        }
-    end
-
     lib.registerContext({
         id = 'mi_fire_pump',
-        title = ('%s -- pump panel'):format(profile.label or 'Apparatus'),
+        title = ('%s -- pump panel'):format(state.label or 'Apparatus'),
         options = options,
     })
 

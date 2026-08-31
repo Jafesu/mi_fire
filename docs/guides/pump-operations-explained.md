@@ -187,9 +187,15 @@ These numbers are ours, not published. **Are they roughly right?**
 2. **Is 0.434 psi/foot right for this, or should we use the ½ psi rule of thumb people actually
    work in?** One is accurate, the other is what a real operator does in their head.
 
-3. **How do you actually set a discharge?** We have the operator entering a pressure per
-   outlet. Is that the right mental model, or is it throttle-and-governor with the individual
-   discharges being gates you open?
+3. ~~**How do you actually set a discharge?**~~ **Answered: you do not type a pressure.** The
+   operator works the throttle and pulls the gate handles, and the gauges read what that
+   produces. Rebuilt to match — there is one throttle for the whole pump, because there is one
+   pump, and each discharge is a handle from shut to wide open. Raising the throttle raises it
+   for everybody, which is what makes a second line take water off the first.
+
+   **Still open, and smaller:** we model a part-open gate as a pressure loss growing with the
+   square of how far shut it is. The shape is right; the coefficient is ours. How much does a
+   half-open gate actually knock off?
 
 4. **What would you pump a 200 ft 1¾″ crosslay with a 15/16″ tip at?** If our model does not
    give roughly your number, our model is wrong.
@@ -199,11 +205,15 @@ These numbers are ours, not published. **Are they roughly right?**
 
 6. **Is under ⅓ of rated nozzle pressure the right place to call a line soft?**
 
-7. **Are 750 gallons and a 1500 gpm pump right for a Pierce Enforcer engine?** Our figures are
-   conventional rather than measured off the real rigs.
+7. ~~**Are 750 gallons right?**~~ **Answered: 1000.** Set. The 1500 gpm pump rating is still
+   ours rather than measured.
 
-8. **Which gauges do you actually watch, moment to moment?** We are building the panel from
-   photographs and would rather emphasise the three you look at than render twenty faithfully.
+8. ~~**Which gauges do you actually watch?**~~ **Answered: all of them, and they must be
+   live.** Every gauge that has a use gets rendered and driven by real state — no decorative
+   faces. That decision shapes the whole panel, so the question worth asking instead is:
+   **which gauges on these rigs have a use we have not modelled yet?** We currently have
+   nothing behind an intake gauge beyond enough to detect cavitation, and nothing at all behind
+   a foam or a governor readout.
 
 9. **How does cavitation present to you, and what do you do about it?** We warn the crew on the
    line as well as the operator, on the grounds that they are the ones about to lose water.

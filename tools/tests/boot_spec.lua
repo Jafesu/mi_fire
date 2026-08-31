@@ -80,7 +80,22 @@ return function(t)
         }),
 
         cache = { ped = 1, serverId = 1 },
-        lib = setmetatable({}, { __index = function() return function() end end }),
+        --- Anything reached through `lib` answers, at any depth, and is callable.
+        ---
+        --- A stub returning a plain function broke on `lib.callback.register(...)`: the first
+        --- index gave a function and indexing a function is an error. Nested access is
+        --- ordinary in ox_lib, so the stub has to survive it rather than the caller having to
+        --- avoid it.
+        lib = (function()
+            local function stub()
+                return setmetatable({}, {
+                    __index = function() return stub() end,
+                    __call = function() end,
+                })
+            end
+
+            return stub()
+        end)(),
     }
 
     -- Keep the real print but capture it, so a noisy boot is visible in the test output
@@ -133,6 +148,7 @@ return function(t)
         'config/scorch.lua',
         'config/apparatus.lua',
         'config/hose.lua',
+        'config/pump.lua',
     }
 
     local serverFiles = {

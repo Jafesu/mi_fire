@@ -171,7 +171,8 @@ MIFireApparatus.profiles = {
 
     ['eengineht'] = {
         label = 'Engine',
-        tankGallons = 750.0,
+        --- 1000 rather than the conventional 750, confirmed against the real rig.
+        tankGallons = 1000.0,
         foamGallons = 30.0,
         pumpRatingGpm = 1500.0,
         panelFamily = 'engine',

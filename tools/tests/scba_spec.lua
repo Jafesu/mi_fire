@@ -71,6 +71,28 @@ return function(t)
     t.ok(structural.appearance.male and structural.appearance.female,
         'for both sexes, so nobody is left in civilian clothes')
 
+    t.describe('every appearance slot in every gear tier is a real slot')
+
+    -- The bug this catches is silent and total. `Appearance.split` sorts a slot into components,
+    -- props, or `unknown`, and unknown slots are dropped -- so a misspelled name means that
+    -- piece of gear simply never goes on, with no error and nothing missing from the config to
+    -- look at. `bags` instead of `bag` was exactly this: a firefighter kept their civilian
+    -- backpack on over the turnout coat, and every other slot worked, so nothing looked wrong.
+    --
+    -- Checked across every tier and both sexes, because the tiers are hand-authored and get
+    -- copied between each other.
+    for tierName, tier in pairs(MIFireGear.tiers) do
+        for sex, set in pairs(tier.appearance or {}) do
+            for slot in pairs(set) do
+                t.ok(Appearance.resolveSlot(slot) ~= nil,
+                    ('%s/%s: "%s" is a slot the appearance bridge knows')
+                        :format(tierName, sex, slot))
+            end
+        end
+    end
+
+    -- -----------------------------------------------------------------------
+
     local turnoutComponents, turnoutProps = Appearance.split(structural.appearance.male)
     t.ok(#turnoutProps >= 1, 'including a helmet on the prop slot')
     t.ok(#turnoutComponents >= 3, 'and several clothing components')

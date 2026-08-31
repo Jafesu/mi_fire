@@ -100,8 +100,16 @@ MIFireGear.tiers = {
                 pants  = 11,    -- no separate trousers -- the boots carry them
                 shoes  = 164,   -- bunker boots with trousers
                 arms   = 179,   -- gloves
-                bags = 0,     -- no backpack
-                decals = 0,    -- no decals
+
+                -- Zero is not "leave it alone", it is "wear none of it". That is the point:
+                -- a civilian rucksack over a turnout coat survives donning otherwise, because
+                -- nothing else in this set touches those two slots.
+                --
+                -- `bag`, singular. The bridge's slot table is illenium's vocabulary and
+                -- `bags` is not in it -- an unknown slot is dropped silently, so the backpack
+                -- would simply have stayed on with nothing to show why.
+                bag    = 0,     -- no backpack
+                decals = 0,     -- no decals or badges
             },
             female = {
                 hat    = 251,
@@ -109,7 +117,7 @@ MIFireGear.tiers = {
                 pants  = 11,
                 shoes  = 164,
                 arms   = 179,
-                bags = 0,
+                bag    = 0,
                 decals = 0,
             },
         },

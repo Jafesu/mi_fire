@@ -232,119 +232,128 @@ end)
 --- guessing one that silently draws nothing is a failure mode this project has already paid
 --- for once. Same spirit as the offset finder: author the value by seeing it, not by trusting
 --- a comment.
---- Find a decal type -- and a parameter convention -- that actually draws on this build.
+--- Find a decal type that actually draws on this build.
 ---
---- Rewritten after the first version produced nothing visible, which told us only that
---- something was wrong and not which thing. There are three independent suspects and
---- guessing between them is how a session gets burned:
+--- **Round two, after round one found five accepted types and showed none of them.**
+--- Two faults in that test, both mine:
 ---
----   1. the **type ID** does not exist on this build
----   2. `rCoef/gCoef/bCoef` and `opacity` are **0-255**, not the 0-1 they are named for --
----      in which case an opacity of 0.85 is 0.3% and invisible rather than absent
----   3. a `timeout` of -1 is rejected rather than meaning "permanent"
+---   The second row was offset in world Y with **no marker over it**, so the row drawn in
+---   white -- the one most likely to be visible -- was 2.6 metres from anything the player
+---   was told to look at.
 ---
---- So this sweeps rather than tests a hypothesis. Every accepted type is reported with its
---- handle, drawn under a numbered marker you can walk to, and laid out in two rows: one in
---- each colour convention. Whichever row you can see settles suspect 2, and which markers
---- have something under them settles suspect 1.
----@param sweep boolean Try a wide range of type IDs rather than the configured candidates.
-local function decalTest(sweep)
+---   The first row was drawn at 0.2 grey, which on a dark floor is very nearly the floor.
+---   A test for "does this render at all" has no business being subtle.
+---
+--- So this draws only the types the game already accepted, at four metres across, in flat
+--- white at full opacity, with a marker directly over every one. If a decal renders on this
+--- build at all, it is impossible to miss. If they are still invisible, decals are the wrong
+--- mechanism here and the fallback is a different one rather than another parameter.
+---
+--- Run it **outdoors on tarmac**. Interior floors are a common case for decals not taking,
+--- and a station bay is exactly the surface most likely to refuse them.
+---@param types table Type IDs to draw.
+local function drawCandidates(types)
     local ped = cache.ped
     local origin = GetEntityCoords(ped)
     local forward = GetEntityForwardVector(ped)
     local right = vec3(forward.y, -forward.x, 0.0)
 
-    local types = MIFireScorch.decalCandidates
-
-    if sweep then
-        -- Let the game enumerate rather than trusting a list. Cheap: a rejected type costs
-        -- one native call that returns 0.
-        types = {}
-        for id = 0, 40 do types[#types + 1] = id end
-        for id = 1000, 1035 do types[#types + 1] = id end
-    end
-
+    local placed = {}
     local lines = {
-        ('Testing %d decal type(s). Two rows: near row uses 0-1 colour values, far row uses '
-            .. '0-255.'):format(#types),
-        'Walk the rows. Whichever you can see tells us which convention this build wants.',
+        ('Drawing %d type(s) at 4m across, flat white, full opacity.'):format(#types),
+        'Every one has a marker over it. Look straight down at each in turn.',
     }
-
-    local accepted, placed = {}, 0
 
     for i = 1, #types do
         local decal = types[i]
 
-        -- Spread along your right so the rows do not overlap, wrapping every 12.
-        local column = (i - 1) % 12
-        local row = math.floor((i - 1) / 12)
-
-        local x = origin.x + right.x * (column * 2.2 - 12.0) + forward.x * (4.0 + row * 3.0)
-        local y = origin.y + right.y * (column * 2.2 - 12.0) + forward.y * (4.0 + row * 3.0)
+        -- Six metres apart, along your right, starting well clear of you.
+        local offset = (i - 1) * 6.0 - ((#types - 1) * 3.0)
+        local x = origin.x + right.x * offset + forward.x * 6.0
+        local y = origin.y + right.y * offset + forward.y * 6.0
 
         local z = origin.z
-        local found, groundZ = GetGroundZFor_3dCoord(x, y, origin.z + 2.0, false)
+        local found, groundZ = GetGroundZFor_3dCoord(x, y, origin.z + 3.0, false)
         if found then z = groundZ end
 
-        -- Convention A: coefficients, as the parameter names claim.
-        local a = AddDecal(decal, x, y, z + 0.35,
-            0.0, 0.0, -1.0, 1.0, 0.0, 0.0,
-            1.6, 1.6,
-            0.2, 0.2, 0.2, 1.0,
-            600000.0, false, false, false)
+        local handle = AddDecal(decal, x, y, z + 0.3,
+            0.0, 0.0, -1.0, 0.0, 1.0, 0.0,
+            4.0, 4.0,
+            1.0, 1.0, 1.0, 1.0,
+            120000.0, false, false, false)
 
-        -- Convention B: bytes, as a good deal of working code in the wild passes.
-        local b = AddDecal(decal, x, y + 2.6, z + 0.35,
-            0.0, 0.0, -1.0, 1.0, 0.0, 0.0,
-            1.6, 1.6,
-            255.0, 255.0, 255.0, 255.0,
-            600000.0, false, false, false)
-
-        if (a and a ~= 0) or (b and b ~= 0) then
-            placed = placed + 1
-            accepted[#accepted + 1] = decal
-            lines[#lines + 1] = ('  type %-5s  coef=%s  bytes=%s'):format(
-                tostring(decal),
-                (a and a ~= 0) and 'ok' or '--',
-                (b and b ~= 0) and 'ok' or '--')
-        end
+        placed[#placed + 1] = { decal = decal, x = x, y = y, z = z, handle = handle or 0 }
+        lines[#lines + 1] = ('  %d. type %s -- handle %s'):format(
+            i, tostring(decal), tostring(handle))
     end
 
-    if placed == 0 then
-        lines[#lines + 1] = 'NOTHING was accepted. Every AddDecal call returned 0, so this is '
-            .. 'not a type-ID problem -- the native is refusing outright on this build.'
-    else
-        lines[#lines + 1] = ('%d of %d type(s) accepted. Accepted: %s'):format(
-            placed, #types, table.concat(accepted, ', '))
-        lines[#lines + 1] = 'Set the one that looks like scorching as MIFireScorch.decal.'
-    end
+    lines[#lines + 1] = 'If every marker has bare ground under it, decals do not render here '
+        .. 'and no type ID will fix that -- say so and the mechanism changes.'
 
     for i = 1, #lines do
         TriggerEvent('chat:addMessage', { args = { 'mi_fire', lines[i] } })
         print('[mi_fire] ' .. lines[i])
     end
 
-    -- Markers over every slot for two minutes, so an invisible decal is distinguishable
-    -- from one placed somewhere you are not looking.
+    -- A marker over every single one this time, numbered by height so they are tellable
+    -- apart from a distance.
     CreateThread(function()
         local until_ = GetGameTimer() + 120000
         while GetGameTimer() < until_ do
             Wait(0)
-            for i = 1, #types do
-                local column = (i - 1) % 12
-                local row = math.floor((i - 1) / 12)
-                local x = origin.x + right.x * (column * 2.2 - 12.0) + forward.x * (4.0 + row * 3.0)
-                local y = origin.y + right.y * (column * 2.2 - 12.0) + forward.y * (4.0 + row * 3.0)
-
-                DrawMarker(2, x, y, origin.z + 1.4, 0, 0, 0, 0, 0, 0,
-                    0.25, 0.25, 0.25, 255, 190, 60, 140, false, true, 2, false)
+            for i = 1, #placed do
+                local p = placed[i]
+                DrawMarker(2, p.x, p.y, p.z + 1.6 + i * 0.35, 0, 0, 0, 0, 0, 0,
+                    0.4, 0.4, 0.4, 255, 190, 60, 160, false, true, 2, false)
             end
         end
     end)
 end
 
+--- Sweep every plausible type ID and report which the game accepts.
+---@return table accepted
+local function sweepTypes()
+    local accepted = {}
+
+    -- Placed far below the map and immediately removed: this only asks whether the native
+    -- accepts the type, and drawing 77 decals around the player to find out is the thing
+    -- that made round one unreadable.
+    for _, id in ipairs({ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 }) do
+        local handle = AddDecal(id, 0.0, 0.0, -200.0,
+            0.0, 0.0, -1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+            100.0, false, false, false)
+        if handle and handle ~= 0 then
+            accepted[#accepted + 1] = id
+            RemoveDecal(handle)
+        end
+    end
+
+    for id = 1000, 1035 do
+        local handle = AddDecal(id, 0.0, 0.0, -200.0,
+            0.0, 0.0, -1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+            100.0, false, false, false)
+        if handle and handle ~= 0 then
+            accepted[#accepted + 1] = id
+            RemoveDecal(handle)
+        end
+    end
+
+    return accepted
+end
+
 RegisterNetEvent('mi_fire:client:decalTest', function(sweep)
-    decalTest(sweep == true)
+    if sweep then
+        local accepted = sweepTypes()
+
+        TriggerEvent('chat:addMessage', { args = { 'mi_fire',
+            ('accepted types: %s'):format(table.concat(accepted, ', ')) } })
+        print('[mi_fire] accepted types: ' .. table.concat(accepted, ', '))
+
+        drawCandidates(accepted)
+        return
+    end
+
+    drawCandidates(MIFireScorch.decalCandidates)
 end)
 
 -- ---------------------------------------------------------------------------

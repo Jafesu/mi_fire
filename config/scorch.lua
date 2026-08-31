@@ -29,11 +29,13 @@ MIFireScorch.enabled = true
 ---
 --- Confirm with `/fire decals` before trusting it. If burn marks do not appear, this is the
 --- first thing to change and the command exists to tell you what to change it to.
-MIFireScorch.decal = 1023
+MIFireScorch.decal = 1010
 
 --- Candidates offered by `/fire decals`, laid out left to right so you can pick by eye.
 --- Widened or trimmed freely; the command reads this list.
-MIFireScorch.decalCandidates = { 1023, 1010, 1011, 1012, 1013, 1014, 1015, 4, 5, 9 }
+--- The five this build reported as accepted when swept. Anything not in this list was
+--- refused outright by the native, so there is no point offering it.
+MIFireScorch.decalCandidates = { 1010, 1015, 1017, 1020, 1030 }
 
 --- Colour scale. 1.0 treats the colour values below as the 0-1 coefficients their parameter
 --- names claim; 255.0 treats them as bytes, which a good deal of working code in the wild

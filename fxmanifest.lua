@@ -23,6 +23,7 @@ shared_scripts {
     'shared/scorch.lua',
     'shared/apparatus.lua',
     'shared/hose.lua',
+    'shared/pump.lua',
     'config/config.lua',
     'config/dispatch.lua',
     'config/zones.lua',

@@ -119,6 +119,7 @@ return function(t)
         'shared/scorch.lua',
         'shared/apparatus.lua',
         'shared/hose.lua',
+        'shared/pump.lua',
         'config/config.lua',
         'config/dispatch.lua',
         'config/zones.lua',
@@ -240,7 +241,7 @@ return function(t)
         'Enums', 'Util', 'Hydraulics', 'Validate', 'FireClass', 'Suppression',
         'Framework', 'Dispatch', 'Inventory', 'DB', 'State', 'Permissions',
         'Fire', 'Spread', 'Admin', 'Turnout', 'Appearance', 'GearAppearance',
-        'Pass', 'PassServer', 'Exposure', 'ExposureServer', 'Medical', 'Smoke', 'SmokeServer', 'GearMatch', 'Integrity', 'Scorch', 'Apparatus', 'Hose', 'HoseServer',
+        'Pass', 'PassServer', 'Exposure', 'ExposureServer', 'Medical', 'Smoke', 'SmokeServer', 'GearMatch', 'Integrity', 'Scorch', 'Apparatus', 'Hose', 'Pump', 'HoseServer',
     }
     for _, name in ipairs(expected) do
         t.ok(type(MIFire) == 'table' and MIFire[name] ~= nil,

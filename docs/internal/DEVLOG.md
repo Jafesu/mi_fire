@@ -2182,3 +2182,57 @@ not evidence that the thing is necessary. It is evidence that one of them copied
 
 **Next:** water.
 
+---
+
+## 2026-08-31 (eleventh) — the grip survives a crash, and aiming gets its own placement
+
+**Scope:** a crash ate a placement mid-tuning. Two fixes and a confirmation.
+
+**Changed:**
+
+- `client/modules/hose/init.lua` — grips persist to KVP; a separate placement while aiming; the
+  attach is no longer redone every frame.
+- `config/hose.lua` — `nozzleGripAiming`.
+- `data/weaponanimations.meta` — the comment now carries the log evidence.
+
+**Decisions:**
+
+- **The placement is saved to KVP.** Finding one is minutes of nudging, and losing it to a crash
+  before it has been written down means doing all of it again. Per client, because it is a local
+  preference being discovered rather than server state.
+
+  The values from the lost session were **not** recoverable. Every client log was searched and
+  none of the reported lines are in any of them -- presumably the tail was never flushed. Which
+  is the argument for persisting rather than printing.
+
+- **Aiming gets its own placement.** The hand rotates between carrying and aiming and the nozzle
+  has to follow differently, so one set of numbers cannot serve both. `/fire nozzlegrip` edits
+  whichever stance the player is currently in, so aiming and then nudging fixes the aiming pose
+  with no extra syntax and no way to edit the wrong one by accident.
+
+- **The attach is applied on change, not every frame.** It was being redone every pass, which is
+  wasteful for something that holds until broken, and is a plausible contributor to the crash. It
+  now re-attaches only when the numbers change, the stance changes, or the weapon entity is
+  replaced.
+
+**The merge, confirmed independently:** the client log shows **seven** `weaponanimations.meta`
+files loading side by side, from four resources -- FireTools alone ships four, one per tool. If
+these replaced rather than merged, only the last would survive and FireTools would have noticed
+years ago. Ours is 90 lines; SmartHose's and ThrowBag's are 13,011 and 13,223.
+
+That is a better answer than the in-game check, and it was sitting in a log file the whole time.
+Worth remembering that the machine already had the evidence -- the question was never hard, only
+unasked.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1055 passed, 0 failed**.
+- `/mi_fire/data/weaponanimations.meta` appears in the client log as loading, so the file is
+  reaching the game rather than being silently ignored.
+
+**Open:**
+
+- Re-nudge the placement, now that losing it costs nothing.
+- The aiming placement has never been set.
+- Still nothing fired.
+

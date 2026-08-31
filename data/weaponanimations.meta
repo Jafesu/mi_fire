@@ -24,12 +24,22 @@
   one merges into the game's set or replaces it outright. It merges: with this file loaded and
   only WEAPON_MINOZZLE in it, pistols, rifles and ThrowBag's weapon all kept their animations.
 
-  That is worth writing down because the evidence pointed the other way. Both other resources on
-  this machine that ship one of these (SmartHose, ThrowBag) carry a full 13,000 line copy of the
-  vanilla data with their own entry added, which is only necessary if the file replaces. They had
-  copied an approach nobody had checked.
+  The client log settles it beyond the in-game check. Seven of these load side by side on this
+  server, from four resources at once:
 
-  So: a new weapon needs four lines of animation mapping, not thirteen thousand.
+      /FireTools/data/circularsaw/weaponanimations.meta
+      /FireTools/data/driptorch/weaponanimations.meta
+      /FireTools/data/halligan/weaponanimations.meta
+      /FireTools/data/spreaders/weaponanimations.meta
+      /SmartHose/data/weaponanimations.meta
+      /ThrowBag/weaponanimations.meta
+      /mi_fire/data/weaponanimations.meta
+
+  FireTools ships four small ones, one per tool, and they coexist. If these replaced rather than
+  merged, only the last would survive and that resource would have noticed years ago.
+
+  SmartHose and ThrowBag each carry a full 13,000 line copy of the vanilla data anyway. This file
+  is 90 lines and does the same job. They had copied an approach nobody checked.
 
   TO REVERT anyway: delete the `data_file 'WEAPON_ANIMATIONS_FILE'` line from `fxmanifest.lua`
   and its entry in `files`. The stance falls back to the weapon's default, which is the fire

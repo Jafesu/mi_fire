@@ -224,18 +224,83 @@ end
 --- lesson this repository already paid for once with the rope.
 local BONES = { right = 57005, left = 18905 }
 
---- Set by `/fire nozzlegrip`, and takes precedence over the config while it is set.
----@type table|nil
-local gripOverride = nil
+--- Two placements, because carrying and aiming are different poses.
+---
+--- The hand rotates between them and the nozzle has to follow differently, which is why one set
+--- of numbers looked right at rest and wrong the moment anyone aimed. Whichever set matches the
+--- current stance is the one `/fire nozzlegrip` edits, so aiming and then nudging fixes the
+--- aiming pose without any extra syntax to remember.
+---@type table<string, table|nil>
+local grips = { carry = nil, aim = nil }
+
+--- What was last handed to `AttachEntityToEntity`, so it is not handed over again every frame.
+local appliedKey = nil
+local appliedTo = nil
+
+local GRIP_KVP = 'mi_fire:nozzlegrip'
+
+---@return string
+local function aimingNow()
+    return IsPlayerFreeAiming(PlayerId()) and 'aim' or 'carry'
+end
+
+--- Survives a restart, and more to the point a crash.
+---
+--- Finding a placement is minutes of nudging, and losing it to a crash before it has been
+--- written down means doing all of it again. Stored per client because it is a local
+--- preference being discovered, not server state.
+local function saveGrips()
+    local ok, encoded = pcall(json.encode, grips)
+    if ok and encoded then SetResourceKvp(GRIP_KVP, encoded) end
+end
+
+local function loadGrips()
+    local raw = GetResourceKvpString(GRIP_KVP)
+    if not raw then return end
+
+    local ok, decoded = pcall(json.decode, raw)
+    if ok and type(decoded) == 'table' then
+        grips.carry = decoded.carry
+        grips.aim = decoded.aim
+    end
+end
+
+---@return table|nil
+local function activeGrip()
+    local key = aimingNow()
+
+    -- Falls back to the carry placement while there is no aiming one, so a half-tuned setup is
+    -- merely imperfect rather than broken.
+    return grips[key]
+        or (key == 'aim' and (grips.carry or MIFireHose.visuals.nozzleGripAiming))
+        or MIFireHose.visuals[key == 'aim' and 'nozzleGripAiming' or 'nozzleGrip']
+        or MIFireHose.visuals.nozzleGrip
+end
 
 ---@param ped integer
+---@param force boolean|nil
 ---@return boolean applied
-local function applyNozzleGrip(ped)
-    local grip = gripOverride or MIFireHose.visuals.nozzleGrip
-    if not grip then return false end
+local function applyNozzleGrip(ped, force)
+    local grip = activeGrip()
+
+    if not grip then
+        appliedKey, appliedTo = nil, nil
+        return false
+    end
 
     local object = GetCurrentPedWeaponEntityIndex(ped)
-    if not object or object == 0 or not DoesEntityExist(object) then return false end
+    if not object or object == 0 or not DoesEntityExist(object) then
+        appliedKey, appliedTo = nil, nil
+        return false
+    end
+
+    -- Re-attaching every frame is wasteful and there is no reason for it: an attachment holds
+    -- until something breaks it. So it is redone only when the numbers change, when the stance
+    -- changes, or when the weapon entity itself is replaced.
+    local key = ('%s|%s|%s|%s|%s|%s|%s'):format(grip.bone or 'right',
+        grip.x or 0, grip.y or 0, grip.z or 0, grip.rx or 0, grip.ry or 0, grip.rz or 0)
+
+    if not force and appliedKey == key and appliedTo == object then return true end
 
     local bone = GetPedBoneIndex(ped, BONES[grip.bone or 'right'] or BONES.right)
 
@@ -244,6 +309,7 @@ local function applyNozzleGrip(ped)
         grip.rx or 0.0, grip.ry or 0.0, grip.rz or 0.0,
         true, true, false, true, 1, true)
 
+    appliedKey, appliedTo = key, object
     return true
 end
 
@@ -456,6 +522,8 @@ local reEquips = 0
 --- off a ped, and the failure is silent: the nozzle vanishes from the hand and the line goes on
 --- flowing. If it keeps happening that is said out loud once, because the cause is outside this
 --- resource and guessing at it from in here wastes an evening.
+loadGrips()
+
 local function reconcileNozzle()
     local line = mine and lines[mine]
     local holding = line ~= nil and line.nozzleHolder == GetPlayerServerId(PlayerId())
@@ -1332,17 +1400,20 @@ end)
 --- The alternative is baking a new origin into the model, exporting, restarting, and looking --
 --- per attempt. Six numbers and a bone, changed live, is the same job in seconds.
 ---
---- Nudging is per-axis rather than all six at once, because finding a placement means changing
---- one thing and seeing what moved. Retyping six numbers to alter one of them is how people
---- stop bothering.
+--- Nudging is per-axis, because finding a placement means changing one thing and seeing what
+--- moved. Retyping six numbers to alter one of them is how people stop bothering.
+---
+--- **Whichever stance you are in is the one you are editing.** Stand and nudge to fix the carry;
+--- aim and nudge to fix the aim. No extra syntax, and it is impossible to edit the wrong one by
+--- accident.
 RegisterNetEvent('mi_fire:client:nozzleGrip', function(action, axis, amount)
     local function say(text)
         TriggerEvent('chat:addMessage', { args = { 'mi_fire', text } })
         print('[mi_fire] ' .. text)
     end
 
-    local function current()
-        local from = gripOverride or MIFireHose.visuals.nozzleGrip or {}
+    local function defaults(from)
+        from = from or {}
         return {
             bone = from.bone or 'right',
             x = from.x or 0.0, y = from.y or 0.0, z = from.z or 0.0,
@@ -1350,29 +1421,38 @@ RegisterNetEvent('mi_fire:client:nozzleGrip', function(action, axis, amount)
         }
     end
 
-    --- The line to paste into `config/hose.lua`, so a placement found by eye does not have to
-    --- be copied down by hand from six separate chat messages.
-    local function report(grip)
-        say(('bone=%s  x=%.3f y=%.3f z=%.3f  rx=%.1f ry=%.1f rz=%.1f')
-            :format(grip.bone, grip.x, grip.y, grip.z, grip.rx, grip.ry, grip.rz))
-        say(("nozzleGrip = { bone = '%s', x = %.3f, y = %.3f, z = %.3f, rx = %.1f, ry = %.1f, rz = %.1f },")
-            :format(grip.bone, grip.x, grip.y, grip.z, grip.rx, grip.ry, grip.rz))
+    --- The line to paste into `config/hose.lua`, so a placement found by eye does not have to be
+    --- copied down by hand out of six separate chat messages.
+    local function line(name, grip)
+        if not grip then return ('%s = nil,'):format(name) end
+
+        return ("%s = { bone = '%s', x = %.3f, y = %.3f, z = %.3f, rx = %.1f, ry = %.1f, rz = %.1f },")
+            :format(name, grip.bone, grip.x, grip.y, grip.z, grip.rx, grip.ry, grip.rz)
+    end
+
+    local function report()
+        say(('editing the %s placement (aim to switch)'):format(aimingNow()))
+        say(line('nozzleGrip', grips.carry))
+        say(line('nozzleGripAiming', grips.aim))
     end
 
     if action == 'off' then
-        gripOverride = nil
-        say('grip override cleared -- placement is the game\'s again')
+        grips.carry, grips.aim = nil, nil
+        saveGrips()
+        applyNozzleGrip(cache.ped, true)
+        say('cleared both placements -- back to the game\'s own')
         return
     end
 
     if action == 'show' then
-        return report(current())
+        return report()
     end
 
-    local grip = current()
+    local key = aimingNow()
+    local grip = defaults(grips[key] or grips.carry)
 
     if action == 'nudge' then
-        if grip[axis] == nil or axis == 'bone' then
+        if axis == 'bone' or grip[axis] == nil then
             return say(('"%s" is not an axis -- use x, y, z, rx, ry or rz'):format(tostring(axis)))
         end
 
@@ -1382,15 +1462,17 @@ RegisterNetEvent('mi_fire:client:nozzleGrip', function(action, axis, amount)
         grip.bone = axis
 
     elseif action == 'set' then
-        grip = axis
+        grip = defaults(axis)
     end
 
-    gripOverride = grip
+    grips[key] = grip
+    saveGrips()
 
-    if applyNozzleGrip(cache.ped) then
-        report(grip)
+    if applyNozzleGrip(cache.ped, true) then
+        report()
     else
         say('nothing in hand to move -- pull a line first')
+        report()
     end
 end)
 

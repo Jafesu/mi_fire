@@ -364,6 +364,16 @@ MIFireHose.visuals = {
     --- nil leaves the placement entirely to the game.
     nozzleGrip = nil,
 
+    --- The same, for while the player is aiming.
+    ---
+    --- Two placements rather than one because the hand rotates between the two stances and the
+    --- nozzle has to follow differently -- a set of numbers that looks right at rest goes wrong
+    --- the moment anyone aims. `/fire nozzlegrip` edits whichever stance you are currently in,
+    --- so aiming and then nudging fixes the aiming pose.
+    ---
+    --- nil falls back to `nozzleGrip`, so a half-tuned setup is imperfect rather than broken.
+    nozzleGripAiming = nil,
+
     --- Only if the weapon fails to load, which means the metas did not reach the client.
     ---
     --- Deliberately still here. A weapon needs `data/weapons.meta` and

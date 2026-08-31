@@ -89,9 +89,13 @@ Then confirm the rig route still works:
 
 ## 5. Catching fire is survivable now
 
-`StartEntityFire` was applying GTA's own ped fire damage on top of ours — about two seconds
-of life against a four second roll. The flames are a particle this resource owns now.
+Two separate natives were applying the engine's own fire damage over the top of this
+resource's model: `StartEntityFire` on the burning player, and `StartScriptFire` under every
+fire node. Both are gone. **The node one is confirmed fixed** — timings are back to the
+model's numbers.
 
+- [x] Full turnout in a fire lasts about a minute rather than seven seconds, and ignition
+      takes ~46 seconds rather than two.
 - [ ] Stand in a fire in turnout until you ignite (~46 seconds).
 - [ ] **The flames should look right.** They are a particle on your spine now, not the engine
       effect. If nothing is drawn, check F8 for a `burn particle` warning.
@@ -176,6 +180,9 @@ effect, and an orphaned one would survive the restart.
 
 - [ ] `restart mi_fire` **twice** while a fire is burning, **you are alight**, gear is on and
       SCBA is active.
+- [ ] Confirm fires still **light the scene at night**. The light is drawn directly now
+      rather than coming from the script fire that was removed — if a night fire is a flat
+      orange smudge, that is the regression to report.
 - [ ] No flames left on your ped, no orphaned particles, no stuck timecycle, no lingering
       sound, no leftover blips, no frozen HUD row.
 - [ ] `/fire list` after restart — empty.

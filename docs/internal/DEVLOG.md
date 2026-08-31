@@ -1361,3 +1361,78 @@ happening. That is the pattern worth remembering.
   partner.
 
 **Next:** re-run `TESTING.md` sections 2-6 against these fixes.
+
+---
+
+## 2026-08-30 · session 020
+
+**Scope:** the round-two test, and the defect that had been overruling the entire exposure
+model since Phase 1.
+
+**Changed:** `client/modules/fire/render.lua`, `config/fire_classes.lua`, `shared/pass.lua`,
+`config/scba.lua`, `server/modules/admin/init.lua`, `server/modules/exposure/init.lua`,
+`client/modules/turnout/init.lua`, `tools/tests/{fire,pass}_spec.lua`, docs.
+
+**The defect.** `render.lua` called `StartScriptFire` under every node, described in its own
+comment as "Light. Not the fire itself" and in config as "decoration". It is neither. A
+script fire is a real engine fire that ignites peds within a second or two of contact and
+burns them down on GTA's schedule, which knows nothing about `fireResist`, integrity,
+coverage, or any other number this resource computes.
+
+Full structural turnout gave **seven seconds** instead of sixty-four, and ignition took
+**two** instead of forty-six. Every survival figure in `docs/` was being computed correctly
+and then discarded by the engine.
+
+**What made it hard to see, and worth writing down:** the three symptoms looked mutually
+contradictory. Igniting in two seconds requires integrity below 20%, but the HUD showed the
+coat full and serviceable -- and *both readings were correct*. Our model really had only
+taken 29 of 240 integrity in those seven seconds; it simply was not the thing doing the
+killing. Two correct readings that cannot both be true is the signature of a third actor,
+and the reflex to reach for the tuning knobs is exactly wrong.
+
+The arithmetic was never the problem. 657 tests passed throughout, because every one of them
+was testing a model that the game was ignoring.
+
+**This is the second instance of the same fault.** `StartEntityFire` was removed from the
+burning-player path last session for identical reasons. Fixing one and leaving the other is
+why the invariant went into BUILD.md, and it is why it is now a test that walks every class
+rather than a sentence in a document.
+
+**Decisions:**
+
+- **Light is drawn, not spawned.** `DrawLightWithRange` per frame -- flickering, scaled by
+  intensity, distance-culled, idle when nothing burns. That was the only thing the script
+  fire was genuinely wanted for, and removing it without a replacement would have made every
+  night fire a flat orange smudge.
+
+- **`/fire gear` returns both halves in one block.** The server's view went to chat while the
+  client's went to F8, so the useful half was lost -- and the client half alone was
+  self-consistent and could never have found this. It now carries the resolved tier,
+  integrity against capacity, whether the wearer is currently ignitable, and what the
+  exposure model samples where they stand, broken down per channel in hp/s.
+
+- **Ignition logs the tier and integrity it fired at**, and warns outright above half
+  integrity. That combination is a contradiction rather than a tuning problem and should
+  announce itself rather than present as gear that does not work.
+
+- **PASS runs shortened timings when the wearer is down** -- 11 seconds to full alarm rather
+  than 38. A real PASS cannot tell you are down and takes its full thirty-odd seconds either
+  way; accurate, and useless, since that is most of a bleed-out timer spent silent. The
+  realistic values are one config line away and there is a test asserting both.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **657 passed, 0 failed** (was 642).
+- **Confirmed in game by the user:** full turnout now lasts about a minute and ignites
+  around forty-six seconds, matching the model.
+- All 53 Lua files parse.
+
+**Open:**
+
+- Whether fires still read well at night now the script fire is gone. The drawn light is
+  untested by eye.
+- The rest of round two: repair modes, the clothing-menu SCBA path, and everything needing
+  a second player.
+
+**Next:** the remainder of `TESTING.md`, starting with the repair modes -- none of which has
+ever executed, since both options were unreachable until two sessions ago.

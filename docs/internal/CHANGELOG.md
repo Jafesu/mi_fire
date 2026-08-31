@@ -9,6 +9,10 @@ Versions follow [Semantic Versioning](https://semver.org).
 
 - SCBA worn through a clothing menu is recognised, the same way turnout gear already was.
   A visible harness previously counted for nothing.
+- Fire kills at the rate the gear model says it does. Every fire node was spawning a real
+  engine fire underneath it, which ignited and killed players on the engine's own schedule
+  — full structural turnout gave about seven seconds instead of a minute. Fires still light
+  the scene; the light is drawn directly now.
 - Catching fire is survivable if you act at once. The engine's own ped fire was applying
   damage on top of the resource's, killing a firefighter in about two seconds against a
   four second roll — so stop, drop and roll could not be performed by anyone.

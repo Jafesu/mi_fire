@@ -236,22 +236,30 @@ Wiring those is what makes a 2.5 inch a three-person line rather than a number i
 file. `/fire hose` returns both the server's view and the client's in one block, which is the
 tool for the next attempt.
 
-### `ASSET-001` — replace the borrowed nozzle model
+### `ASSET-001` — replace the borrowed models
 
-`MIFireHose.visuals.nozzleProp` is `w_am_hose`, which belongs to **SmartHose**.
+`stream/` holds three files copied from **SmartHose**: `w_am_hose.ydr` and `.ytd` for the
+nozzle in hand, and `rope.ytd`, which is the hose texture.
 
-Nothing of theirs is in this repository. The model is referenced by name while SmartHose is
-installed, so it is loaded by their stream folder and used by ours -- no copy, and nothing that
-would be redistributed with mi_fire. If SmartHose stops, the prop does not load and the hose
-works without one.
+They are copied rather than referenced because those resources are not running on this server,
+and a streamed model can only be used by name while the resource that streams it is loaded.
 
-**It still must not ship.** Their escrow covers the Lua rather than the stream folder, so the
-asset is technically readable; that is a fact about the packaging and not permission. Replace
-it with an own model before release, or set it to nil.
+**They are gitignored.** A clone gets the code and none of somebody else's art, so shipping
+them cannot happen by accident -- only deliberately. Their escrow covers the Lua rather than
+the stream folder, so the files were readable; that is a fact about the packaging and not
+permission, and the gitignore is what keeps the distinction from mattering.
 
-Two things make forgetting hard rather than merely discouraged: the server warns on every start
-naming the model and its owner, and `conventions_spec` fails if a model is used that is
-neither base game nor declared in `visuals.borrowed`.
+The resource runs without them. The prop does not load, the server warns naming the model and
+its owner, and the hose works with nothing in the hand.
+
+**`rope.ytd` is worth understanding separately.** It replaces the game's rope texture
+dictionary, so it changes the appearance of *every* rope on the server rather than only ours.
+That is how SmartHose recolours its own. If another resource's ropes start looking like fire
+hose, this is why -- and it is a reason to replace this one sooner than the nozzle.
+
+Two things make forgetting hard rather than merely discouraged: the server warns on every start,
+and `conventions_spec` fails if a model is used that is neither base game nor declared in
+`visuals.borrowed`.
 
 ### Remaining phases
 

@@ -1512,3 +1512,77 @@ config key, if a decal comes back 0 in normal use.
   a reasonable thing to want.
 
 **Next:** in-game round three, starting with `/fire decals`.
+
+---
+
+## 2026-08-31 · session 022
+
+**Scope:** `HOSE-001`…`HOSE-004`, the rope, and Phase 2's zone rework.
+
+**Changed:** `config/{hose,apparatus}.lua`, `shared/{hose,apparatus}.lua`,
+`server/modules/{hose,apparatus,admin}/init.lua`, `client/modules/{hose,apparatus,placement,offsetfinder}/init.lua`,
+`tools/tests/{hose,apparatus,conventions}_spec.lua`.
+
+**Hoses work.** A crosslay pulls off the rig, the rope draws, it connects, it charges from the
+pump panel, and water goes on the fire through the same agent matrix everything else uses.
+Crew slots, flow ceilings and the tank clock are all live.
+
+**Ports became two shapes**, on the user's call. Compartments -- gear, tools, hose bed, bottle
+rack, ladder rack, panel -- are areas whose corners get walked with `/fireoffset`, tested with
+a crossing count so a footprint can be any quadrilateral. Fittings -- discharges, intakes,
+deck gun -- stay tight points, because picking the right piece of brass *is* the interaction.
+A centre plus a size was the wrong description for either: it guesses at a shape nobody
+measured.
+
+**The rope cost four rounds and a fire engine, and it should not have.**
+
+Every other visual constant in this resource came from reading something already running: the
+particle pairs out of a working fire resource, the roll animation out of qbx_medical, the decal
+sweep after a scan proved decals dead here. The rope is the one place I worked from the native
+names instead, and it produced, in order: nothing drawn, a fire engine thrown across the map
+and deleted, a flickering line, and a taut cable that stretched past its own length.
+
+`AttachEntitiesToRope` takes world coordinates and was handed vehicle-local offsets and a
+literal 0,0,0 -- so the rope became a constraint between the rig and the centre of the map.
+`AttachRopeToEntity` and `PinRopeVertex` both wanted vertex 0, so they fought every frame.
+Without `ActivatePhysics` a rope draws as a straight line. And attaching *either* end rigidly
+removes the freedom the sag comes from.
+
+SmartHose is on this machine and had the answer the whole time: pin both ends every frame,
+attach nothing, pin three vertices along the outlet axis so the hose leaves the coupling
+straight. Reading it first would have cost ten minutes.
+
+**Decisions:**
+
+- **The truck is never attached to the rope.** Not "attached correctly" -- not attached. Pinning
+  applies force to nothing, so the failure that destroyed a vehicle is unavailable rather than
+  fixed.
+
+- **No nozzle prop.** `prop_fire_hosereel_l1` is the reel, and in hand it read as a firefighter
+  carrying a large flat coil. There is no vanilla prop that looks like a nozzle, and nothing in
+  the hand beats the wrong thing in it.
+
+- **`/fire hose drop|clear`.** The first test stranded a player holding a prop with nothing in
+  the world to target. A system that can strand someone needs an exit that is not a restart,
+  and `clear` deliberately does not ask the server first -- the case it exists for is the one
+  where the two disagree.
+
+- **Three conventions became tests rather than notes**: no client file calls `lib.addCommand`,
+  no manifest block declares a file twice, and shared client helpers load before their
+  consumers. All three had already been broken once.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **901 passed, 0 failed** (was 830).
+- Confirmed in game: crosslay pulls, rope draws off the authored rear discharge, connect works.
+
+**Open:**
+
+- `HOSE-010`, parked: the hose follows the firefighter rather than lying where it was walked.
+  The note says why more slack will not fix it and what will.
+- `SCORCH-002`, parked: burn marks are on the marker fallback.
+- Nothing in Phase 3 has been tested with two players, so crew slots and backup positions are
+  unproven.
+
+**Next:** the rest of Phase 3 -- appliances and the gated wye -- or Phase 4, which now has its
+panel photographs.

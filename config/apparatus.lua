@@ -181,10 +181,10 @@ MIFireApparatus.profiles = {
             --- sphere. Boxes are vehicle-aligned, so this stays correct however it is parked.
             { id = "hosebed1", type = "hosebed",
               corners = {
-                { x = -1.286, y = -4.942, z = 0.853 },
-                { x = 1.114, y = -4.942, z = 0.853 },
-                { x = 1.114, y = -3.342, z = 0.853 },
-                { x = -1.286, y = -3.342, z = 0.853 },
+            { x = -0.906, y = -4.385, z = 0.714 },
+            { x = -0.890, y = -4.386, z = 1.194 },
+            { x = 0.882, y = -4.386, z = 1.152 },
+            { x = 0.889, y = -4.386, z = 0.700 },
               } },
                   
             { id = "pumppanel", type = "panel",
@@ -198,32 +198,32 @@ MIFireApparatus.profiles = {
             --- one locker is correct -- it is one locker.
             { id = "gear1", type = "gear",
               corners = {
-                { x = -1.738, y = -2.954, z = 0.159 },
-                { x = -0.738, y = -2.954, z = 0.159 },
-                { x = -0.738, y = -1.154, z = 0.159 },
-                { x = -1.738, y = -1.154, z = 0.159 },
+            { x = -1.238, y = 2.890, z = -0.446 },
+            { x = -1.238, y = 2.116, z = -0.429 },
+            { x = -1.238, y = 2.094, z = 0.890 },
+            { x = -1.238, y = 2.921, z = 0.878 },
               } },
             { id = "toolcompartment", type = "tool",
               corners = {
-                { x = -1.738, y = -2.954, z = 0.159 },
-                { x = -0.738, y = -2.954, z = 0.159 },
-                { x = -0.738, y = -1.154, z = 0.159 },
-                { x = -1.738, y = -1.154, z = 0.159 },
+            { x = -1.238, y = -1.440, z = -0.110 },
+            { x = -1.238, y = -1.429, z = 0.628 },
+            { x = -1.238, y = -2.956, z = 0.622 },
+            { x = -1.238, y = -2.934, z = -0.116 },
               } },
             { id = "scba_rack1", type = "scba_rack",
               corners = {
-                { x = -1.738, y = -4.409, z = 0.221 },
-                { x = -0.738, y = -4.409, z = 0.221 },
-                { x = -0.738, y = -3.009, z = 0.221 },
-                { x = -1.738, y = -3.009, z = 0.221 },
+            { x = -1.238, y = -0.556, z = 0.610 },
+            { x = -1.238, y = -1.323, z = 0.604 },
+            { x = -1.238, y = -1.324, z = -1.038 },
+            { x = -1.238, y = -0.558, z = -1.031 },
               } },
             --- Ladders run nearly the length of the rig.
             { id = "ladder_rack", type = "ladder_rack",
               corners = {
-                { x = 0.434, y = -4.446, z = 0.467 },
-                { x = 1.434, y = -4.446, z = 0.467 },
-                { x = 1.434, y = -0.446, z = 0.467 },
-                { x = 0.434, y = -0.446, z = 0.467 },
+            { x = 1.238, y = -4.321, z = -0.136 },
+            { x = 1.238, y = -0.513, z = -0.150 },
+            { x = 1.323, y = -4.219, z = 0.543 },
+            { x = 1.232, y = -0.499, z = 0.543 },
               } },
             --- The outlets are inches apart on a real rig, so these zones overlap and
             --- ox_target offers several at once. That is correct rather than a problem, but

@@ -166,6 +166,36 @@ the user is capturing. Authoring a layout from guesswork means building it twice
 `ladder`, `tower`, and `tanker` families follow in Phase 5 with the aerial and supply work their
 controls depend on.
 
+### `HOSE-010` — the hose should lie where it was walked, parked
+
+Working, but the rope follows the firefighter rather than staying where it was laid. Pulling a
+line away from the rig drags the whole hose with you instead of leaving it on the ground
+behind you.
+
+**Do not start by adjusting slack or rope length.** That ground is covered: the rope is created
+short and paid out, both ends are pinned every frame rather than attached, and three vertices
+are pinned along the outlet axis at the rig. That is the shape SmartHose uses and it is correct
+as far as it goes. More slack makes a longer rope between the same two moving points; it does
+not make the hose stay put.
+
+The reason is structural. Only two points are held — the coupling and the hand — so everything
+between them is a free-hanging catenary that moves whenever either end does. A hose that stays
+where it was laid needs the **path** recorded, not just the ends:
+
+- Sample the nozzle holder's position as they walk, dropping a world point every metre or so.
+- Pin intermediate rope vertices along that trail rather than leaving them free.
+- Drop trail points when the crew moves *away* from the rig; consume them when they walk back,
+  so the line takes itself in rather than doubling up.
+- The trail is also the honest source for hose length used: distance along the path, not the
+  straight line to the rig, which is what a real stretch around a corner costs.
+
+Worth doing at the same time: a **dropped** line currently is not drawn at all, because nothing
+records where it is when nobody is holding it. The trail solves that too -- the last point is
+where the nozzle was put down.
+
+`Supply-Line` on this drive lays a hose along a road and may already do the trail part; read it
+before writing this, the way SmartHose should have been read before the rope.
+
 ### Remaining phases
 
 | Phase | Scope |

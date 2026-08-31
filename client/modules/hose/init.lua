@@ -172,19 +172,28 @@ end
 ---@param id string
 ---@param line table
 local function draw(id, line)
-    if drawn[id] then return end
-    if MIFireHose.visuals.enabled == false then return end
+    if MIFireHose.visuals.enabled == false then
+        drawn[id] = nil
+        return
+    end
     if not ensureTextures() then return end
 
     local from, vehicle, port = sourceCoords(line)
-    if not from then return end
+
+    if not from then
+        drawn[id] = nil
+        return
+    end
 
     local holder = line.nozzleHolder and GetPlayerFromServerId(line.nozzleHolder)
     local holderPed = holder and holder ~= -1 and GetPlayerPed(holder) or nil
 
     -- Nobody is holding it. A dropped line is real and worth drawing eventually, but it needs
     -- a world position to hang from that nothing currently records.
-    if not holderPed or not DoesEntityExist(holderPed) then return end
+    if not holderPed or not DoesEntityExist(holderPed) then
+        drawn[id] = nil
+        return
+    end
 
     local size = MIFireHose.sizes[line.diameter] or {}
     local maxLength = Hose.lengthFeet(size, line.sections) * 0.3048
@@ -203,12 +212,16 @@ local function draw(id, line)
 
     if not rope or rope == 0 then
         Util.warn('AddRope failed for line %s -- check the rope type in config/hose.lua', id)
+        drawn[id] = nil
         return
     end
 
-    -- Claimed before the wait below, so two syncs arriving close together cannot both get past
-    -- the guard and leave a rope orphaned with nothing tracking it.
-    drawn[id] = { rope = rope, vehicle = vehicle, pending = true }
+    -- The claim was already staked by the caller; fill in what it needs to tear this down if
+    -- the build fails partway.
+    drawn[id] = drawn[id] or {}
+    drawn[id].rope = rope
+    drawn[id].vehicle = vehicle
+    drawn[id].pending = true
 
     -- A rope has no vertices until it has been simulated once.
     local vertices = 0
@@ -247,9 +260,6 @@ local function draw(id, line)
         port = port,
     }
 
-    if line.nozzleHolder == GetPlayerServerId(PlayerId()) then
-        drawn[id].nozzle = attachNozzle(cache.ped)
-    end
 end
 
 ---@param id string
@@ -258,61 +268,101 @@ local function undraw(id)
     if not entry then return end
 
     if entry.rope and DoesRopeExist(entry.rope) then DeleteRope(entry.rope) end
-    if entry.nozzle and DoesEntityExist(entry.nozzle) then DeleteEntity(entry.nozzle) end
 
     drawn[id] = nil
 end
 
---- Hold both ends of every rope, every frame.
+--- The nozzle in our own hands.
 ---
---- This is the shape the working hose resource on this machine uses, read rather than guessed
---- at after three attempts at inventing it. Two things in it matter and neither is obvious:
+--- Kept entirely apart from the rope. It used to be created inside `draw`, which meant it only
+--- appeared when a rope did -- and a rope only draws once the line is coupled to something. So
+--- a crew walking an uncoupled line out from the bed had nothing in their hands the whole way,
+--- which is exactly the part of the job where they are carrying a nozzle.
+local heldNozzle = nil
+
+local function reconcileNozzle()
+    local line = mine and lines[mine]
+    local holding = line ~= nil and line.nozzleHolder == GetPlayerServerId(PlayerId())
+
+    if holding and not heldNozzle then
+        heldNozzle = attachNozzle(cache.ped)
+
+    elseif not holding and heldNozzle then
+        if DoesEntityExist(heldNozzle) then DeleteEntity(heldNozzle) end
+        heldNozzle = nil
+    end
+end
+
+--- Reconcile what is drawn against what should be, every frame.
+---
+--- **Reconciling rather than reacting.** The rope used to be built in response to a sync event
+--- and torn down by the same handler, which had two failure modes that both showed up in play:
+--- a rope that failed to build never tried again, and a rope torn down by a momentary hiccup --
+--- a network id not resolving for one frame, say -- stayed gone until the server happened to
+--- send another update. The line appearing and then vanishing on connect was the second of
+--- those.
+---
+--- Now the loop asks what should exist and makes it so. A transient failure costs a frame.
+---
+--- Holding the ends is the other half, and two things in it matter, neither obvious:
 ---
 --- **Neither end is attached to an entity.** `AttachRopeToEntity` and `AttachEntitiesToRope`
---- both make the rope a physical constraint on whatever they bind, which is how a fire engine
---- ends up airborne, and they hold their end rigidly enough that the rope has no freedom to
---- hang. Pinning a vertex just says where that vertex is. Everything between the pins is left
---- to the simulation, which is where the sag comes from.
+--- make the rope a physical constraint on whatever they bind, which is how a fire engine ends
+--- up airborne, and they hold their end rigidly enough that the rope cannot hang. Pinning says
+--- where a vertex is and applies force to nothing.
 ---
---- **Three vertices are pinned at the rig, not one.** Pinning only the last gives a hose that
---- leaves the coupling in whatever direction the physics fancies. Pinning the last three along
---- the outlet's axis makes it exit the fitting straight, the way a coupled hose does.
----
---- Every frame, because a hand moves every frame and a rope pinned on a timer visibly lags
---- behind it.
+--- **Three vertices are pinned at the rig**, along the outlet's axis, so the hose leaves the
+--- coupling straight rather than at whatever angle physics settles on.
 CreateThread(function()
     while true do
-        if next(drawn) == nil then
+        if next(lines) == nil and next(drawn) == nil then
             Wait(250)
+            reconcileNozzle()
         else
             Wait(0)
 
-            for id, entry in pairs(drawn) do
-                local line = lines[id]
+            reconcileNozzle()
 
-                if entry.pending then
-                    -- Still waiting for its first simulation.
+            -- Anything drawn whose line is gone.
+            for id in pairs(drawn) do
+                if not lines[id] then undraw(id) end
+            end
 
-                elseif not line or not entry.rope or not DoesRopeExist(entry.rope) then
-                    undraw(id)
+            for id, line in pairs(lines) do
+                local entry = drawn[id]
 
-                elseif not entry.holder or not DoesEntityExist(entry.holder) then
-                    undraw(id)
+                if entry and entry.pending then
+                    -- Still building. Pinning now would use vertex 0, which is the end the
+                    -- firefighter is on.
+
+                elseif entry and (not entry.rope or not DoesRopeExist(entry.rope)) then
+                    -- The rope went away underneath us. Drop the record and let this loop
+                    -- build a new one next frame rather than leaving the line invisible.
+                    drawn[id] = nil
+
+                elseif not entry then
+                    -- Claimed here rather than inside `draw`, and built on its own thread.
+                    -- `draw` yields while it waits for the rope to simulate, and yielding
+                    -- inside a `pairs` walk of a table another handler can rewrite is how a
+                    -- loop ends up with an invalid key.
+                    drawn[id] = { pending = true }
+
+                    CreateThread(function() draw(id, line) end)
 
                 else
                     local from = sourceCoords(line)
+                    local holder = entry.holder
 
-                    if not from then
-                        undraw(id)
+                    if not from or not holder or not DoesEntityExist(holder) then
+                        -- Transient. A network id that does not resolve this frame is not a
+                        -- reason to delete a hose.
+
                     else
-                        local hand = GetWorldPositionOfEntityBone(entry.holder,
-                            GetPedBoneIndex(entry.holder, 6286))
+                        local hand = GetWorldPositionOfEntityBone(holder,
+                            GetPedBoneIndex(holder, 6286))
 
-                        -- The nozzle end.
                         PinRopeVertex(entry.rope, 0, hand.x, hand.y, hand.z)
 
-                        -- The coupling end, along the outlet's axis so the hose leaves it
-                        -- straight rather than at whatever angle the physics settles on.
                         local axis = portAxis(entry.vehicle, entry.port)
                         local last = entry.vertices - 1
 
@@ -322,10 +372,8 @@ CreateThread(function()
                         PinRopeVertex(entry.rope, last - 2,
                             from.x + axis.x * 0.5, from.y + axis.y * 0.5, from.z + axis.z * 0.5)
 
-                        -- Pay the line out as the crew walks and haul it in as they return, so
-                        -- there is always slack and never a heap. Capped at what is on the bed:
-                        -- two hundred feet of hose reaches two hundred feet, and finding that
-                        -- out at the door is part of stretching a line.
+                        -- Pay the line out as the crew walks and haul it in as they return,
+                        -- capped at what is on the bed.
                         local slack = 1.0 + (MIFireHose.visuals.slack or 0.35)
                         local wanted = math.min(entry.maxLength,
                             math.max(2.0, #(from - hand) * slack))
@@ -339,40 +387,6 @@ CreateThread(function()
             end
         end
     end
-end)
-
--- ---------------------------------------------------------------------------
--- Sync
--- ---------------------------------------------------------------------------
-
-RegisterNetEvent('mi_fire:client:hoseLine', function(id, line)
-    if type(id) ~= 'string' then return end
-
-    if not line then
-        undraw(id)
-        lines[id] = nil
-        if mine == id then mine = nil end
-        return
-    end
-
-    local previous = lines[id]
-    lines[id] = line
-
-    if onCrew(line, GetPlayerServerId(PlayerId())) then
-        mine = id
-    elseif mine == id then
-        mine = nil
-    end
-
-    -- Redraw when something that changes the rope's shape changed. Rebuilding a rope every
-    -- tick would be both expensive and visibly jittery.
-    if previous and (previous.sourceNet ~= line.sourceNet
-        or previous.nozzleHolder ~= line.nozzleHolder
-        or previous.sections ~= line.sections) then
-        undraw(id)
-    end
-
-    draw(id, line)
 end)
 
 -- ---------------------------------------------------------------------------
@@ -877,9 +891,19 @@ end)
 RegisterNetEvent('mi_fire:client:clearHoseProps', function()
     for id in pairs(drawn) do undraw(id) end
 
+    if heldNozzle and DoesEntityExist(heldNozzle) then DeleteEntity(heldNozzle) end
+
+    heldNozzle = nil
     drawn = {}
     lines = {}
     mine = nil
+end)
+
+AddEventHandler('onResourceStop', function(resource)
+    if resource ~= GetCurrentResourceName() then return end
+
+    -- An attached prop outlives the resource otherwise, and there is nothing left to remove it.
+    if heldNozzle and DoesEntityExist(heldNozzle) then DeleteEntity(heldNozzle) end
 end)
 
 --- The pump panel, until Phase 4's NUI replaces it.

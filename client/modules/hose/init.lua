@@ -1331,24 +1331,64 @@ end)
 ---
 --- The alternative is baking a new origin into the model, exporting, restarting, and looking --
 --- per attempt. Six numbers and a bone, changed live, is the same job in seconds.
-RegisterNetEvent('mi_fire:client:nozzleGrip', function(grip)
+---
+--- Nudging is per-axis rather than all six at once, because finding a placement means changing
+--- one thing and seeing what moved. Retyping six numbers to alter one of them is how people
+--- stop bothering.
+RegisterNetEvent('mi_fire:client:nozzleGrip', function(action, axis, amount)
     local function say(text)
         TriggerEvent('chat:addMessage', { args = { 'mi_fire', text } })
         print('[mi_fire] ' .. text)
     end
 
-    if grip == nil then
+    local function current()
+        local from = gripOverride or MIFireHose.visuals.nozzleGrip or {}
+        return {
+            bone = from.bone or 'right',
+            x = from.x or 0.0, y = from.y or 0.0, z = from.z or 0.0,
+            rx = from.rx or 0.0, ry = from.ry or 0.0, rz = from.rz or 0.0,
+        }
+    end
+
+    --- The line to paste into `config/hose.lua`, so a placement found by eye does not have to
+    --- be copied down by hand from six separate chat messages.
+    local function report(grip)
+        say(('bone=%s  x=%.3f y=%.3f z=%.3f  rx=%.1f ry=%.1f rz=%.1f')
+            :format(grip.bone, grip.x, grip.y, grip.z, grip.rx, grip.ry, grip.rz))
+        say(("nozzleGrip = { bone = '%s', x = %.3f, y = %.3f, z = %.3f, rx = %.1f, ry = %.1f, rz = %.1f },")
+            :format(grip.bone, grip.x, grip.y, grip.z, grip.rx, grip.ry, grip.rz))
+    end
+
+    if action == 'off' then
         gripOverride = nil
-        say('grip override cleared -- back to the config, or to the game if that is nil')
+        say('grip override cleared -- placement is the game\'s again')
         return
+    end
+
+    if action == 'show' then
+        return report(current())
+    end
+
+    local grip = current()
+
+    if action == 'nudge' then
+        if grip[axis] == nil or axis == 'bone' then
+            return say(('"%s" is not an axis -- use x, y, z, rx, ry or rz'):format(tostring(axis)))
+        end
+
+        grip[axis] = grip[axis] + amount
+
+    elseif action == 'bone' then
+        grip.bone = axis
+
+    elseif action == 'set' then
+        grip = axis
     end
 
     gripOverride = grip
 
     if applyNozzleGrip(cache.ped) then
-        say(('grip: bone=%s xyz=%.3f %.3f %.3f rot=%.1f %.1f %.1f')
-            :format(grip.bone, grip.x, grip.y, grip.z, grip.rx, grip.ry, grip.rz))
-        say('when it looks right, paste that line back and it goes in the config')
+        report(grip)
     else
         say('nothing in hand to move -- pull a line first')
     end

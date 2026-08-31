@@ -2136,3 +2136,49 @@ diagnostic that caught it was luck.
 
 **Next:** whether other weapons survive.
 
+---
+
+## 2026-08-31 (tenth) — the animation file merges, and the grip gets a nudge
+
+**Scope:** the experiment paid off. Placement is the last thing left.
+
+**The result: FiveM merges `weaponanimations.meta`.** With our file loaded and only
+`WEAPON_MINOZZLE` in it, pistols, rifles and ThrowBag's weapon all kept their animations, and the
+nozzle is held correctly.
+
+That is worth recording loudly because the evidence pointed the other way. Both resources on this
+machine that ship one of these carry a **full 13,000 line copy** of the vanilla data with their
+own entry added -- which is only necessary if the file replaces. They had copied an approach that
+nobody appears to have checked, and it propagated. A new weapon needs four lines of animation
+mapping, not thirteen thousand.
+
+The general lesson is one this project keeps paying for: two resources doing the same thing is
+not evidence that the thing is necessary. It is evidence that one of them copied the other.
+
+**Changed:**
+
+- `data/weaponanimations.meta`, `fxmanifest.lua` — comments now record the answer rather than the
+  question.
+- `/fire nozzlegrip` — per-axis nudging, `show`, and `bone`.
+
+**Decisions:**
+
+- **Nudging is per-axis.** Finding a placement means changing one thing and seeing what moved,
+  and retyping six numbers to alter one of them is how people stop bothering.
+  `/fire nozzlegrip nudge z 0.02`.
+
+- **It prints the config line, not just the numbers.** A placement found by eye should not then
+  have to be copied down by hand out of six separate chat messages.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1055 passed, 0 failed**.
+- In game: the stance is right and no other weapon is affected.
+
+**Open:**
+
+- The grip itself, which is now a few minutes of nudging rather than a rebuild.
+- Still nothing fired.
+
+**Next:** water.
+

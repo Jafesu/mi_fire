@@ -17,25 +17,23 @@
   clip set, a filter, and jump and fall clip sets together.
 
   ============================================================================================
-  THIS FILE IS AN EXPERIMENT, AND IT MAY BREAK EVERY OTHER WEAPON ON THE SERVER.
+  FiveM MERGES this file. Tested in game.
   ============================================================================================
 
-  `CWeaponAnimationsSets` is a single global structure. If FiveM **merges** this into the game's
-  set, only WEAPON_MINOZZLE is affected and everything else is untouched. If it **replaces** it,
-  every weapon that is not listed here loses its animations – which is very visible and affects
-  everyone.
+  `CWeaponAnimationsSets` is a single global structure, so the open question was whether a second
+  one merges into the game's set or replaces it outright. It merges: with this file loaded and
+  only WEAPON_MINOZZLE in it, pistols, rifles and ThrowBag's weapon all kept their animations.
 
-  The evidence on this machine points at replacement: both other resources here that ship one of
-  these (SmartHose, ThrowBag) carry a full 13,000 line copy of the vanilla data with their own
-  entry added, which is only necessary if the file replaces. They may equally have copied that
-  approach from a tutorial without testing it. Nobody seems to know, so this settles it.
+  That is worth writing down because the evidence pointed the other way. Both other resources on
+  this machine that ship one of these (SmartHose, ThrowBag) carry a full 13,000 line copy of the
+  vanilla data with their own entry added, which is only necessary if the file replaces. They had
+  copied an approach nobody had checked.
 
-  TO REVERT: delete the `data_file 'WEAPON_ANIMATIONS_FILE'` line from `fxmanifest.lua` and its
-  entry in `files`, then restart the resource. Nothing else depends on this file – the stance
-  falls back to the weapon's default, which is the fire extinguisher's, and that works.
+  So: a new weapon needs four lines of animation mapping, not thirteen thousand.
 
-  WHAT TO CHECK, beyond whether the nozzle looks right: draw a pistol, a rifle, and anything from
-  ThrowBag. If those are fine, it merges. If they T-pose or hold wrongly, it replaces – revert.
+  TO REVERT anyway: delete the `data_file 'WEAPON_ANIMATIONS_FILE'` line from `fxmanifest.lua`
+  and its entry in `files`. The stance falls back to the weapon's default, which is the fire
+  extinguisher's.
 -->
 <CWeaponAnimationsSets>
   <WeaponAnimationsSets>

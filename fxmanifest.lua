@@ -121,15 +121,16 @@ dependencies {
 data_file 'WEAPONINFO_FILE' 'data/weapons.meta'
 data_file 'WEAPON_METADATA_FILE' 'data/weaponarchetypes.meta'
 
---- How the nozzle is held. **Experimental -- this line is the revert switch.**
+--- How the nozzle is held.
 ---
---- `CWeaponAnimationsSets` is a single global structure, and nobody here is certain whether
---- FiveM merges a second one into the game's or replaces it outright. If it merges, only
---- WEAPON_MINOZZLE is affected. If it replaces, every weapon not listed in our file loses its
---- animations -- server-wide and very visible.
+--- `CWeaponAnimationsSets` is a single global structure, so whether a second one merges into the
+--- game's set or replaces it outright decides whether this file is safe. **It merges** --
+--- confirmed in game, with pistols, rifles and ThrowBag's weapon all keeping their animations
+--- while only WEAPON_MINOZZLE was listed here.
 ---
---- Delete this line and the matching entry in `files` to undo it completely. The stance falls
---- back to the weapon's own, which is the fire extinguisher's, and that works.
+--- Worth knowing, because the evidence pointed the other way: both resources on this machine
+--- that ship one of these carry a full 13,000 line copy of the vanilla data, which is only
+--- necessary if it replaces. A new weapon needs four lines of mapping, not thirteen thousand.
 data_file 'WEAPON_ANIMATIONS_FILE' 'data/weaponanimations.meta'
 
 ui_page 'web/index.html'

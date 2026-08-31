@@ -616,50 +616,79 @@ subcommands.nozzlehold = function(source, args)
         :format(clipset, args[3] == 'move' and 'movement' or 'weapon'))
 end
 
---- `/fire nozzlegrip <left|right> <x> <y> <z> <rx> <ry> <rz>` -- move the nozzle in the hand.
+--- `/fire nozzlegrip ...` -- move the nozzle in the hand.
 ---
 --- Baking a new origin into the model costs an export and a restart to see one attempt. This is
---- the same job live, and the numbers it prints go straight into `MIFireHose.visuals.nozzleGrip`.
+--- the same job live, and it prints the config line to paste back when it looks right.
 ---
---- `off` hands placement back to the game.
+---     /fire nozzlegrip show                  what it is now
+---     /fire nozzlegrip nudge <axis> <amount> one axis at a time: x y z rx ry rz
+---     /fire nozzlegrip bone <left|right>     which hand
+---     /fire nozzlegrip <x> <y> <z> <rx> <ry> <rz>   all six at once
+---     /fire nozzlegrip off                   hand placement back to the game
+---
+--- Per-axis because finding a placement means changing one thing and seeing what moved.
+--- Retyping six numbers to alter one of them is how people stop bothering.
 subcommands.nozzlegrip = function(source, args)
     if source == 0 then
         return reply(source, 'the console has no hands; run this in game', 'error')
     end
 
-    -- `args[1]` is the subcommand name itself -- the dispatcher passes the whole line. Every
-    -- other subcommand here starts at `args[2]`, and this one did not, so "right" was compared
-    -- against "nozzlegrip" and every call printed the usage text.
-    if args[2] == 'off' or args[2] == 'reset' then
-        TriggerClientEvent('mi_fire:client:nozzleGrip', source, nil)
+    local action = args[2]
+
+    if action == 'off' or action == 'reset' then
+        TriggerClientEvent('mi_fire:client:nozzleGrip', source, 'off')
         return reply(source, 'grip override cleared')
     end
 
-    local bone = args[2]
-
-    if bone ~= 'left' and bone ~= 'right' then
-        return reply(source,
-            'usage: /fire nozzlegrip <left|right> <x> <y> <z> <rx> <ry> <rz>, or "off". '
-            .. 'Offsets are metres, rotations degrees. Start from 0 0 0 0 0 0 and nudge.',
-            'error')
+    if not action or action == 'show' then
+        TriggerClientEvent('mi_fire:client:nozzleGrip', source, 'show')
+        return reply(source, 'nudge one axis at a time: /fire nozzlegrip nudge z 0.02')
     end
 
+    if action == 'bone' then
+        local bone = args[3]
+
+        if bone ~= 'left' and bone ~= 'right' then
+            return reply(source, 'usage: /fire nozzlegrip bone <left|right>', 'error')
+        end
+
+        TriggerClientEvent('mi_fire:client:nozzleGrip', source, 'bone', bone)
+        return reply(source, ('moved to the %s hand'):format(bone))
+    end
+
+    if action == 'nudge' then
+        local axis = args[3]
+        local amount = tonumber(args[4])
+
+        if not amount then
+            return reply(source,
+                'usage: /fire nozzlegrip nudge <x|y|z|rx|ry|rz> <amount>. '
+                .. 'Try 0.02 for a position, 15 for a rotation, and negatives to go back.',
+                'error')
+        end
+
+        TriggerClientEvent('mi_fire:client:nozzleGrip', source, 'nudge', axis, amount)
+        return reply(source, ('%s %+g'):format(tostring(axis), amount))
+    end
+
+    -- Six numbers, all at once.
     local numbers = {}
 
-    for i = 3, 8 do
+    for i = 2, 7 do
         local value = tonumber(args[i])
 
         if not value then
             return reply(source,
-                ('argument %d ("%s") is not a number -- six are needed: x y z rx ry rz')
-                    :format(i - 1, tostring(args[i])), 'error')
+                ('"%s" is neither a number nor one of show, nudge, bone, off')
+                    :format(tostring(args[i])), 'error')
         end
 
         numbers[#numbers + 1] = value
     end
 
-    TriggerClientEvent('mi_fire:client:nozzleGrip', source, {
-        bone = bone,
+    TriggerClientEvent('mi_fire:client:nozzleGrip', source, 'set', {
+        bone = 'right',
         x = numbers[1], y = numbers[2], z = numbers[3],
         rx = numbers[4], ry = numbers[5], rz = numbers[6],
     })

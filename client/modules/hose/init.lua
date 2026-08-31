@@ -207,6 +207,46 @@ local function applyNozzleHold(ped, clipset)
     return true
 end
 
+--- Where the nozzle sits in the hand, overriding what the animation does with it.
+---
+--- An equipped weapon is normally placed entirely by the game: the model origin goes to the
+--- hand and the clipset decides the rest. That is fine until the model is not shaped like the
+--- weapon whose animation it is borrowing -- a nozzle held by its bale handle is not a minigun,
+--- and no amount of moving the origin fixes the rotation.
+---
+--- `GetCurrentPedWeaponEntityIndex` hands back the weapon as an entity, and an entity can be
+--- re-attached. So the placement becomes six numbers and a bone rather than a rebuild of the
+--- model, which matters because every origin change otherwise costs an export and a restart to
+--- see. `/fire nozzlegrip` sets them live; whatever looks right goes in the config.
+---
+--- `SKEL_` bones, not `PH_`. The prop-helper bones are absent on player peds and
+--- `GetPedBoneIndex` answers -1, which attaches the nozzle to the middle of the map -- a
+--- lesson this repository already paid for once with the rope.
+local BONES = { right = 57005, left = 18905 }
+
+--- Set by `/fire nozzlegrip`, and takes precedence over the config while it is set.
+---@type table|nil
+local gripOverride = nil
+
+---@param ped integer
+---@return boolean applied
+local function applyNozzleGrip(ped)
+    local grip = gripOverride or MIFireHose.visuals.nozzleGrip
+    if not grip then return false end
+
+    local object = GetCurrentPedWeaponEntityIndex(ped)
+    if not object or object == 0 or not DoesEntityExist(object) then return false end
+
+    local bone = GetPedBoneIndex(ped, BONES[grip.bone or 'right'] or BONES.right)
+
+    AttachEntityToEntity(object, ped, bone,
+        grip.x or 0.0, grip.y or 0.0, grip.z or 0.0,
+        grip.rx or 0.0, grip.ry or 0.0, grip.rz or 0.0,
+        true, true, false, true, 1, true)
+
+    return true
+end
+
 --- Both of them, because either one left behind outlasts the nozzle.
 ---@param ped integer
 local function clearNozzleHold(ped)
@@ -436,6 +476,11 @@ local function reconcileNozzle()
             end
 
         elseif nozzleEquipped then
+            -- Re-applied every pass rather than once. The game re-places the weapon itself
+            -- whenever the ped changes stance -- drawing, aiming, getting in a vehicle -- and a
+            -- grip that only survives until the first aim is not one worth having.
+            applyNozzleGrip(cache.ped)
+
             local hash = joaat(MIFireHose.visuals.nozzleWeapon)
 
             if not HasPedGotWeapon(cache.ped, hash, false) then
@@ -457,6 +502,7 @@ local function reconcileNozzle()
                 if nozzleEquipped then
                     applyNozzleStrafe(cache.ped)
                     applyNozzleHold(cache.ped)
+                    applyNozzleGrip(cache.ped)
                 end
             end
         end
@@ -1278,6 +1324,33 @@ RegisterNetEvent('mi_fire:client:nozzleHold', function(clipset, kind)
         say('T-posing means it is the other kind. "/fire nozzlehold off" undoes it.')
     else
         say(('"%s" would not load'):format(clipset))
+    end
+end)
+
+--- `/fire nozzlegrip ...` -- move the nozzle in the hand without rebuilding it.
+---
+--- The alternative is baking a new origin into the model, exporting, restarting, and looking --
+--- per attempt. Six numbers and a bone, changed live, is the same job in seconds.
+RegisterNetEvent('mi_fire:client:nozzleGrip', function(grip)
+    local function say(text)
+        TriggerEvent('chat:addMessage', { args = { 'mi_fire', text } })
+        print('[mi_fire] ' .. text)
+    end
+
+    if grip == nil then
+        gripOverride = nil
+        say('grip override cleared -- back to the config, or to the game if that is nil')
+        return
+    end
+
+    gripOverride = grip
+
+    if applyNozzleGrip(cache.ped) then
+        say(('grip: bone=%s xyz=%.3f %.3f %.3f rot=%.1f %.1f %.1f')
+            :format(grip.bone, grip.x, grip.y, grip.z, grip.rx, grip.ry, grip.rz))
+        say('when it looks right, paste that line back and it goes in the config')
+    else
+        say('nothing in hand to move -- pull a line first')
     end
 end)
 

@@ -1900,3 +1900,63 @@ the minigun's, and the nozzle was gripped by its body rather than its handle.
 
 **Next:** water.
 
+---
+
+## 2026-08-31 (sixth) — a tuner, rather than another guess at the grip
+
+**Scope:** fourth in-game run. It holds and it poses; the placement is wrong and walking T-poses.
+
+**Changed:**
+
+- `config/hose.lua` — `nozzleClipset = 'weapons@heavy@minigun'`, matching the hold.
+- `client/modules/hose/init.lua` — `applyNozzleGrip`, re-attaching the weapon entity to a bone
+  with configurable offsets, re-applied every pass.
+- `/fire nozzlegrip <left|right> <x> <y> <z> <rx> <ry> <rz>` and `off`.
+
+**Decisions:**
+
+- **The walking T-pose is the missing half of a pair.** The vanilla data gives the minigun
+  `weapons@heavy@minigun` for **both** `MotionClipSetHash` and `WeaponClipSetHash`. Only the
+  weapon one was set, so the hold was right and the walk had nothing to stand in. Setting both
+  matches what the game does with its own weapon, which is a better argument than any reasoning
+  about what a clipset contains.
+
+  Also worth recording: the very first T-pose was blamed on passing a weapon clipset to
+  `SetPedMovementClipset`. That was probably wrong too -- the weapon was being stripped at the
+  same time, so the ped was empty-handed, and this run shows the same name works fine as a
+  movement clipset when something is actually in hand. Two bugs overlapping produced a
+  confident, wrong conclusion, twice.
+
+- **Placement stops being a rebuild.** Baking a new origin costs an export and a restart to see
+  a single attempt, and the grip has now been wrong twice -- centre, then barrel, and the bale
+  handle still needs rotating. `GetCurrentPedWeaponEntityIndex` returns the weapon as an entity,
+  and an entity can be re-attached, so placement becomes six numbers and a bone that can change
+  live.
+
+  This is the same conclusion this project reached about ports and about the rope: when
+  something can only be judged by looking at it, the tool that lets someone look is worth more
+  than another careful guess. The remaining unknown -- which hand, and which way round -- is one
+  I cannot see and the user can.
+
+- **`SKEL_` bones, not `PH_`.** The prop-helper bones are absent on player peds and
+  `GetPedBoneIndex` answers -1, which attaches to the world origin. Already paid for once with
+  the rope.
+
+- **Re-applied every pass, not once.** The game re-places an equipped weapon on every stance
+  change -- drawing, aiming, entering a vehicle. A grip that survives until the first aim is not
+  worth having.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1043 passed, 0 failed**.
+- **Not** tested in game. The grip numbers are deliberately `nil`: placement stays with the game
+  until someone finds better ones.
+
+**Open:**
+
+- Find the grip with `/fire nozzlegrip` and put the numbers in `nozzleGrip`.
+- Confirm walking no longer T-poses now both clipsets are set.
+- Nothing has been fired. Water is still the next real milestone.
+
+**Next:** water, once the thing is being held properly.
+

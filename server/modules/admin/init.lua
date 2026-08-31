@@ -615,6 +615,54 @@ subcommands.nozzlehold = function(source, args)
         :format(clipset, args[2] == 'move' and 'movement' or 'weapon'))
 end
 
+--- `/fire nozzlegrip <left|right> <x> <y> <z> <rx> <ry> <rz>` -- move the nozzle in the hand.
+---
+--- Baking a new origin into the model costs an export and a restart to see one attempt. This is
+--- the same job live, and the numbers it prints go straight into `MIFireHose.visuals.nozzleGrip`.
+---
+--- `off` hands placement back to the game.
+subcommands.nozzlegrip = function(source, args)
+    if source == 0 then
+        return reply(source, 'the console has no hands; run this in game', 'error')
+    end
+
+    if args[1] == 'off' or args[1] == 'reset' then
+        TriggerClientEvent('mi_fire:client:nozzleGrip', source, nil)
+        return reply(source, 'grip override cleared')
+    end
+
+    local bone = args[1]
+
+    if bone ~= 'left' and bone ~= 'right' then
+        return reply(source,
+            'usage: /fire nozzlegrip <left|right> <x> <y> <z> <rx> <ry> <rz>, or "off". '
+            .. 'Offsets are metres, rotations degrees. Start from 0 0 0 0 0 0 and nudge.',
+            'error')
+    end
+
+    local numbers = {}
+
+    for i = 2, 7 do
+        local value = tonumber(args[i])
+
+        if not value then
+            return reply(source,
+                ('argument %d ("%s") is not a number -- six are needed: x y z rx ry rz')
+                    :format(i, tostring(args[i])), 'error')
+        end
+
+        numbers[#numbers + 1] = value
+    end
+
+    TriggerClientEvent('mi_fire:client:nozzleGrip', source, {
+        bone = bone,
+        x = numbers[1], y = numbers[2], z = numbers[3],
+        rx = numbers[4], ry = numbers[5], rz = numbers[6],
+    })
+
+    reply(source, 'applied -- look at your hands')
+end
+
 --- `/fire perms` -- why you can or cannot use these commands.
 ---
 --- Deliberately reachable by anyone: someone who cannot run the commands is exactly who

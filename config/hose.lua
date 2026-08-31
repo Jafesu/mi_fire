@@ -313,12 +313,29 @@ MIFireHose.visuals = {
 
     --- How the firefighter **walks** while carrying it, as a movement clipset.
     ---
-    --- Separate from the hold above and usually not needed -- the weapon clipset is what
-    --- changes the carry. Names beginning `move_` are movement clipsets; anything else almost
-    --- certainly is not, and getting it wrong here is the T-pose.
+    --- The same name as the hold, which looks like a mistake and is not: the game's own
+    --- weaponanimations gives the minigun `weapons@heavy@minigun` for **both**
+    --- `MotionClipSetHash` and `WeaponClipSetHash`. Setting only the hold left the walk with
+    --- nothing to fall back on, and walking T-posed.
     ---
-    --- Try one with `/fire nozzlehold <clipset> move`.
-    nozzleClipset = nil,
+    --- Try alternatives with `/fire nozzlehold <clipset> move`.
+    nozzleClipset = 'weapons@heavy@minigun',
+
+    --- Where the nozzle sits in the hand.
+    ---
+    --- The animation places an equipped weapon by itself, which works while the model is shaped
+    --- like the weapon whose animation it borrows. A nozzle held by its bale handle is not a
+    --- minigun, so it gets placed by hand: the weapon entity is re-attached to a bone with these
+    --- offsets, every pass, because the game re-places it on every stance change.
+    ---
+    --- `bone` is 'right' or 'left'. Rotations are degrees.
+    ---
+    --- **Find these with `/fire nozzlegrip`, not by arithmetic.** It moves the nozzle live and
+    --- prints the line to paste back here. Baking a new origin into the model instead costs an
+    --- export and a restart per attempt.
+    ---
+    --- nil leaves the placement entirely to the game.
+    nozzleGrip = nil,
 
     --- Only if the weapon fails to load, which means the metas did not reach the client.
     ---

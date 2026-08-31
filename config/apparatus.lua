@@ -83,6 +83,15 @@ MIFireApparatus.profiles = {
         deployPanelMod = true,
         ports = {
             { id = "hosebed1", type = "hosebed", x = -0.086, y = -4.142, z = 0.853, heading = 180.0 },
+            { id = "pumppanel", type = "panel", x = -0.902, y = 0.186, z = -0.328, heading = 105.0 },
+            { id = "gear1", type = "gear", x = -1.238, y = -2.054, z = 0.159, heading = 90.0 },
+            { id = "toolcompartment", type = "tool", x = -1.238, y = -2.054, z = 0.159, heading = 90.0 },
+            { id = "scba_rack1", type = "scba_rack", x = -1.238, y = -3.709, z = 0.221, heading = 90.0 },
+            { id = "ladder_rack", type = "ladder_rack", x = 0.934, y = -2.446, z = 0.467, heading = 270.0 },
+            { id = "discharge1", type = "discharge", x = -0.894, y = 0.178, z = -0.435, heading = 90.0 },
+            { id = "discharge2", type = "discharge", x = -0.893, y = -0.260, z = -0.394, heading = 90.0 },
+            { id = "intake1", type = "intake", x = -0.894, y = -0.060, z = -0.942, heading = 90.0 },
+            { id = "discharge3", type = "discharge", x = -1.044, y = 0.440, z = -0.913, heading = 90.0 },
         },
     },
 

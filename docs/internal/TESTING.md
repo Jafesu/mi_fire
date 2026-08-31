@@ -4,8 +4,7 @@
 what passed is in [DEVLOG.md](DEVLOG.md) session 019, not here. What is left is the work:
 seven fixes that need confirming, and the checks nobody has ever been able to run.
 
-Ordered by what invalidates what. A failure in section 1 makes sections 2 and 3 meaningless,
-so work down rather than picking.
+Ordered by what invalidates what. A failure early makes what follows meaningless, so work down rather than picking.
 
 Set `Config.debug = true` in `config/config.lua` before starting, and watch F8.
 
@@ -23,7 +22,28 @@ Set `Config.debug = true` in `config/config.lua` before starting, and watch F8.
 
 ---
 
-## 1. The HUD
+## 1. Apparatus ports
+
+`EengineHT` now has ten authored ports, so its interactions are at the actual compartments
+rather than anywhere on a twelve-metre truck.
+
+- [ ] Third-eye the **gear compartment** on the officer's side. **Don turnout gear** appears.
+- [ ] Third-eye the **front bumper**. It should **not** — that is the change.
+- [ ] Third-eye the **SCBA rack** (behind the gear locker). **Take an SCBA set** appears there
+      and nowhere else.
+- [ ] **Refill air bottle** is at the SCBA rack too, not at the gear locker.
+- [ ] Do the same on a rig with **no authored ports** — an `EtankerHT`, say. Everything should
+      work anywhere on it, exactly as before. *A fleet nobody has run `/fireoffset` on must
+      keep working; authoring ports tightens an interaction rather than being what makes it
+      exist.*
+
+> `gear1` and `toolcompartment` are authored at the **same coordinates**. That is legal and
+> probably deliberate — one compartment, two things in it — but it means two ox_target options
+> at one point. Worth a look to confirm it reads the way you want.
+
+---
+
+## 2. The HUD
 
 Everything below depends on this, because the HUD is now the only readout for air, gear
 condition and heat — the screen effects that used to hint at them are gone.
@@ -42,7 +62,7 @@ condition and heat — the screen effects that used to hint at them are gone.
 
 ---
 
-## 2. Screen effects are gone
+## 3. Screen effects are gone
 
 Your call, and this is now intended behaviour rather than a gap.
 
@@ -58,7 +78,7 @@ every flag in it is `false`.
 
 ---
 
-## 3. SCBA from a clothing menu
+## 4. SCBA from a clothing menu
 
 The fix with the widest blast radius: SCBA was never given the treatment turnout gear got in
 ADR 0004, so a visible harness counted for nothing.
@@ -77,7 +97,7 @@ Then confirm the rig route still works:
 
 ---
 
-## 4. Air is ten minutes now
+## 5. Air is ten minutes now
 
 - [ ] With the valve open, **sprint** around and watch the AIR row. It should drain visibly
       faster than standing still. *You could not check this before — there was no gauge.*
@@ -87,7 +107,7 @@ Then confirm the rig route still works:
 
 ---
 
-## 5. Catching fire is survivable now
+## 6. Catching fire is survivable now
 
 Two separate natives were applying the engine's own fire damage over the top of this
 resource's model: `StartEntityFire` on the burning player, and `StartScriptFire` under every
@@ -117,7 +137,7 @@ model's numbers.
 
 ---
 
-## 6. Turnout repair and replacement
+## 7. Turnout repair and replacement
 
 Both options were unreachable until now, so none of this has ever run.
 
@@ -143,7 +163,7 @@ Both options were unreachable until now, so none of this has ever run.
 
 ---
 
-## 7. PASS runs on its own battery
+## 8. PASS runs on its own battery
 
 Your observation was right and the behaviour changed to match: a PASS is not powered by
 cylinder pressure, so an empty bottle must not switch it off.
@@ -164,7 +184,7 @@ cylinder pressure, so an empty bottle must not switch it off.
 
 ---
 
-## 8. Class B smoke reads like Class B
+## 9. Class B smoke reads like Class B
 
 Colour was driven only by how developed the fire was, with no input from the fuel — so a
 flammable-liquid fire smoked white while it was still small.
@@ -183,7 +203,7 @@ flammable-liquid fire smoked white while it was still small.
 
 ---
 
-## 9. Burn marks
+## 10. Burn marks
 
 Marks are drawn as **flat dark discs**, not decals. Decals are the better mechanism and this
 build does not render them: `AddDecal` accepts five type IDs, hands back real non-zero
@@ -206,7 +226,7 @@ behind `MIFireScorch.renderer = 'decal'` for servers where it works.
 
 ---
 
-## 10. Teardown, with the new particle
+## 11. Teardown, with the new particle
 
 Only worth re-running because burning is now a particle we start rather than an engine
 effect, and an orphaned one would survive the restart.

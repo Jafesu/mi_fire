@@ -217,12 +217,21 @@ end)
 ---@param entity integer
 ---@return boolean
 local function isApparatus(entity)
-    if not entity or entity == 0 then return false end
+    return MIFire.ApparatusClient.isApparatus(entity)
+end
 
-    local name = GetDisplayNameFromVehicleModel(GetEntityModel(entity))
-    if name and MIFireApparatus.profiles[name:lower()] then return true end
-
-    return MIFireApparatus.allowUnprofiled and GetVehicleClass(entity) == 18
+--- Is the player at the right compartment for this?
+---
+--- A rig with no port of that type authored answers true anywhere on it, so a fleet nobody
+--- has run `/fireoffset` on behaves exactly as it did before. Authoring ports *tightens* the
+--- interaction rather than being what makes it exist -- nobody should have to author a truck
+--- before they can get a coat out of it.
+---@param entity integer
+---@param coords vector3|nil
+---@param portType string
+---@return boolean
+local function atPort(entity, coords, portType)
+    return MIFire.ApparatusClient.atPort(entity, coords, portType)
 end
 
 local function coordsOf(entity)
@@ -242,8 +251,9 @@ local apparatusOptions = {
             icon = 'screwdriver-wrench',
             label = 'Service turnout gear',
             distance = 2.5,
-            canInteract = function(entity)
+            canInteract = function(entity, _, coords)
                 if not isApparatus(entity) then return false end
+                if not atPort(entity, coords, 'gear') then return false end
                 if not MIFireGear.integrity.persist.repairAtApparatus then return false end
                 return gear.worn and gear.integrity < (gear.capacity or math.huge)
             end,
@@ -269,8 +279,9 @@ local apparatusOptions = {
             label = 'Draw a fresh set',
             distance = 2.5,
             requiresFirefighter = true,
-            canInteract = function(entity)
+            canInteract = function(entity, _, coords)
                 if not isApparatus(entity) then return false end
+                if not atPort(entity, coords, 'gear') then return false end
                 return gear.worn and gear.integrity < (gear.capacity or math.huge) * 0.95
             end,
             onSelect = function(data)
@@ -293,8 +304,9 @@ local apparatusOptions = {
             label = 'Don turnout gear',
             distance = 2.5,
             requiresFirefighter = true,
-            canInteract = function(entity)
-                return isApparatus(entity) and not MIFire.wearingGear
+            canInteract = function(entity, _, coords)
+                return isApparatus(entity) and atPort(entity, coords, 'gear')
+                    and not MIFire.wearingGear
             end,
             onSelect = function(data)
                 TriggerServerEvent('mi_fire:server:donTurnout', 'structural', coordsOf(data.entity))
@@ -306,8 +318,9 @@ local apparatusOptions = {
             label = 'Doff turnout gear',
             distance = 2.5,
             requiresFirefighter = true,
-            canInteract = function(entity)
-                return isApparatus(entity) and MIFire.wearingGear == true
+            canInteract = function(entity, _, coords)
+                return isApparatus(entity) and atPort(entity, coords, 'gear')
+                    and MIFire.wearingGear == true
             end,
             onSelect = function()
                 TriggerServerEvent('mi_fire:server:doffTurnout')
@@ -319,9 +332,10 @@ local apparatusOptions = {
             label = 'Take an SCBA set',
             distance = 2.5,
             requiresFirefighter = true,
-            canInteract = function(entity)
+            canInteract = function(entity, _, coords)
                 return MIFireScba.sources.apparatus.enabled
-                    and isApparatus(entity) and not scba.worn
+                    and isApparatus(entity) and atPort(entity, coords, 'scba_rack')
+                    and not scba.worn
             end,
             onSelect = function(data)
                 TriggerServerEvent('mi_fire:server:donScba',
@@ -334,8 +348,9 @@ local apparatusOptions = {
             label = 'Rack SCBA set',
             distance = 2.5,
             requiresFirefighter = true,
-            canInteract = function(entity)
-                return MIFireScba.sources.apparatus.enabled and isApparatus(entity) and scba.worn
+            canInteract = function(entity, _, coords)
+                return MIFireScba.sources.apparatus.enabled and isApparatus(entity)
+                    and atPort(entity, coords, 'scba_rack') and scba.worn
             end,
             onSelect = function(data)
                 TriggerServerEvent('mi_fire:server:doffScba',
@@ -348,9 +363,9 @@ local apparatusOptions = {
             label = 'Refill air bottle',
             distance = 2.5,
             requiresFirefighter = true,
-            canInteract = function(entity)
-                return isApparatus(entity) and scba.worn
-                    and scba.air < scba.capacity * 0.95
+            canInteract = function(entity, _, coords)
+                return isApparatus(entity) and atPort(entity, coords, 'scba_rack')
+                    and scba.worn and scba.air < scba.capacity * 0.95
             end,
             onSelect = function(data)
                 TriggerServerEvent('mi_fire:server:refillScba', coordsOf(data.entity))

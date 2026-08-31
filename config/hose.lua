@@ -247,8 +247,12 @@ MIFireHose.visuals = {
     --- Diameter above which the thicker rope is used, in inches.
     largeAbove = 2.5,
 
-    --- Slack, as a fraction of the span. A hose lying on the ground is not a taut cable, and
-    --- a line with no slack in it reads as a tow rope.
+    --- Slack, as a fraction of the distance between the two ends.
+    ---
+    --- The rope is kept at roughly this much more than the span, and pays out as the crew walks
+    --- away. Creating it at its full length instead gives sixty metres of rope between two
+    --- points five metres apart, which is a heap rather than a hose; creating it at exactly the
+    --- span gives a tow cable. Raise it for a lazier, more realistic lay.
     slack = 0.18,
 
     --- Props. Base game, all four confirmed present in resources on this machine.

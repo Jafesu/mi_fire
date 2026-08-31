@@ -148,9 +148,17 @@ local function draw(id, line)
         and MIFireHose.visuals.ropeTypeLarge
         or MIFireHose.visuals.ropeType
 
+    -- Created at the length it needs right now rather than at its full 200ft. A rope holding
+    -- sixty metres of slack between two points five metres apart is a heap, not a hose. It
+    -- pays out as the crew walks away, up to the length actually on the bed -- which is what
+    -- running out of hose looks like.
+    local reach = #(from - GetEntityCoords(holderPed))
+    local slack = 1.0 + (MIFireHose.visuals.slack or 0.18)
+    local initial = math.min(maxLength, math.max(1.0, reach * slack))
+
     local rope = AddRope(from.x, from.y, from.z, 0.0, 0.0, 0.0,
-        maxLength, ropeType, maxLength, 0.0, 1.0,
-        false, false, false, 1.0, false, 0)
+        maxLength, ropeType, initial, 0.5, 1.0,
+        false, true, false, 1.0, false, 0)
 
     if not rope or rope == 0 then
         Util.warn('AddRope failed for line %s -- check the rope type in config/hose.lua', id)
@@ -211,6 +219,15 @@ local function draw(id, line)
 
     PinRopeVertex(rope, pin, from.x, from.y, from.z)
 
+    -- Without this the rope is never simulated, and an unsimulated rope draws as a straight
+    -- taut line between its ends -- no sag, no weight, no hose.
+    --
+    -- It was taken out along with the vehicle attachment, on the assumption it was part of what
+    -- threw the engine across the map. It was not: the flinging came from binding the rig to
+    -- one end with nonsense coordinates. Nothing is attached to the pinned end now, so
+    -- simulating it can only move the rope.
+    ActivatePhysics(rope)
+
     local entry = {
         rope = rope,
         vehicle = vehicle,
@@ -218,6 +235,7 @@ local function draw(id, line)
         holder = holderPed,
         pin = pin,
         pinnedAt = from,
+        length = initial,
     }
 
     drawn[id] = entry
@@ -265,6 +283,26 @@ CreateThread(function()
                 if from and (not entry.pinnedAt or #(from - entry.pinnedAt) > 0.05) then
                     PinRopeVertex(entry.rope, entry.pin or 0, from.x, from.y, from.z)
                     entry.pinnedAt = from
+                end
+
+                -- Pay the line out as the crew walks, and haul it back in as they return, so
+                -- there is always a little slack and never a heap. Capped at what is actually
+                -- on the bed: two hundred feet of hose reaches two hundred feet, and finding
+                -- that out at the door is a real part of stretching a line.
+                local holderPed = entry.holder
+
+                if from and holderPed and DoesEntityExist(holderPed) then
+                    local size = MIFireHose.sizes[line.diameter] or {}
+                    local maximum = Hose.lengthFeet(size, line.sections) * 0.3048
+                    local slack = 1.0 + (MIFireHose.visuals.slack or 0.18)
+
+                    local wanted = math.min(maximum,
+                        math.max(1.0, #(from - GetEntityCoords(holderPed)) * slack))
+
+                    if math.abs(wanted - (entry.length or 0)) > 0.4 then
+                        RopeForceLength(entry.rope, wanted)
+                        entry.length = wanted
+                    end
                 end
             end
         end

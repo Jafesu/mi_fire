@@ -196,6 +196,33 @@ where the nozzle was put down.
 `Supply-Line` on this drive lays a hose along a road and may already do the trail part; read it
 before writing this, the way SmartHose should have been read before the rope.
 
+### `HOSE-011` — crew slots, unverified in game
+
+The state, the flow ceiling and the interactions are all written. **None of it has run with two
+players.**
+
+Working by inspection and by test: crew tracked per line, join, leave, take nozzle, the flow
+ceiling (two on a 2.5 inch are capped at 179 gpm and told so), and a line surviving one hand
+short when someone disconnects.
+
+Fixed but unconfirmed: "Back up this line" was registered with `addGlobalPed`, which never
+fires on a player ped, so it could not have appeared at all. Now on `addGlobalPlayer`. The
+crew list was also sent as a set keyed by server id, which does not arrive at a client with one
+meaning; it is a list now. Neither fix has been seen working.
+
+Still modelled and wired to nothing -- correct, tested, unreachable, which is the same shape as
+the gear that never burned through:
+
+| | |
+|---|---|
+| `Hose.aimDrift` | the nozzle should wander when short-handed |
+| `Hose.lossChance` | the line should get away, whip, and hurt |
+| `Hose.dragWeight` / `dragSpeed` | charged hose should slow a crew down |
+
+Wiring those is what makes a 2.5 inch a three-person line rather than a number in a config
+file. `/fire hose` returns both the server's view and the client's in one block, which is the
+tool for the next attempt.
+
 ### Remaining phases
 
 | Phase | Scope |

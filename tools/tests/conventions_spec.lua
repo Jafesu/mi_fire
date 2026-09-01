@@ -477,13 +477,27 @@ return function(t)
 
         t.equal(weaponName, hose.nozzleWeapon,
             'config nozzleWeapon matches <Name> in data/weapons.meta')
-        t.equal(weaponModel, archetypeModel,
-            '<Model> in weapons.meta matches <modelName> in weaponarchetypes.meta')
+        -- Normally these must match. While a model bisect is running they deliberately do not,
+        -- and the marker is what separates "being tested" from "quietly broken" -- so the test
+        -- still fails if the model is wrong and nobody said why.
+        local diagnostic = weapons:find('DIAGNOSTIC', 1, true) ~= nil
+
+        if diagnostic then
+            t.ok(weaponModel ~= nil and weaponModel ~= archetypeModel,
+                'a model bisect is running -- weapons.meta names a different model on purpose')
+            t.ok(weapons:find('TO RESTORE', 1, true) ~= nil,
+                'and it says how to put the real model back')
+        else
+            t.equal(weaponModel, archetypeModel,
+                '<Model> in weapons.meta matches <modelName> in weaponarchetypes.meta')
+        end
         t.equal(archetypeTxd, archetypeModel,
             'the archetype txdName matches its own modelName')
 
-        t.ok(weaponModel ~= nil and read('stream/' .. weaponModel .. '.ydr') ~= nil,
-            ('stream/%s.ydr is shipped'):format(tostring(weaponModel)))
+        -- The archetype's model, not the weapon's: during a bisect the weapon points elsewhere
+        -- on purpose, but the archetype still declares ours and it still has to be shipped.
+        t.ok(archetypeModel ~= nil and read('stream/' .. archetypeModel .. '.ydr') ~= nil,
+            ('stream/%s.ydr is shipped'):format(tostring(archetypeModel)))
 
         -- The slot has to exist in the navigate order or the weapon is unreachable.
         local slot = weapons:match('<Slot>(SLOT_[%w_]+)</Slot>')

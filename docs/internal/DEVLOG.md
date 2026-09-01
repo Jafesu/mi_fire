@@ -2625,3 +2625,61 @@ is now written at the top of the file.
 - Whether it holds.
 - The stream particle offsets are still zero.
 
+---
+
+## 2026-09-01 — stop fixing, start bisecting
+
+**Scope:** third identical crash, after the weapon was aligned field for field.
+
+Same hash, same stack. Five attempts at this now, every one a fix reasoned out and shipped
+without a measurement behind it. That is the thing to correct, not the next field.
+
+**What is actually known:**
+
+- The crash is on firing, never on equipping or holding, and never varies.
+- `data/weapons.meta` now differs from a weapon known to fire without crashing in **four**
+  places: `Name`, `Model`, `Slot`, `HumanNameHash`. Three of those are strings a lookup either
+  finds or does not.
+- **Our model has no skeleton.** The Blender file contains one mesh and no armature, confirmed
+  by reading it. Every GTA weapon model is a skinned drawable.
+
+**What could not be established:** the bone names a working weapon uses. Sollumz's importer
+produced nothing at all in a headless run -- not for FireTools' circular saw, not for a stock
+pistol, and not for our own `.ydr`, which is known to load in game. So the importer is what
+failed, and nothing was learned about skeletons from it either way.
+
+Two smaller things went wrong on the way there, both already written down elsewhere in this
+repository and both repeated anyway: `read_factory_settings` discards the extension repository
+list exactly as `--factory-startup` does, and a broad `grep` across the whole resources tree
+takes long enough to need backgrounding.
+
+**Changed:** `data/weapons.meta` points at `w_am_fireext` -- the base game extinguisher's model.
+
+That is not a fix. It is the one measurement that separates the two remaining possibilities, and
+it costs a single restart:
+
+| Result | Meaning |
+|---|---|
+| Crash stops | The fault is in `w_mi_nozzle`, and the missing skeleton is the first thing to look at |
+| Crash continues | The model is innocent, and the fault is somewhere none of us has looked |
+
+**On the discipline:** the temptation was to add a skeleton now, because the evidence for its
+absence is solid and every weapon has one. That would have been a sixth reasoned guess, and if it
+had not worked it would have taught nothing -- the restart would have been spent. A bisect
+returns a fact either way. After five wrong guesses, facts are worth more than fixes.
+
+`conventions_spec` was taught about the diagnostic rather than having the check deleted for it:
+while the model is swapped it requires the `DIAGNOSTIC` marker and the restore instructions to be
+present, so the state is deliberate and cannot be left behind quietly.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1104 passed, 0 failed**.
+- The XML comment written for this change contained a double hyphen, again, and was caught by the
+  check that exists for it, again.
+
+**Open:**
+
+- The answer to the bisect.
+- Restoring `w_mi_nozzle` afterwards, either way.
+

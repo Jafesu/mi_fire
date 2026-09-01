@@ -971,9 +971,17 @@ CreateThread(function()
 
         -- `usable` is the pump's verdict: a line below a third of its rated nozzle pressure is
         -- soft, and a soft line puts water on the floor rather than on the fire.
+        -- Either way of having a nozzle counts.
+        --
+        -- This used to require `nozzleEquipped`, which is only true on the weapon path -- so
+        -- turning the weapon off did not fall back to a working hose, it fell back to a hose
+        -- that could not put water on anything. The weapon only ever supplied the hold; the
+        -- bale, the stream, the aim and the water are all mi_fire's, and none of them need it.
+        --
+        -- Which also means `nozzleWeapon = nil` is a real escape hatch rather than a half one.
         local holding = line ~= nil
             and line.nozzleHolder == GetPlayerServerId(PlayerId())
-            and nozzleEquipped
+            and (nozzleEquipped or heldNozzle ~= nil)
 
         local flowing = holding and line.state == 'charged' and (line.gpm or 0) > 0
             and line.usable ~= false

@@ -849,43 +849,32 @@ local streamAssetAsked = false
 --- Which agent the running particle was started for. See the restart in the flow loop.
 local streamAgent = nil
 
---- Holds the trigger down so the stream can be aimed with both hands free.
+--- Keeps the stream on so it can be aimed with both hands free.
 ---
 --- The same problem the aim lock solves, and worse: tuning a particle means holding the trigger,
 --- typing a command, letting go to read the result, and pulling again -- per nudge, of which
 --- there are dozens.
 ---
---- It also **bypasses the charged check**, deliberately. Otherwise finding where a particle comes
---- out would mean laying a line, coupling it, engaging the pump, throttling up and opening a gate
+--- It **bypasses the charged check**, deliberately. Otherwise finding where a particle comes out
+--- would mean laying a line, coupling it, engaging the pump, throttling up and opening a gate
 --- first, every time. What it does not bypass is holding the nozzle: the offsets are measured
 --- from the hand, so there has to be a hand with a nozzle in it.
 ---
---- No water is delivered while it is on. The line is not charged, the server would refuse, and a
---- tuning command that quietly emptied a tank would be a nasty surprise.
+--- No water is delivered while it is on. That is enforced separately, in the flow loop, rather
+--- than left to the server refusing.
+---
+--- It used to hold `INPUT_ATTACK` down with `SetControlNormal`, which is no longer needed or
+--- wanted -- the attack control is disabled while a nozzle is held, so pressing it would do
+--- nothing, and the flag alone is what the stream reads.
 local streamForce = false
 
 local ATTACK_CONTROL = 24
+local ATTACK_CONTROL_ALT = 257
 
 ---@param on boolean
 local function setStreamForce(on)
-    if streamForce == on then return end
     streamForce = on
-
-    if not on then return end
-
-    CreateThread(function()
-        while streamForce do
-            SetControlNormal(0, ATTACK_CONTROL, 1.0)
-            Wait(0)
-        end
-    end)
 end
-
---- Off is a diagnostic, not a preference.
----
---- If the game still goes down with this disabled then the particle was never the problem, and
---- that is worth being able to find out in ten seconds rather than by another round of edits.
-local streamEnabled = true
 
 --- What is coming out of the nozzle, for the agent the line is actually carrying.
 ---
@@ -993,11 +982,30 @@ CreateThread(function()
         -- nozzle, though: the offsets are measured from the hand.
         local ready = flowing or (holding and streamForce)
 
-        -- Only worth watching a control every frame while there is something to open.
-        Wait(ready and 0 or 500)
+        -- Every frame while a nozzle is in hand, not merely while water is flowing: the attack
+        -- control has to be suppressed the whole time it is held, and the bale has to respond
+        -- the instant it is pressed.
+        Wait(holding and 0 or 500)
+
+        -- **The weapon must never actually fire.**
+        --
+        -- Nothing in mi_fire needs it to. The bale is read from the control directly, and the
+        -- shot itself only ever produced something unwanted: as VOLUMETRIC_PARTICLE it sprayed
+        -- extinguisher powder from an uncoupled nozzle, and as INSTANT_HIT it put bullet impacts
+        -- on the ground in front of the firefighter.
+        --
+        -- Disabling the control leaves the input perfectly readable through the `IsDisabled...`
+        -- variants, which is what the bale uses. It also means the weapon's own fire type stops
+        -- mattering, which is the right place for that decision to end up: what comes out of a
+        -- nozzle is mi_fire's business, not a weapon definition's.
+        if holding then
+            DisableControlAction(0, ATTACK_CONTROL, true)
+            DisableControlAction(0, ATTACK_CONTROL_ALT, true)
+        end
 
         if not ready then
             stopStream()
+            streamAgent = nil
             streamAssetAsked = false
         else
             -- Disabled as well as enabled: aiming a weapon disables the plain attack control in

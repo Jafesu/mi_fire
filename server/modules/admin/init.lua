@@ -722,8 +722,8 @@ end
 ---     /fire nozzlestream reset   back to the config
 ---
 --- `fire` bypasses the charged check, so a particle can be aimed without laying a line, coupling
---- it, engaging the pump and opening a gate first. It delivers no water: the line is not charged
---- and the server would refuse anyway.
+--- it, engaging the pump and opening a gate first. It delivers no water -- that is enforced in
+--- the flow loop rather than left to the server refusing.
 ---
 --- Which way a particle emits is not readable from the effect or the model, so it gets found by
 --- looking, the same as the grip did.

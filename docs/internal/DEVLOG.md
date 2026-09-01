@@ -2938,3 +2938,53 @@ the trigger is held, and none of the knobs beside it apply.
   other than the fire type, and the next question is `EffectGroup`.
 - The stream offsets, still unfound, and much easier to see without a fog in front of them.
 
+---
+
+## 2026-09-01 (seventh) — the weapon should never fire at all
+
+**Scope:** `INSTANT_HIT` replaced a cloud of extinguisher powder with bullet impacts on the road.
+
+**The thing that should have been noticed several attempts ago:** nothing in mi_fire needs the
+weapon to fire. The bale is read from the control directly -- `IsControlPressed(0, 24)` -- and the
+shot itself has never been used for anything. Every fire type was chosen to make the shot produce
+the right effect, when the shot should simply not have been happening.
+
+Two fire types, two unwanted results, and the same root cause:
+
+| FireType | What the shot did |
+|---|---|
+| `VOLUMETRIC_PARTICLE` | sprayed extinguisher powder from an uncoupled nozzle |
+| `INSTANT_HIT` | put bullet impacts on the ground in front of the firefighter |
+
+**Changed:** the attack controls are disabled while a nozzle is held.
+
+**Decisions:**
+
+- **Disabled, not removed.** `DisableControlAction` leaves the input perfectly readable through
+  the `IsDisabled...` variants, which is what the bale already used -- the flow loop has read both
+  forms since it was written, for a different reason. So suppressing the shot costs nothing and
+  changes no behaviour the player can feel.
+
+- **The weapon's fire type stops mattering**, which is the right place for that decision to end
+  up. What comes out of a nozzle is mi_fire's business, not a weapon definition's, and the last
+  three commits were all attempts to make a weapon definition express something it has no way to
+  express -- water and foam looking different, from a field that holds one particle name.
+
+- **The loop now runs every frame while a nozzle is held**, not only while water is flowing. The
+  control has to be suppressed the whole time it is in hand, and the bale has to answer the
+  instant it is pressed.
+
+- **`setStreamForce` stopped pressing anything.** It held `INPUT_ATTACK` with `SetControlNormal`
+  so the weapon would spray; with the control disabled that would do nothing, and the flag alone
+  is what the stream reads.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1110 passed, 0 failed**.
+- **Not** tested in game.
+
+**Open:**
+
+- Whether anything still comes out of the weapon. If it does, it is not coming from the trigger.
+- The stream offsets.
+

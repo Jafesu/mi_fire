@@ -426,6 +426,66 @@ return function(t)
 
     -- -----------------------------------------------------------------------
 
+    t.describe('the weapon always names a particle, whatever its fire type')
+
+    -- This crashed the game. `FireType VOLUMETRIC_PARTICLE` emits the `FlashFx` particle
+    -- continuously while the trigger is held -- that *is* the spray, not a muzzle flash -- and
+    -- an empty `FlashFx` sends the game looking for something that is not there. It goes down
+    -- natively on the first trigger pull: no script error, no warning, nothing in the log but a
+    -- stack of game addresses.
+    --
+    -- The fire type is `INSTANT_HIT` now, which does not emit it, so strictly this only matters
+    -- if someone changes that back. **Which is exactly why the check is unconditional.** Tying
+    -- it to the fire type means the guard quietly disappears at the moment the setting that
+    -- needs guarding is restored, and the next person gets the same crash with the same absence
+    -- of explanation.
+    --
+    -- Nothing else in this repository could have caught it: the XML is valid, the weapon loads,
+    -- and the fault only appears when someone pulls the trigger.
+    do
+        local weapons = withoutXmlComments(read('data/weapons.meta') or '')
+        local flash = weapons:match('<FlashFx>([^<]*)</FlashFx>')
+
+        t.ok(flash ~= nil and flash:gsub('%s', '') ~= '',
+            'FlashFx names a particle, so VOLUMETRIC_PARTICLE stays safe to switch back to')
+
+        -- A self-closing `<FlashFx />` is the shape the empty one actually took, and it would
+        -- slip past a match on the paired form above.
+        t.equal(weapons:find('<FlashFx%s*/>'), nil,
+            'and it is not the self-closing empty form')
+    end
+
+    -- -----------------------------------------------------------------------
+
+    t.describe('the weapon names real cameras, and no empty ones')
+
+    -- A camera slot left empty is not "no camera" -- it is a lookup that finds nothing, and the
+    -- game does that lookup when you aim, take cover, or move while firing. Two of these were
+    -- empty and the third was `DEFAULT_FIRE_EXTINGUISHER_CAMERA`, which does not exist anywhere:
+    -- it was written because it sounded like the right shape.
+    --
+    -- This cannot check that a hash is real, which is the failure that actually cost the most.
+    -- It can check that one is present, which would have caught two of the three, and it records
+    -- the shape of the mistake for whoever edits this next.
+    do
+        local weapons = withoutXmlComments(read('data/weapons.meta') or '')
+
+        for _, tag in ipairs({ 'DefaultCameraHash', 'CoverCameraHash', 'RunAndGunCameraHash' }) do
+            local paired = weapons:match('<' .. tag .. '>([^<]*)</' .. tag .. '>')
+            local selfClosing = weapons:find('<' .. tag .. '%s*/>')
+
+            t.equal(selfClosing, nil, ('%s is not left empty'):format(tag))
+            t.ok(paired ~= nil and paired:gsub('%s', '') ~= '',
+                ('%s names a camera'):format(tag))
+        end
+
+        -- The one invented value, by name. Cheap, and it never comes back.
+        t.equal(weapons:find('DEFAULT_FIRE_EXTINGUISHER_CAMERA', 1, true), nil,
+            'the invented camera hash is gone')
+    end
+
+    -- -----------------------------------------------------------------------
+
     t.describe('a volumetric weapon names the particle it fires')
 
     -- This one crashed the game. `FireType VOLUMETRIC_PARTICLE` makes the game emit a particle

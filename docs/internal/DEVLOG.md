@@ -2891,3 +2891,50 @@ name their own effect without touching each other, so per-weapon effects are a r
 
 - The stream offsets, which is what this exists to find.
 
+---
+
+## 2026-09-01 (sixth) — the fire type, not the scale
+
+**Scope:** the extinguisher cloud survived being shrunk.
+
+**What did not work:** `FlashFxScale` from 1.0 to 0.01 changed nothing visible. So the scale does
+not size a volumetric particle, and neither do the two `FlashFxChance` values, both of which have
+been zero throughout while it emitted anyway. `VOLUMETRIC_PARTICLE` simply emits `FlashFx` while
+the trigger is held, and none of the knobs beside it apply.
+
+**Changed:** `FireType` from `VOLUMETRIC_PARTICLE` to `INSTANT_HIT`.
+
+**Decisions:**
+
+- **Removed rather than shrunk.** Having failed to make the spray small, the remaining options
+  were to rename the particle or to stop the weapon emitting one. Renaming is still not worth it:
+  a weapon's `FlashFx` resolves against its `EffectGroup` rather than the `core` dictionary, so a
+  name proven to work with `StartParticleFxLoopedOnEntity` is not known to work here, and an
+  unresolvable one crashes the client on the trigger. That is a bug this project has already paid
+  for six times.
+
+- **`INSTANT_HIT` is the best-trodden value available**, used by nearly every weapon in the game.
+  With `Damage` at zero it hits nothing and with both chance values at zero there is no muzzle
+  flash either. `FlashFx` stays populated so switching back cannot reintroduce the crash.
+
+- **This is what water and foam looking different requires anyway.** The weapon has one `FlashFx`
+  and cannot show two agents. `MIFireHose.visuals.stream` can, and is already gated on the line
+  being charged and switchable per agent -- so taking the visual away from the weapon entirely is
+  the right shape regardless of the fog.
+
+- **The `FlashFx` check became unconditional.** It had been guarded by `FireType ==
+  VOLUMETRIC_PARTICLE`, which meant the guard vanished the moment the fire type changed -- so it
+  would have been absent precisely when someone restored the setting that needs guarding. Two
+  assertions came back and are now stronger than before.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1110 passed, 0 failed**.
+- **Not** tested in game.
+
+**Open:**
+
+- Whether the cloud is actually gone. If it is not, the weapon is emitting it from somewhere
+  other than the fire type, and the next question is `EffectGroup`.
+- The stream offsets, still unfound, and much easier to see without a fog in front of them.
+

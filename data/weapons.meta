@@ -90,7 +90,31 @@
             <HitBoat>DONTCARE</HitBoat>
             <HitPlane>DONTCARE</HitPlane>
           </Explosion>
-          <FireType>VOLUMETRIC_PARTICLE</FireType>
+          <!--
+            INSTANT_HIT, not VOLUMETRIC_PARTICLE.
+
+            VOLUMETRIC_PARTICLE makes the game emit the FlashFx particle continuously while the
+            trigger is held: that *is* the spray, not a muzzle flash. It is why an uncoupled,
+            uncharged nozzle produced a cloud of extinguisher powder, and it ignores both the
+            FlashFxChance values and FlashFxScale – shrinking the scale to 0.01 changed nothing
+            visible.
+
+            The obvious alternative is renaming FlashFx to a water effect, and it is still not
+            worth the risk: a weapon's FlashFx resolves against its EffectGroup rather than the
+            `core` dictionary, so a name that works for `StartParticleFxLoopedOnEntity` is not
+            known to work here, and an unresolvable one crashes the client on the trigger.
+
+            INSTANT_HIT is the fire type nearly every weapon in the game uses, so it is the
+            best-trodden value available. With Damage at zero it hits nothing, and with both
+            FlashFxChance values at zero there is no muzzle flash either. FlashFx stays populated
+            so that flipping this back does not reintroduce the crash.
+
+            What the player sees is `MIFireHose.visuals.stream`, drawn by mi_fire, gated on the
+            line being charged and the bale open, and switchable per agent. Which is what water
+            and foam looking different requires anyway – the weapon cannot do that, since it has
+            one FlashFx.
+          -->
+          <FireType>INSTANT_HIT</FireType>
           <WheelSlot>WHEEL_THROWABLE_SPECIAL</WheelSlot>
           <Group>GROUP_FIREEXTINGUISHER</Group>
           <AmmoInfo ref="AMMO_FIREEXTINGUISHER" />

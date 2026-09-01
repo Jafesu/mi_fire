@@ -2988,3 +2988,61 @@ Two fire types, two unwanted results, and the same root cause:
 - Whether anything still comes out of the weapon. If it does, it is not coming from the trigger.
 - The stream offsets.
 
+---
+
+## 2026-09-01 (eighth) — the logs, and two real findings
+
+**Scope:** three client logs from another machine. The first evidence in this whole sequence that
+was not a guess.
+
+**Finding one: `TimeBetweenShots = 0` with `INSTANT_HIT`.**
+
+Zero is correct for `VOLUMETRIC_PARTICLE`, where it means a continuous spray, and it was
+inherited from the reference weapon that uses that fire type. Changing the fire type to
+`INSTANT_HIT` left it behind, and there it means *fire as fast as the engine can*. With
+`Automatic` beside it, one click became an unbounded stream of raycasts and impact effects.
+
+That is why there was no crash dump: nothing crashed. The client was saturated, which looks
+identical from the outside -- no chat, no pause menu, no targeting -- and leaves nothing to read.
+
+Now 0.5, and the `Automatic` flag is gone. The nozzle should never fire at all, since the attack
+control is disabled while one is held, so this is the blast radius of a stray shot rather than a
+rate anyone will notice.
+
+**Finding two: restarting the resource duplicates the weapon archetype.**
+
+```
+Duplicate Archetype 'w_mi_nozzle' (F403C2F3), seen in 'Extra' and 'Extra'
+```
+
+Present in the one log with two `Creating script environments` lines; absent from both logs with
+one. So `restart mi_fire` leaves the old archetype registered and adds a second.
+
+**This one is worth more than the fix.** Every test in this sequence was run after a `restart`,
+so a second archetype has been sitting underneath everything being measured. Some of what looked
+like a change making things worse may have been that instead -- which would explain why several
+carefully-reasoned fixes appeared to do nothing or to trade one symptom for another. Written into
+`CONTRIBUTING.md`: reconnect, do not restart, after touching `data/`.
+
+**On the method:** six changes were shipped on reasoning and five were wrong. Both findings here
+came from reading three log files, and both were sitting in them the whole time. The lesson is
+not subtle and this is the third time this project has learned it -- ask for the artefact before
+theorising, not after the theories run out.
+
+**Changed:**
+
+- `data/weapons.meta` — `TimeBetweenShots` 0.5; `Automatic` removed.
+- `tools/tests/conventions_spec.lua` — a non-volumetric weapon must have a rate limit, and the
+  nozzle must not be automatic.
+- `docs/internal/CONTRIBUTING.md` — reconnect after meta changes.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1113 passed, 0 failed**.
+- Mutation tested: restoring `TimeBetweenShots = 0` fails the new check by name.
+- Both findings read from the logs rather than inferred.
+
+**Open:**
+
+- Whether the lockup is gone. Test with a **reconnect**, not a restart.
+

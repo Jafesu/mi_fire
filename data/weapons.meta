@@ -164,7 +164,20 @@
           <VehicleReloadTime value="-1.000000" />
           <AnimReloadRate value="1.000000" />
           <BulletsPerAnimLoop value="1" />
-          <TimeBetweenShots value="0.000000" />
+          <!--
+            NOT zero, and the reason matters.
+
+            Zero was inherited from a weapon whose FireType is VOLUMETRIC_PARTICLE, where it
+            means a continuous spray and is correct. With INSTANT_HIT it means "fire as fast as
+            the engine can" – and with the Automatic flag, one click produced an unbounded
+            stream of raycasts and impact effects and locked the client hard enough to need a
+            force quit. No crash dump, because nothing crashed: the game was saturated.
+
+            Half a second. The nozzle should never fire at all – the attack control is disabled
+            while one is held – so this is the blast radius of a stray shot rather than a rate
+            anyone will notice.
+          -->
+          <TimeBetweenShots value="0.500000" />
           <TimeLeftBetweenShotsWhereShouldFireIsCached value="-1.000000" />
           <SpinUpTime value="0.000000" />
           <SpinTime value="0.000000" />
@@ -299,7 +312,7 @@
           <AttachPoints />
           <GunFeedBone />
           <TargetSequenceGroup />
-          <WeaponFlags>CarriedInHand Automatic CanFreeAim AnimCrouchFire UsableOnFoot UsableClimbing AllowEarlyExitFromFireAnimAfterBulletFired DoesRevivableDamage CanBeFiredLikeGun NonViolent SuppressGunshotEvent</WeaponFlags>
+          <WeaponFlags>CarriedInHand CanFreeAim AnimCrouchFire UsableOnFoot UsableClimbing AllowEarlyExitFromFireAnimAfterBulletFired DoesRevivableDamage CanBeFiredLikeGun NonViolent SuppressGunshotEvent</WeaponFlags>
           <TintSpecValues ref="TINT_DEFAULT" />
           <FiringPatternAliases ref="NULL" />
           <ReloadUpperBodyFixupExpressionData ref="default" />

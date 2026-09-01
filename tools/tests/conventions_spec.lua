@@ -426,6 +426,39 @@ return function(t)
 
     -- -----------------------------------------------------------------------
 
+    t.describe('an instant-hit weapon has a rate limit')
+
+    -- This locked the client hard enough to need a force quit, and left no crash dump because
+    -- nothing crashed -- the game was saturated rather than broken.
+    --
+    -- `TimeBetweenShots = 0` is correct for `VOLUMETRIC_PARTICLE`, where it means a continuous
+    -- spray, and it was inherited from a weapon that uses that fire type. With `INSTANT_HIT` it
+    -- means fire as fast as the engine can, and with `Automatic` beside it a single click became
+    -- an unbounded stream of raycasts and impact effects.
+    --
+    -- The pairing is the bug, not either value alone, which is why the check looks at both.
+    do
+        local weapons = withoutXmlComments(read('data/weapons.meta') or '')
+        local fireType = weapons:match('<FireType>([%w_]+)</FireType>')
+        local between = tonumber(weapons:match('<TimeBetweenShots value="([%d%.%-]+)"'))
+        local flags = weapons:match('<WeaponFlags>([^<]*)</WeaponFlags>') or ''
+
+        t.ok(between ~= nil, 'TimeBetweenShots is present and numeric')
+
+        if fireType ~= 'VOLUMETRIC_PARTICLE' then
+            t.ok((between or 0) > 0,
+                ('%s needs a rate limit -- zero means as fast as the engine can'):format(
+                    tostring(fireType)))
+        end
+
+        -- Automatic turns one press into a burst at whatever the rate limit allows. A nozzle has
+        -- no reason to be automatic, and it is what made a single click unrecoverable.
+        t.equal(flags:find('Automatic', 1, true), nil,
+            'the nozzle is not an automatic weapon')
+    end
+
+    -- -----------------------------------------------------------------------
+
     t.describe('the weapon always names a particle, whatever its fire type')
 
     -- This crashed the game. `FireType VOLUMETRIC_PARTICLE` emits the `FlashFx` particle

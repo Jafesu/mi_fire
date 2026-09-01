@@ -16,6 +16,26 @@ How work happens in this repo. Read this before writing code.
    first. Those rows carry verified `file:line` facts. Re-verify anything you are about to
    depend on — other resources get updated.
 
+## Reconnect, do not restart, when a weapon meta has changed
+
+`restart mi_fire` while connected leaves the old weapon archetype registered and adds a second
+one. The client log says so plainly:
+
+```
+Duplicate Archetype 'w_mi_nozzle' (F403C2F3), seen in 'Extra' and 'Extra'
+```
+
+Confirmed across three sessions: the log with **two** `Creating script environments for mi_fire`
+lines has the duplicate; both logs with one start have none.
+
+A weapon model registered twice is a state nothing else in the resource can see or fix, and it
+sits underneath whatever is being tested. Several hours were spent attributing crashes to code
+changes while every test between them was a `restart` -- so a change that looked like it made
+things worse may only have been the second archetype.
+
+**Use F8 → `reconnect` after touching anything in `data/`.** A plain `restart` is fine for Lua.
+
+
 ## End of session
 
 1. Update the task status in [TASKS.md](TASKS.md) (`review`, `done`, or back to `blocked`

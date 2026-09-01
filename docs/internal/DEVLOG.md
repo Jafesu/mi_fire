@@ -3046,3 +3046,44 @@ theorising, not after the theories run out.
 
 - Whether the lockup is gone. Test with a **reconnect**, not a restart.
 
+---
+
+## 2026-09-01 (ninth) — a silent switch, left off
+
+**Scope:** "it is doing nothing now, even charged and open".
+
+**The cause was mine, and it was not a bug.** `/fire nozzlestream off` was suggested during the
+crash bisecting, to find out whether the particle was involved. It sets `streamEnabled = false`
+**and saves it to KVP**, so it survived every restart and reconnect afterwards. `on` fixed it
+immediately.
+
+**The real fault is that it failed silently.** `startStream` had five bare `return`s -- switched
+off, no config, no ped, asset still loading, bad bone -- and every one of them looked identical
+from the outside: nothing happens. A toggle that persists across sessions and gives no sign it is
+set is a trap, and it was one I built while trying to make something else diagnosable.
+
+**Changed:**
+
+- `startStream` returns a reason instead of returning bare. The flow loop says it once rather
+  than every frame; `/fire nozzlestream fire` says it in the same breath as the command.
+- `/fire nozzlestream why` prints the whole picture: particle on or off, force, what is in hand,
+  whether a handle exists, and the line's state, flow, usability and holder.
+
+**Decisions:**
+
+- **Persisting the toggle was right; hiding it was not.** Losing a tuning session to a crash is
+  what the persistence exists to prevent, and that still holds. What it needed was to say so.
+
+- **The reason lands with the command that asked.** `fire` now tries to start the stream
+  immediately rather than leaving it to the loop, so the answer arrives with the request instead
+  of in a warning nobody was watching for.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1113 passed, 0 failed**.
+- Confirmed in game by the user: `on` then `fire` worked.
+
+**Open:**
+
+- The stream offsets, which is what all of this was in the way of.
+

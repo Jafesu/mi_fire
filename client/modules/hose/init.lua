@@ -849,6 +849,9 @@ local streamAssetAsked = false
 --- Which agent the running particle was started for. See the restart in the flow loop.
 local streamAgent = nil
 
+--- The last reason the stream would not start, so it is said once rather than every frame.
+local streamComplaint = nil
+
 --- Keeps the stream on so it can be aimed with both hands free.
 ---
 --- The same problem the aim lock solves, and worse: tuning a particle means holding the trigger,
@@ -915,40 +918,57 @@ local function stopStream()
 end
 
 ---@param ped integer
+---@return string|nil reason nil when the stream started, otherwise why it did not
 local function startStream(ped)
-    if not streamEnabled then return end
-    if not MIFireHose.visuals.stream then return end
-    if not ped or ped == 0 or not DoesEntityExist(ped) then return end
+    -- Every one of these used to be a bare `return`, and the result was a command that could
+    -- fail five different ways and look identical each time: nothing happens. Saying which one
+    -- is the difference between a two minute fix and an evening.
+    if not streamEnabled then
+        return 'the particle is switched off -- "/fire nozzlestream on" turns it back on. '
+            .. 'It persists, so it stays off across restarts until you do.'
+    end
+
+    if not MIFireHose.visuals.stream then
+        return 'MIFireHose.visuals.stream is nil in config/hose.lua, so there is nothing to draw'
+    end
+
+    if not ped or ped == 0 or not DoesEntityExist(ped) then
+        return 'no ped to attach to'
+    end
 
     local cfg = streamCfg()
 
     if not HasNamedPtfxAssetLoaded(cfg.asset) then
-        -- Asked for once rather than every frame. A missing asset is a missing asset, and
-        -- hammering the request only fills the log.
         if not streamAssetAsked then
             RequestNamedPtfxAsset(cfg.asset)
             streamAssetAsked = true
         end
-        return
+        return ('the "%s" particle asset is still loading'):format(cfg.asset)
     end
 
     -- The same hand the nozzle is in, so the jet tracks it without knowing anything about it.
     local grip = activeGrip() or {}
-    local bone = GetPedBoneIndex(ped, BONES[grip.bone or 'right'] or BONES.right)
+    local boneName = grip.bone or 'right'
+    local bone = GetPedBoneIndex(ped, BONES[boneName] or BONES.right)
 
     -- A bone index of -1 is `GetPedBoneIndex` saying the bone is not on this ped, and handing
-    -- that to a native is how the rope ended up anchored to the middle of the map. What it does
-    -- to a particle is not worth finding out on someone else's session.
+    -- that to a native is how the rope ended up anchored to the middle of the map.
     if not bone or bone < 0 then
-        Util.warn('nozzle stream: bone "%s" is not on this ped, so there is nothing to attach '
-            .. 'the jet to. The water still flows.', tostring(grip.bone or 'right'))
-        return
+        return ('the %s hand bone is not on this ped'):format(boneName)
     end
 
     UseParticleFxAssetNextCall(cfg.asset)
 
     streamHandle = StartParticleFxLoopedOnEntityBone(cfg.name, ped,
         cfg.x, cfg.y, cfg.z, cfg.rx, cfg.ry, cfg.rz, bone, cfg.scale, false, false, false)
+
+    if not streamHandle or streamHandle == 0 then
+        streamHandle = nil
+        return ('"%s" in "%s" would not start -- the effect name is probably wrong')
+            :format(cfg.name, cfg.asset)
+    end
+
+    return nil
 end
 
 --- Put water on the fire.
@@ -1049,8 +1069,18 @@ CreateThread(function()
 
             if open and (not streamHandle or streamAgent ~= agentNow) then
                 stopStream()
-                startStream(cache.ped)
+
+                local reason = startStream(cache.ped)
                 streamAgent = agentNow
+
+                -- Said once rather than every frame. A stream that never appears is otherwise
+                -- indistinguishable from one that is aimed into the ground.
+                if reason and reason ~= streamComplaint then
+                    streamComplaint = reason
+                    Util.warn('the water stream is not showing: %s', reason)
+                elseif not reason then
+                    streamComplaint = nil
+                end
             elseif not open and streamHandle then
                 stopStream()
                 streamAgent = nil
@@ -1098,16 +1128,46 @@ RegisterNetEvent('mi_fire:client:nozzleStream', function(action, axis, amount)
         print('[mi_fire] ' .. text)
     end
 
+    --- Everything that decides whether anything appears, in one message.
+    ---
+    --- Built after an evening lost to "it is doing nothing now", which turned out to be a debug
+    --- toggle left off in a previous session and quietly persisted.
+    local function why()
+        local line = mine and lines[mine]
+        local held = nozzleEquipped and 'weapon' or (heldNozzle and 'prop' or 'NOTHING')
+
+        say(('particle=%s  force=%s  inHand=%s  handle=%s')
+            :format(streamEnabled and 'on' or 'OFF',
+                tostring(streamForce), held, tostring(streamHandle ~= nil)))
+
+        if not line then
+            return say('no line -- pull one from the bed first')
+        end
+
+        say(('line: state=%s gpm=%s usable=%s yours=%s')
+            :format(tostring(line.state), tostring(line.gpm), tostring(line.usable ~= false),
+                tostring(line.nozzleHolder == GetPlayerServerId(PlayerId()))))
+    end
+
     local function report()
         local c = streamCfg()
-        say(('particle is %s; offsets are from the hand bone')
-            :format(streamEnabled and 'on' or 'OFF'))
+        why()
         say(("stream = { asset = '%s', name = '%s', scale = %.2f, x = %.3f, y = %.3f, z = %.3f, rx = %.1f, ry = %.1f, rz = %.1f },")
             :format(c.asset, c.name, c.scale, c.x, c.y, c.z, c.rx, c.ry, c.rz))
     end
 
     if action == 'fire' then
         setStreamForce(true)
+
+        -- Tried immediately rather than left to the loop, so the reason lands in the same
+        -- breath as the command that asked for it.
+        local reason = startStream(cache.ped)
+
+        if reason then
+            say('nothing to see: ' .. reason)
+            return why()
+        end
+
         return say('trigger held. Nudge away -- "/fire nozzlestream stop" to let go.')
     end
 
@@ -1141,6 +1201,7 @@ RegisterNetEvent('mi_fire:client:nozzleStream', function(action, axis, amount)
     end
 
     if action == 'show' then return report() end
+    if action == 'why' then return why() end
 
     local c = streamCfg()
     local updated = {

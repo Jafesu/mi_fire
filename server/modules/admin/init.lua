@@ -713,6 +713,7 @@ end
 
 --- `/fire nozzlestream ...` -- aim the water.
 ---
+---     /fire nozzlestream why      why nothing is appearing
 ---     /fire nozzlestream show
 ---     /fire nozzlestream fire    hold the trigger so it keeps spraying while you nudge
 ---     /fire nozzlestream stop    let go
@@ -759,6 +760,11 @@ subcommands.nozzlestream = function(source, args)
         return reply(source, 'stream tuning cleared')
     end
 
+    if action == 'why' then
+        TriggerClientEvent('mi_fire:client:nozzleStream', source, 'why')
+        return reply(source, 'checking')
+    end
+
     if not action or action == 'show' then
         TriggerClientEvent('mi_fire:client:nozzleStream', source, 'show')
         return reply(source, 'hold the trigger to see it: /fire nozzlestream nudge rz 90')
@@ -779,7 +785,7 @@ subcommands.nozzlestream = function(source, args)
         return reply(source, ('%s %+g -- hold the trigger'):format(tostring(axis), amount))
     end
 
-    reply(source, ('"%s" is not one of show, fire, stop, nudge, on, off, reset')
+    reply(source, ('"%s" is not one of show, why, fire, stop, nudge, on, off, reset')
         :format(tostring(action)), 'error')
 end
 

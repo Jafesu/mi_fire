@@ -2683,3 +2683,65 @@ present, so the state is deliberate and cannot be left behind quietly.
 - The answer to the bisect.
 - Restoring `w_mi_nozzle` afterwards, either way.
 
+---
+
+## 2026-09-01 (second) — the model had no skeleton
+
+**Scope:** the bisect failed usefully, and the answer turned up in Sollumz's own source.
+
+**The bisect gave nothing to test.** Pointing `<Model>` at `w_am_fireext` produced no weapon at
+all, so there was no trigger to pull. A bad measurement -- but it did not need to be run twice,
+because reading the exporter answered the question outright.
+
+**`ydr/ydrexport.py`, line 135:**
+
+```python
+if armature_obj or drawable_obj.type == "ARMATURE":
+    drawable.skeleton = create_skeleton(...)
+else:
+    drawable.skeleton = None
+```
+
+`sollumz.converttodrawable` produces an **Empty** with the mesh underneath. So every `.ydr` this
+pipeline has ever produced shipped `skeleton = None`, while every GTA weapon model is a skinned
+drawable and firing looks up a muzzle bone to emit the flash from. The blend confirmed it from
+the other side: one mesh, no armature, ever.
+
+**Changed:**
+
+- `tools/assets/nozzle/export_ydr.py` — the Drawable root is now an armature carrying `gun_root`
+  and `gun_muzzle`, the muzzle at the tip on the barrel axis.
+- `verify_skeleton` — decompresses the finished `.ydr` and fails if the bones are not in it.
+- `data/weapons.meta` — the bisect reverted.
+
+**Decisions:**
+
+- **The conversion still runs first.** Building the hierarchy by hand exported nothing and
+  reported "has no Sollumz materials", because `get_sollumz_materials` walks the model's LOD
+  levels and only `converttodrawable` sets those up. Only the root gets swapped afterwards.
+
+- **The pipeline now checks the file, not itself.** A `.ydr` is an RSC7 container -- 16 byte
+  header, then raw deflate -- so the bone names can be read straight out of the finished
+  artefact. Every other check in this pipeline asserts what the script believes it did; this one
+  asserts what was written. The bug it guards against was silent for the model's entire life:
+  clean export, success reported, nothing in any log.
+
+- **Read-only properties no longer abort the property copy.** `shader_order` is derived, and one
+  failure was losing the other five silently.
+
+**Verified:**
+
+- The bones are **in the file**: decompressed the 364,263 byte `.ydr` to 1,376,256 bytes and
+  found `gun_root`, `gun_muzzle` and the texture name. First change in this sequence confirmed
+  rather than assumed.
+- `lua tools/run_tests.lua` — **1103 passed, 0 failed**.
+- **Not** tested in game.
+
+**Open:**
+
+- Whether a skeleton is what the crash wanted. The evidence is strong and it is still a
+  hypothesis until someone pulls a trigger.
+- If it still crashes, the model is still the only thing left differing from a working weapon,
+  and the next question is whether the mesh needs to be skinned to those bones rather than merely
+  parented.
+

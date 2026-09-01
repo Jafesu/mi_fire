@@ -39,6 +39,32 @@ OUT="build/nozzle"
 
 `--tris N` overrides the triangle budget on step 1 if 8,000 turns out to be the wrong call.
 
+### The drawable needs a skeleton, and Sollumz only writes one for an armature
+
+`ydrexport.py`:
+
+```python
+if armature_obj or drawable_obj.type == "ARMATURE":
+    drawable.skeleton = create_skeleton(...)
+else:
+    drawable.skeleton = None
+```
+
+`sollumz.converttodrawable` produces an **Empty** with the mesh under it, so every export from
+this pipeline shipped `skeleton = None` — while every GTA weapon model is a skinned drawable, and
+firing looks up a muzzle bone to emit the flash from. That crashed the game on the trigger, and
+nothing in any log said so.
+
+`build_drawable_with_skeleton` still runs the conversion first, because it sets up the model's
+LOD levels and `get_sollumz_materials` walks those — a hand-built hierarchy without them exports
+nothing and reports *"has no Sollumz materials"*. Only the root is swapped afterwards, for an
+armature carrying `gun_root` and `gun_muzzle`.
+
+`verify_skeleton` then decompresses the finished `.ydr` and checks the bone names are really in
+it. That is the only check in this pipeline that reads what was written rather than what the
+script believes it did, and it exists because the failure it guards against was invisible for the
+model's entire life.
+
 ### The model is a nozzle *and* a length of hose
 
 `HOSE_STUB` adds a bevelled curve off the back of the coupling. Without it the nozzle floats in

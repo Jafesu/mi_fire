@@ -78,27 +78,7 @@
       <Infos>
         <Item type="CWeaponInfo">
           <Name>WEAPON_MINOZZLE</Name>
-          <!--
-            DIAGNOSTIC: this is deliberately NOT our model.
-
-            Four fixes to this file have not stopped the crash, and it now differs from a weapon
-            known to fire without crashing in only four places: Name, Model, Slot and
-            HumanNameHash. Three of those are just strings. That leaves the model.
-
-            `w_am_fireext` is the base game fire extinguisher's, so it definitely has whatever a
-            weapon model is supposed to have. If the crash stops with this in place, the fault is
-            in `w_mi_nozzle` and the first thing to look at is that it has no skeleton at all –
-            our Blender file contains a single mesh and no armature, while every GTA weapon model
-            is a skinned drawable. If the crash continues, the model is innocent and the fault is
-            somewhere none of us has looked yet.
-
-            Either answer is worth one restart, and it is worth more than another confident guess.
-
-            TO RESTORE: put `w_mi_nozzle` back below and delete this comment. `conventions_spec`
-            fails while this is in place unless the marker word above is present, so it cannot be
-            left here by accident.
-          -->
-          <Model>w_am_fireext</Model>
+          <Model>w_mi_nozzle</Model>
           <Audio />
           <Slot>SLOT_MINOZZLE</Slot>
           <DamageType>FIRE_EXTINGUISHER</DamageType>

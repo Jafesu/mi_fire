@@ -2745,3 +2745,53 @@ the other side: one mesh, no armature, ever.
   and the next question is whether the mesh needs to be skinned to those bones rather than merely
   parented.
 
+---
+
+## 2026-09-01 (third) — it fires
+
+**The skeleton was the cause.** Six attempts, five of them fixes reasoned out and shipped without
+a measurement, and the answer was in Sollumz's own source the whole time: a Drawable rooted on an
+Empty exports `skeleton = None`, and a weapon with no muzzle bone takes the game down when fired.
+
+**What is left is cosmetic.** The spray that appears is the weapon's own, not mi_fire's, and two
+things follow from that which were not obvious:
+
+- With `FireType VOLUMETRIC_PARTICLE` the `FlashFx` **is** the spray rather than a muzzle flash.
+  That is why it fires on an uncoupled, uncharged line, and why it looks like extinguisher powder.
+- `FlashFxChanceSP` and `FlashFxChanceMP` are both zero and it emits anyway, so those do not gate
+  it.
+
+**Changed:** `FlashFxScale` from 1.0 to 0.01.
+
+**Decisions:**
+
+- **Shrunk rather than renamed.** Swapping `weap_extinguisher` for a water effect is the obvious
+  move and is exactly the shape of the bug that crashed the game six times: an unresolvable
+  `FlashFx` is unresolvable, and there is no way to check a ptfx name from outside the game. A
+  scale is a float. Renaming is a guess; shrinking cannot fail the same way.
+
+- **The behaviour that falls out is the right one.** What the player sees becomes
+  `MIFireHose.visuals.stream`, which mi_fire draws and gates on the line being charged and the
+  bale open. An uncoupled nozzle producing a jet of anything was wrong regardless of what the
+  jet looked like.
+
+**On the six attempts:** the pattern is worth naming, because it repeated. Each fix was reasoned
+from the code, was plausible, was shipped, and was wrong. The two things that actually moved it
+forward were both observations rather than deductions -- "it crashes even uncharged", which
+eliminated every hypothesis at once, and reading the exporter's own branch rather than reasoning
+about what it probably did. The dumps were read correctly each time and pointed nowhere, because
+every candidate was native.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1103 passed, 0 failed**.
+- In game: the weapon equips, holds, and **fires without crashing**.
+
+**Open:**
+
+- The water stream offsets are still zero, so it will emit from the hand until nudged.
+- Whether hiding the weapon's own spray leaves anything visible on an uncharged line. It should
+  not.
+
+**Next:** aim the water, then put it on a fire.
+

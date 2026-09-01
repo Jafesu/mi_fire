@@ -182,7 +182,24 @@
             <FlashFxChanceSP value="0.000000" />
             <FlashFxChanceMP value="0.000000" />
             <FlashFxAltChance value="0.000000" />
-            <FlashFxScale value="1.000000" />
+            <!--
+              Shrunk to nothing on purpose.
+
+              With FireType VOLUMETRIC_PARTICLE the FlashFx above **is** the spray, not a muzzle
+              flash, which is why it fires whether or not the line is charged and why it looks
+              like extinguisher powder rather than water. The chance values below are zero and it
+              still emits, so they do not gate it.
+
+              The name cannot simply be swapped for a water effect: an unresolvable FlashFx is
+              what crashed the game on every trigger pull, and there is no way to check a ptfx
+              name from outside the game. A scale is a float, so shrinking it is safe in a way
+              that renaming it is not.
+
+              What the player actually sees is `MIFireHose.visuals.stream`, drawn by mi_fire and
+              gated on the line being charged and the bale open. Which is the correct behaviour
+              anyway: an uncoupled nozzle should produce nothing.
+            -->
+            <FlashFxScale value="0.010000" />
             <FlashFxLightEnabled value="false" />
             <FlashFxLightCastsShadows value="true" />
             <FlashFxLightOffsetDist value="0.000000" />

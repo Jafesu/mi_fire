@@ -2795,3 +2795,60 @@ every candidate was native.
 
 **Next:** aim the water, then put it on a fire.
 
+---
+
+## 2026-09-01 (fourth) — the stream follows the agent
+
+**Scope:** water and foam have to look different, and the client could not tell them apart.
+
+**A correction worth recording:** the note in the last entry said swapping `weap_extinguisher`
+for a water effect would be the obvious move. It would not have broken fire extinguishers --
+`FlashFx` lives inside a single `CWeaponInfo`, so changing ours affects `WEAPON_MINOZZLE` and
+nothing else, and `WEAPON_FIREEXTINGUISHER` keeps its own. The reason not to rename it is the
+crash risk alone: a ptfx name cannot be checked from outside the game, and an unresolvable one is
+exactly what took the client down six times.
+
+That distinction matters going forward. A foam nozzle, a deck gun and an extinguisher can each
+name their own effect without touching each other, so per-weapon effects are a real option later
+-- just not one to reach for on a guess.
+
+**Changed:**
+
+- `server/modules/hose/init.lua` — `publicOf` sends `agent`.
+- `config/hose.lua` — `streamByAgent`, layered over `stream`.
+- `client/modules/hose/init.lua` — the stream picks per agent and restarts when it changes.
+
+**Decisions:**
+
+- **The server always knew and never said.** `applyAgent` has been given `line.agent` since the
+  water path was written, but it was not in `publicOf`, so the client drew a water jet whatever
+  the rig was proportioning. Foam and water do not look alike, and showing the wrong one teaches
+  the wrong thing about which to reach for -- which is the whole point of the agent matrix.
+
+- **Overrides layer, they do not replace.** Only the differences go in `streamByAgent`, so a
+  placement found by nudging stays correct for every agent instead of having to be found again
+  per agent.
+
+- **`pick()` rather than `or` chains.** A zero offset is a real value and `byAgent.x or base.x`
+  steps straight over it. Every field is checked for nil explicitly.
+
+- **Foam has no effect name of its own, deliberately.** It reuses the water jet at a fatter
+  scale. Inventing a plausible ptfx name is precisely the mistake that produced six crashes, and
+  a placeholder that admits to being one is better than a name nobody has verified. The real
+  effect gets taken from something already running, the same way `water_cannon_jet` was.
+
+- **The particle restarts when the agent changes**, not only when the bale does. A looped
+  particle keeps whatever it was started with, so switching to foam mid-flow would have gone on
+  looking like water until the trigger was released.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1103 passed, 0 failed**.
+- **Not** tested in game. Nothing sets `line.agent` to foam yet, so the path is unexercised: this
+  is the plumbing being in place before Phase 8 needs it, not a feature that can be used today.
+
+**Open:**
+
+- Nothing proportions foam yet. The rig has a foam cell in config and no way to open it.
+- A real foam effect.
+

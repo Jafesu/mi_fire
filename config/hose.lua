@@ -424,6 +424,27 @@ MIFireHose.visuals = {
         rx = 0.0, ry = 0.0, rz = 0.0,
     },
 
+    --- What each agent looks like coming out, over the top of `stream` above.
+    ---
+    --- Only the differences: anything not named here falls through to `stream`, so a placement
+    --- found by nudging stays correct for every agent and does not have to be found again.
+    ---
+    --- **The effect names have to come from something already running**, the same rule as
+    --- `water_cannon_jet` itself, which was taken from the water cannon rigs on this machine. A
+    --- ptfx name cannot be checked from outside the game, and an unresolvable one is the exact
+    --- shape of the bug that crashed the client six times over. Nothing here is invented: foam
+    --- currently reuses the water jet at a fatter scale, which is honest about being a
+    --- placeholder rather than pretending to a name nobody has verified.
+    ---
+    --- Agents come from `config/agents.lua`. Only the two a hose line can carry are listed --
+    --- the rest are extinguisher agents and never reach a nozzle.
+    streamByAgent = {
+        --- Thicker and slower than water, and it clings. Until a real foam effect is found this
+        --- is the water jet at a larger scale, which reads as heavier without claiming to be
+        --- something it is not.
+        foam = { scale = 1.8 },
+    },
+
     couplingProp = 'prop_fire_hosebox_01',
     reelProp = 'prop_fire_hosereel',
 

@@ -845,24 +845,43 @@ local PATTERN_WIDEN = 14
 local streamHandle = nil
 local streamAssetAsked = false
 
+--- Which agent the running particle was started for. See the restart in the flow loop.
+local streamAgent = nil
+
 --- Off is a diagnostic, not a preference.
 ---
 --- If the game still goes down with this disabled then the particle was never the problem, and
 --- that is worth being able to find out in ten seconds rather than by another round of edits.
 local streamEnabled = true
 
+--- What is coming out of the nozzle, for the agent the line is actually carrying.
+---
+--- Three layers, in order: the base `stream`, then the agent's differences, then anything
+--- `/fire nozzlestream` is holding. The tuning override wins so a placement being found by eye
+--- is not quietly undone by switching to foam.
 ---@return table
 local function streamCfg()
     local base = MIFireHose.visuals.stream or {}
     local over = streamOverride or {}
 
+    local line = mine and lines[mine]
+    local agent = (line and line.agent) or 'water'
+    local byAgent = (MIFireHose.visuals.streamByAgent or {})[agent] or {}
+
+    -- `or` chains rather than a merge helper, because a zero offset is a real value and
+    -- `byAgent.x or base.x` would step over it. Every field is checked for nil explicitly.
+    local function pick(key)
+        if over[key] ~= nil then return over[key] end
+        if byAgent[key] ~= nil then return byAgent[key] end
+        return base[key]
+    end
+
     return {
-        asset = base.asset or 'core',
-        name = base.name or 'water_cannon_jet',
-        scale = over.scale or base.scale or 1.2,
-        x = over.x or base.x or 0.0, y = over.y or base.y or 0.0, z = over.z or base.z or 0.0,
-        rx = over.rx or base.rx or 0.0, ry = over.ry or base.ry or 0.0,
-        rz = over.rz or base.rz or 0.0,
+        asset = pick('asset') or 'core',
+        name = pick('name') or 'water_cannon_jet',
+        scale = pick('scale') or 1.2,
+        x = pick('x') or 0.0, y = pick('y') or 0.0, z = pick('z') or 0.0,
+        rx = pick('rx') or 0.0, ry = pick('ry') or 0.0, rz = pick('rz') or 0.0,
     }
 end
 
@@ -966,10 +985,18 @@ CreateThread(function()
                 end
             end
 
-            if open and not streamHandle then
+            -- Restarted when the agent changes as well as when the bale does: a looped
+            -- particle keeps whatever it was started with, so switching to foam mid-flow would
+            -- otherwise go on looking like water until the trigger was released.
+            local agentNow = line.agent or 'water'
+
+            if open and (not streamHandle or streamAgent ~= agentNow) then
+                stopStream()
                 startStream(cache.ped)
+                streamAgent = agentNow
             elseif not open and streamHandle then
                 stopStream()
+                streamAgent = nil
             end
 
             local now = GetGameTimer()

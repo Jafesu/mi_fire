@@ -52,6 +52,12 @@ local function publicOf(line)
         state = line.state,
         nozzle = line.nozzle,
         pattern = line.pattern,
+
+        -- What is actually coming out. The server has always known -- `applyAgent` is given
+        -- `line.agent` -- but it was never sent, so the client drew a water jet whatever the
+        -- rig was proportioning. Foam and water do not look alike and putting the wrong one on
+        -- screen teaches the wrong thing about which to reach for.
+        agent = line.agent or 'water',
         gpm = line.gpm,
         bail = line.bail,
         nozzlePsi = line.nozzlePsi,

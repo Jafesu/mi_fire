@@ -3087,3 +3087,49 @@ set is a trap, and it was one I built while trying to make something else diagno
 
 - The stream offsets, which is what all of this was in the way of.
 
+---
+
+## 2026-09-01 (tenth) — the stream, found and split by stance
+
+**Scope:** the carrying stream placement is found. The aiming one needs the same treatment the
+grip did.
+
+**The numbers:**
+
+```lua
+stream = { asset = 'core', name = 'water_cannon_jet', scale = 1.20,
+           x = 0.160, y = -0.030, z = 0.100, rx = 311.1, ry = 11.1, rz = 220.0 }
+```
+
+**Changed:**
+
+- `config/hose.lua` — the found values, and a `streamAiming` slot.
+- `client/modules/hose/init.lua` — the stream resolves per stance as well as per agent.
+- `tools/tests/conventions_spec.lua` — the stream placements are checked for shape.
+
+**Decisions:**
+
+- **Four layers, innermost last:** the tuning override for this stance, the agent's differences,
+  the stance's, then the base. The override wins so a placement being found by eye is not quietly
+  undone by switching agent or coming up to aim.
+
+- **`streamAiming` holds only differences**, so the carrying placement does not have to be found
+  twice. Same as `nozzleGripAiming` and `streamByAgent`: layered, not replaced.
+
+- **The stance being edited is the stance you are in.** No extra syntax, and no way to edit the
+  wrong one by accident -- which is the same choice the grip tuner made, and it has held up.
+
+- **Old saved tuning still loads.** The KVP override used to be a single flat placement; anything
+  saved before the aiming one existed is read as the carrying one rather than discarded. Someone
+  mid-tune should not lose their work to a refactor.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1122 passed, 0 failed** (was 1113).
+- No references to the old single override remain.
+
+**Open:**
+
+- `streamAiming`, which is what the next session is for. `/fire nozzlegrip aim` holds the pose and
+  `/fire nozzlestream fire` holds the stream, so both hands are free.
+

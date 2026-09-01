@@ -234,8 +234,12 @@ local BONES = { right = 57005, left = 18905 }
 local grips = { carry = nil, aim = nil }
 
 --- Where the stream comes out, while it is being found. Saved with the grips.
----@type table|nil
-local streamOverride = nil
+---
+--- Two, for the same reason the grip has two: the hand rotates between carrying and aiming, so
+--- one placement cannot serve both. Whichever stance you are in is the one `/fire nozzlestream`
+--- edits, so aiming and then nudging fixes the aiming stream with no extra syntax.
+---@type table<string, table|nil>
+local streamOverrides = { carry = nil, aim = nil }
 
 --- What was last handed to `AttachEntityToEntity`, so it is not handed over again every frame.
 local appliedKey = nil
@@ -283,7 +287,8 @@ end
 local function saveGrips()
     local ok, encoded = pcall(json.encode, {
         carry = grips.carry, aim = grips.aim,
-        stream = streamOverride, streamOff = not streamEnabled,
+        stream = streamOverrides.carry, streamAim = streamOverrides.aim,
+        streamOff = not streamEnabled,
     })
     if ok and encoded then SetResourceKvp(GRIP_KVP, encoded) end
 end
@@ -296,7 +301,10 @@ local function loadGrips()
     if ok and type(decoded) == 'table' then
         grips.carry = decoded.carry
         grips.aim = decoded.aim
-        streamOverride = decoded.stream
+        -- `decoded.stream` used to be a single flat placement. Anything saved before the
+        -- aiming one existed is read as the carrying one rather than discarded.
+        streamOverrides.carry = decoded.stream
+        streamOverrides.aim = decoded.streamAim
         if decoded.streamOff then streamEnabled = false end
     end
 end
@@ -879,25 +887,30 @@ local function setStreamForce(on)
     streamForce = on
 end
 
---- What is coming out of the nozzle, for the agent the line is actually carrying.
+--- What is coming out of the nozzle, for the agent and the stance.
 ---
---- Three layers, in order: the base `stream`, then the agent's differences, then anything
---- `/fire nozzlestream` is holding. The tuning override wins so a placement being found by eye
---- is not quietly undone by switching to foam.
+--- Four layers, innermost last: the tuning override for this stance, then the agent's
+--- differences, then the stance's, then the base. The override wins so a placement being found
+--- by eye is not quietly undone by switching agent or coming up to aim.
 ---@return table
 local function streamCfg()
+    local stance = aimingNow()
+
     local base = MIFireHose.visuals.stream or {}
-    local over = streamOverride or {}
+    local byStance = (stance == 'aim' and MIFireHose.visuals.streamAiming) or {}
 
     local line = mine and lines[mine]
     local agent = (line and line.agent) or 'water'
     local byAgent = (MIFireHose.visuals.streamByAgent or {})[agent] or {}
 
-    -- `or` chains rather than a merge helper, because a zero offset is a real value and
-    -- `byAgent.x or base.x` would step over it. Every field is checked for nil explicitly.
+    local over = streamOverrides[stance] or {}
+
+    -- Explicit nil checks rather than `or` chains: a zero offset is a real value, and
+    -- `byStance.x or base.x` would step straight over it.
     local function pick(key)
         if over[key] ~= nil then return over[key] end
         if byAgent[key] ~= nil then return byAgent[key] end
+        if byStance[key] ~= nil then return byStance[key] end
         return base[key]
     end
 
@@ -1152,8 +1165,10 @@ RegisterNetEvent('mi_fire:client:nozzleStream', function(action, axis, amount)
     local function report()
         local c = streamCfg()
         why()
-        say(("stream = { asset = '%s', name = '%s', scale = %.2f, x = %.3f, y = %.3f, z = %.3f, rx = %.1f, ry = %.1f, rz = %.1f },")
-            :format(c.asset, c.name, c.scale, c.x, c.y, c.z, c.rx, c.ry, c.rz))
+        say(('editing the %s stream (aim to switch)'):format(aimingNow()))
+        say(("%s = { asset = '%s', name = '%s', scale = %.2f, x = %.3f, y = %.3f, z = %.3f, rx = %.1f, ry = %.1f, rz = %.1f },")
+            :format(aimingNow() == 'aim' and 'streamAiming' or 'stream',
+                c.asset, c.name, c.scale, c.x, c.y, c.z, c.rx, c.ry, c.rz))
     end
 
     if action == 'fire' then
@@ -1193,7 +1208,7 @@ RegisterNetEvent('mi_fire:client:nozzleStream', function(action, axis, amount)
     end
 
     if action == 'reset' then
-        streamOverride = nil
+        streamOverrides.carry, streamOverrides.aim = nil, nil
         streamEnabled = true
         saveGrips()
         stopStream()
@@ -1221,7 +1236,7 @@ RegisterNetEvent('mi_fire:client:nozzleStream', function(action, axis, amount)
         end
     end
 
-    streamOverride = updated
+    streamOverrides[aimingNow()] = updated
     saveGrips()
 
     -- Restarted rather than adjusted: a looped particle keeps the offsets it was started with.

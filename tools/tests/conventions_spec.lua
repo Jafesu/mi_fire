@@ -254,6 +254,54 @@ return function(t)
 
     -- -----------------------------------------------------------------------
 
+    t.describe('the stream placements are usable numbers')
+
+    -- Found by nudging in game across several sessions, one of which was lost to a crash and one
+    -- to a debug toggle left switched off. They are not derivable from anything, and a typo in
+    -- them is invisible until someone opens a bale.
+    do
+        local visuals = MIFireHose.visuals or {}
+
+        for _, name in ipairs({ 'stream', 'streamAiming' }) do
+            local cfg = visuals[name]
+
+            if cfg ~= nil and cfg ~= false then
+                t.equal(type(cfg), 'table', ('%s is a table'):format(name))
+
+                -- `stream` carries the effect; `streamAiming` may hold only differences.
+                if name == 'stream' then
+                    t.ok(type(cfg.asset) == 'string' and cfg.asset ~= '',
+                        'stream.asset names a particle dictionary')
+                    t.ok(type(cfg.name) == 'string' and cfg.name ~= '',
+                        'stream.name names an effect')
+                end
+
+                for _, axis in ipairs({ 'x', 'y', 'z' }) do
+                    if cfg[axis] ~= nil then
+                        -- An offset from a hand bone, in metres. Anything approaching a metre is
+                        -- a typo and puts the water somewhere near the player's feet.
+                        t.ok(math.abs(cfg[axis]) < 0.5,
+                            ('%s.%s is within half a metre of the hand'):format(name, axis))
+                    end
+                end
+
+                for _, axis in ipairs({ 'rx', 'ry', 'rz' }) do
+                    if cfg[axis] ~= nil then
+                        t.ok(cfg[axis] >= 0 and cfg[axis] < 360,
+                            ('%s.%s is wrapped into 0-359'):format(name, axis))
+                    end
+                end
+
+                if cfg.scale ~= nil then
+                    t.ok(cfg.scale > 0 and cfg.scale < 20,
+                        ('%s.scale is a sane multiplier'):format(name))
+                end
+            end
+        end
+    end
+
+    -- -----------------------------------------------------------------------
+
     t.describe('the nozzle placements are usable numbers')
 
     -- These were found by nudging in game over two sessions, one of which was lost to a crash.

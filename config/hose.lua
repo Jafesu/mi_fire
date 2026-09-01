@@ -418,11 +418,30 @@ MIFireHose.visuals = {
     stream = {
         asset = 'core',
         name = 'water_cannon_jet',
-        scale = 1.2,
+        scale = 1.20,
 
-        x = 0.0, y = 0.0, z = 0.0,
-        rx = 0.0, ry = 0.0, rz = 0.0,
+        -- Found by nudging in game, not by arithmetic. Offsets are from the hand bone, so they
+        -- move with the arm rather than with the world.
+        x = 0.160, y = -0.030, z = 0.100,
+        rx = 311.1, ry = 11.1, rz = 220.0,
     },
+
+    --- The same, for while the player is aiming.
+    ---
+    --- A second set for the same reason the grip needs one: the hand rotates between carrying and
+    --- aiming, so a placement that looks right at rest points somewhere else the moment the
+    --- nozzle comes up. Only the differences are needed -- anything left out falls through to
+    --- `stream` above.
+    ---
+    --- Find it by aiming and then nudging. `/fire nozzlegrip aim` holds the aim pose and
+    --- `/fire nozzlestream fire` holds the stream, so both hands are free:
+    ---
+    ---     /fire nozzlegrip aim
+    ---     /fire nozzlestream fire
+    ---     /fire nozzlestream nudge rz 15
+    ---
+    --- nil falls back to `stream`, so a half-tuned setup is imperfect rather than broken.
+    streamAiming = nil,
 
     --- What each agent looks like coming out, over the top of `stream` above.
     ---

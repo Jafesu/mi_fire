@@ -2852,3 +2852,42 @@ name their own effect without touching each other, so per-weapon effects are a r
 - Nothing proportions foam yet. The rig has a foam cell in config and no way to open it.
 - A real foam effect.
 
+---
+
+## 2026-09-01 (fifth) — hold the trigger while tuning the stream
+
+**Scope:** the same problem the aim lock solved, one layer along.
+
+**Changed:** `/fire nozzlestream fire` and `stop`.
+
+**Decisions:**
+
+- **It holds the trigger**, the same way `/fire nozzlegrip aim` holds the aim control: press
+  `INPUT_ATTACK` every frame. Tuning a particle otherwise means holding the trigger, typing a
+  command, letting go to read the result, and pulling again -- per nudge, of which there are
+  dozens.
+
+- **It bypasses the charged check.** Finding where a particle comes out should not require laying
+  a line, coupling it, engaging the pump, throttling up and opening a gate first, every time. What
+  it does not bypass is holding the nozzle -- the offsets are measured from the hand, so there has
+  to be a hand with a nozzle in it.
+
+- **No water is delivered while it is on**, and that is enforced by a separate condition rather
+  than left to the server refusing. The loop now distinguishes `flowing` -- charged, usable, with
+  a real flow -- from `ready`, which is what makes the particle appear. Only `flowing` sends. A
+  tuning command that quietly emptied a thousand gallon tank would be a nasty surprise, and
+  relying on the far end to reject it means one accidental charged line makes it real.
+
+- **It lets go by itself** when the line is dropped or the resource stops, like the aim lock. A
+  player stuck holding the trigger with empty hands has no way to work out why.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1103 passed, 0 failed**.
+- The gating reads as intended: `ready = flowing or (holding and streamForce)`, and the water send
+  is behind `flowing` alone.
+
+**Open:**
+
+- The stream offsets, which is what this exists to find.
+

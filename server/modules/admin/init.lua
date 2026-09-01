@@ -714,10 +714,16 @@ end
 --- `/fire nozzlestream ...` -- aim the water.
 ---
 ---     /fire nozzlestream show
+---     /fire nozzlestream fire    hold the trigger so it keeps spraying while you nudge
+---     /fire nozzlestream stop    let go
 ---     /fire nozzlestream nudge <x|y|z|rx|ry|rz|scale> <amount>
 ---     /fire nozzlestream off     no particle at all -- water still flows
 ---     /fire nozzlestream on
 ---     /fire nozzlestream reset   back to the config
+---
+--- `fire` bypasses the charged check, so a particle can be aimed without laying a line, coupling
+--- it, engaging the pump and opening a gate first. It delivers no water: the line is not charged
+--- and the server would refuse anyway.
 ---
 --- Which way a particle emits is not readable from the effect or the model, so it gets found by
 --- looking, the same as the grip did.
@@ -739,6 +745,13 @@ subcommands.nozzlestream = function(source, args)
     if action == 'on' then
         TriggerClientEvent('mi_fire:client:nozzleStream', source, 'on')
         return reply(source, 'particle on')
+    end
+
+    if action == 'fire' or action == 'stop' then
+        TriggerClientEvent('mi_fire:client:nozzleStream', source, action)
+        return reply(source, action == 'fire'
+            and 'holding the trigger -- nudge away, and "stop" to let go'
+            or 'trigger released')
     end
 
     if action == 'reset' then
@@ -766,7 +779,7 @@ subcommands.nozzlestream = function(source, args)
         return reply(source, ('%s %+g -- hold the trigger'):format(tostring(axis), amount))
     end
 
-    reply(source, ('"%s" is not one of show, nudge, on, off, reset')
+    reply(source, ('"%s" is not one of show, fire, stop, nudge, on, off, reset')
         :format(tostring(action)), 'error')
 end
 

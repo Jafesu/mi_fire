@@ -612,9 +612,10 @@ local function reconcileNozzle()
         end
 
     elseif nozzleEquipped or heldNozzle then
-        -- Whatever was being tuned, it is over: a player left holding the aim control with
-        -- nothing in their hands cannot work out why they are stuck.
+        -- Whatever was being tuned, it is over: a player left holding a control with nothing in
+        -- their hands cannot work out why they are stuck.
         setAimLock(false)
+        setStreamForce(false)
 
         if nozzleEquipped then
             unequipNozzle(cache.ped)
@@ -848,6 +849,38 @@ local streamAssetAsked = false
 --- Which agent the running particle was started for. See the restart in the flow loop.
 local streamAgent = nil
 
+--- Holds the trigger down so the stream can be aimed with both hands free.
+---
+--- The same problem the aim lock solves, and worse: tuning a particle means holding the trigger,
+--- typing a command, letting go to read the result, and pulling again -- per nudge, of which
+--- there are dozens.
+---
+--- It also **bypasses the charged check**, deliberately. Otherwise finding where a particle comes
+--- out would mean laying a line, coupling it, engaging the pump, throttling up and opening a gate
+--- first, every time. What it does not bypass is holding the nozzle: the offsets are measured
+--- from the hand, so there has to be a hand with a nozzle in it.
+---
+--- No water is delivered while it is on. The line is not charged, the server would refuse, and a
+--- tuning command that quietly emptied a tank would be a nasty surprise.
+local streamForce = false
+
+local ATTACK_CONTROL = 24
+
+---@param on boolean
+local function setStreamForce(on)
+    if streamForce == on then return end
+    streamForce = on
+
+    if not on then return end
+
+    CreateThread(function()
+        while streamForce do
+            SetControlNormal(0, ATTACK_CONTROL, 1.0)
+            Wait(0)
+        end
+    end)
+end
+
 --- Off is a diagnostic, not a preference.
 ---
 --- If the game still goes down with this disabled then the particle was never the problem, and
@@ -949,10 +982,16 @@ CreateThread(function()
 
         -- `usable` is the pump's verdict: a line below a third of its rated nozzle pressure is
         -- soft, and a soft line puts water on the floor rather than on the fire.
-        local ready = line and line.state == 'charged' and (line.gpm or 0) > 0
-            and line.usable ~= false
+        local holding = line ~= nil
             and line.nozzleHolder == GetPlayerServerId(PlayerId())
             and nozzleEquipped
+
+        local flowing = holding and line.state == 'charged' and (line.gpm or 0) > 0
+            and line.usable ~= false
+
+        -- Forcing shows the stream without a charged line, for tuning. It cannot conjure a
+        -- nozzle, though: the offsets are measured from the hand.
+        local ready = flowing or (holding and streamForce)
 
         -- Only worth watching a control every frame while there is something to open.
         Wait(ready and 0 or 500)
@@ -964,7 +1003,9 @@ CreateThread(function()
             -- Disabled as well as enabled: aiming a weapon disables the plain attack control in
             -- some states, and a nozzle that stops flowing the moment you aim it would be a
             -- puzzling bug to be handed.
-            local open = IsControlPressed(0, 24) or IsDisabledControlPressed(0, 24)
+            local open = streamForce
+                or IsControlPressed(0, ATTACK_CONTROL)
+                or IsDisabledControlPressed(0, ATTACK_CONTROL)
 
             -- Working the bezel: scroll while the line is open.
             --
@@ -1001,7 +1042,7 @@ CreateThread(function()
 
             local now = GetGameTimer()
 
-            if open and now - lastSend >= 400 then
+            if flowing and open and now - lastSend >= 400 then
                 local seconds = math.min((now - lastSend) / 1000.0, 2.0)
                 lastSend = now
 
@@ -1049,8 +1090,20 @@ RegisterNetEvent('mi_fire:client:nozzleStream', function(action, axis, amount)
             :format(c.asset, c.name, c.scale, c.x, c.y, c.z, c.rx, c.ry, c.rz))
     end
 
+    if action == 'fire' then
+        setStreamForce(true)
+        return say('trigger held. Nudge away -- "/fire nozzlestream stop" to let go.')
+    end
+
+    if action == 'stop' then
+        setStreamForce(false)
+        stopStream()
+        return say('trigger released')
+    end
+
     if action == 'off' then
         streamEnabled = false
+        setStreamForce(false)
         saveGrips()
         stopStream()
         return say('stream particle OFF. Water still flows -- if it still crashes, '
@@ -1095,6 +1148,8 @@ RegisterNetEvent('mi_fire:client:nozzleStream', function(action, axis, amount)
     saveGrips()
 
     -- Restarted rather than adjusted: a looped particle keeps the offsets it was started with.
+    -- The flow loop puts it back on the next frame while the trigger is held, so a nudge shows
+    -- its result without anything else being pressed.
     stopStream()
     report()
 end)
@@ -1850,6 +1905,7 @@ AddEventHandler('onResourceStop', function(resource)
         clearNozzleHold(cache.ped)
     end
     setAimLock(false)
+    setStreamForce(false)
 
     -- A looped particle outlives the resource with nothing left to stop it, and a permanent
     -- jet of water hanging in the air is a restart for everyone who can see it.

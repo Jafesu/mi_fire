@@ -3185,3 +3185,40 @@ fallback prop and no aiming grip -- three unrelated-looking failures from one ed
   held, aimed, and sprays, and the server applies the agent matrix when a charged line flows. The
   next session is a fire and a knockdown.
 
+---
+
+## 2026-09-03 (second) — the hose says what the water did
+
+**Scope:** ahead of putting water on a fire for the first time.
+
+**The gap:** `Fire.applyAgent` returns `{ nodesAffected, knockedDown, intensityRemoved, hazards }`
+and has done since it was written. `/fire agent` reports all of it. The hose threw it away -- so
+the one person who needs to know, whoever is on the nozzle, was the only one not told.
+
+**Changed:** `reportSuppression` in the hose module.
+
+**Decisions:**
+
+- **It matters most when the answer is bad.** Water on a flammable liquid fire spreads it, and
+  the agent matrix models that faithfully -- intensity climbs and a hazard rolls. With nothing on
+  screen that reads as the hose not working, and the lesson the whole matrix exists to teach is
+  lost. A firefighter should be told the fire is growing, not left to infer it.
+
+- **Three tiers, deliberately.** A hazard fired is an explosion or a flare and is never
+  suppressed or rate limited. The fire growing is rate limited to once every five seconds,
+  because this runs several times a second while a bale is open and a warning repeated four times
+  a second stops being read. A knockdown is naturally one-shot, since a node knocks down once.
+
+- **Said to the line, not the player.** `notifyLine` reaches everyone on it. A backup firefighter
+  should know the fire is growing too -- they are standing in it.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1145 passed, 0 failed**.
+- Ordering checked: `notifyLine` is defined well above `reportSuppression`.
+
+**Open:**
+
+- The test itself. A Class A fire should go down; **a Class B fire should get worse**, which is
+  the one that proves the agent matrix is wired to the hose rather than merely present.
+

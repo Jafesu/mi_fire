@@ -742,6 +742,53 @@ end)
 --- It also spends the tank, which is the thing that makes a supply line matter: an engine with
 --- 750 gallons flowing 150 gpm has five minutes, and that clock is the whole reason anyone
 --- lays a hydrant line rather than parking and fighting the fire off the tank.
+--- Tell the crew what the water is doing.
+---
+--- `applyAgent` has always returned this and the hose has always thrown it away, so the one
+--- person who needs to know -- whoever is on the nozzle -- was the only one not told. The admin
+--- command has reported it since it was written.
+---
+--- It matters most when the answer is bad. Putting water on a flammable liquid fire spreads it,
+--- and the agent matrix models that faithfully: intensity climbs and a hazard rolls. Without a
+--- word on screen that reads as the hose not working, and the lesson the matrix exists to teach
+--- is lost.
+---
+--- Rate limited, because this runs several times a second while a bale is open. Knockdowns are
+--- naturally one-shot -- a node knocks down once -- so those are said every time.
+---@param line table
+---@param agent string
+---@param result table
+local function reportSuppression(line, agent, result)
+    if not result or result.nodesAffected == 0 then return end
+
+    local now = os.time()
+
+    -- A hazard is an explosion, a flare or a shock. Never suppressed, never rate limited.
+    if result.hazards and #result.hazards > 0 then
+        notifyLine(line, ('%s on that fire: %s'):format(
+            agent:upper(), table.concat(result.hazards, ', ')), 'error')
+        line.wrongAgentAt = now
+        return
+    end
+
+    -- The fire grew. That is the agent matrix saying the wrong thing is coming out of the line,
+    -- and it is worth interrupting for -- but not four times a second.
+    if result.intensityRemoved < 0 then
+        if not line.wrongAgentAt or now - line.wrongAgentAt >= 5 then
+            line.wrongAgentAt = now
+            notifyLine(line, ('%s is making this worse -- it is the wrong agent for this fire')
+                :format(agent), 'error')
+        end
+        return
+    end
+
+    line.wrongAgentAt = nil
+
+    if result.knockedDown > 0 then
+        notifyLine(line, ('Knocked down %d'):format(result.knockedDown), 'success')
+    end
+end
+
 RegisterNetEvent('mi_fire:server:hoseWater', function(coords, gpm, seconds)
     local source = source
     if type(coords) ~= 'table' then return end
@@ -777,11 +824,15 @@ RegisterNetEvent('mi_fire:server:hoseWater', function(coords, gpm, seconds)
     -- agent matrix and quietly put water on a Class D fire without consequence.
     local delivered = drawn * (60.0 / math.max(0.01, seconds))
 
-    MIFire.Fire.applyAgent(coords, 3.0, line.agent or 'water', {
+    local agent = line.agent or 'water'
+
+    local result = MIFire.Fire.applyAgent(coords, 3.0, agent, {
         gpm = delivered,
         seconds = seconds,
         source = source,
     })
+
+    reportSuppression(line, agent, result)
 end)
 
 --- Cycle the nozzle pattern.

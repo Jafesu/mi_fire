@@ -154,6 +154,93 @@ function Hose.acceptsNozzle(size, nozzleName)
     return false, ('%s does not take that nozzle'):format(size.label or 'that hose')
 end
 
+--- How far apart two points are, ignoring nothing.
+---@param a table
+---@param b table
+---@return number metres
+local function distance(a, b)
+    local dx = (a.x or 0) - (b.x or 0)
+    local dy = (a.y or 0) - (b.y or 0)
+    local dz = (a.z or 0) - (b.z or 0)
+    return math.sqrt(dx * dx + dy * dy + dz * dz)
+end
+
+--- Where the hose has been laid, one point at a time.
+---
+--- A GTA rope cannot describe a walked path. Rope type 6 comes back with **three** vertices
+--- however long it is made, so pinning the ends leaves one point in the middle and everything
+--- between them is a free-hanging catenary that moves whenever either end does. That is why a
+--- line follows the firefighter around instead of staying where it was laid, and why adding
+--- slack never helped: more slack is a longer curve between the same two moving points.
+---
+--- So the path is recorded rather than simulated. A point is dropped every `spacing` metres as
+--- the nozzle is carried away from the rig, and taken back up when the crew walks in again --
+--- which is what a hose does, rather than dragging its whole length along behind.
+---
+--- Pure, and separate from the rendering, because the interesting behaviour is the hysteresis:
+--- dropping and consuming at the same distance makes a point flicker in and out with every step
+--- taken near the boundary, and each flicker is a rope created and destroyed.
+---
+---@param trail table[] The points so far, nearest the rig first. Mutated in place.
+---@param position table Where the nozzle is now.
+---@param spacing number Metres between points.
+---@param maxPoints number|nil Refuse to grow past this.
+---@return string change 'added' | 'removed' | 'none'
+function Hose.trailStep(trail, position, spacing, maxPoints)
+    if type(trail) ~= 'table' or type(position) ~= 'table' then return 'none' end
+
+    spacing = tonumber(spacing) or 3.0
+    if spacing <= 0 then return 'none' end
+
+    local count = #trail
+    if count == 0 then return 'none' end
+
+    -- Walking back in. Checked before laying more, so a crew reversing takes up slack rather
+    -- than laying a point on top of one they are about to reach.
+    --
+    -- 0.6 of the spacing, not the spacing itself: consuming at the same distance as dropping
+    -- means a step either side of the boundary adds and removes a point repeatedly, and every
+    -- one of those is a rope built and torn down.
+    if count >= 2 and distance(position, trail[count - 1]) < spacing * 0.6 then
+        trail[count] = nil
+        return 'removed'
+    end
+
+    if distance(position, trail[count]) >= spacing then
+        if maxPoints and count >= maxPoints then return 'none' end
+        trail[count + 1] = { x = position.x, y = position.y, z = position.z }
+        return 'added'
+    end
+
+    return 'none'
+end
+
+--- How much hose is actually out, along the path rather than as the crow flies.
+---
+--- The honest number: a line walked around a corner has used its length going round the corner,
+--- and measuring the straight line back to the rig would say a crew has hose left that they do
+--- not. This is what should be compared against what was pulled from the bed.
+---
+---@param trail table[]
+---@param head table|nil Where the nozzle is now, beyond the last point.
+---@return number metres
+function Hose.trailLength(trail, head)
+    if type(trail) ~= 'table' then return 0.0 end
+
+    local total = 0.0
+
+    for i = 2, #trail do
+        total = total + distance(trail[i - 1], trail[i])
+    end
+
+    if head and #trail > 0 then
+        total = total + distance(trail[#trail], head)
+    end
+
+    return total
+end
+
+
 --- Turn the bezel one notch.
 ---
 --- Pure, and separate from the event that calls it, because the interesting part is the

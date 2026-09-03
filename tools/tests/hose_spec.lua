@@ -16,6 +16,64 @@ return function(t)
 
     -- -----------------------------------------------------------------------
 
+    t.describe('the hose lies where it was walked')
+
+    -- A GTA rope cannot describe a path: type 6 comes back with three vertices however long it
+    -- is, so pinning the ends leaves everything between them a free-hanging curve that moves
+    -- whenever either end does. The path is therefore recorded rather than simulated.
+    do
+        local function at(x, y) return { x = x, y = y, z = 0.0 } end
+
+        local trail = { at(0, 0) }
+
+        t.equal(Hose.trailStep(trail, at(1, 0), 3.0), 'none',
+            'a step inside the spacing lays nothing')
+        t.equal(#trail, 1, 'so the trail is unchanged')
+
+        t.equal(Hose.trailStep(trail, at(3, 0), 3.0), 'added', 'reaching the spacing lays a point')
+        t.equal(#trail, 2, 'which the trail keeps')
+
+        t.equal(Hose.trailStep(trail, at(6, 0), 3.0), 'added', 'and again further out')
+        t.equal(#trail, 3, 'three points now')
+
+        t.describe('and takes itself back up on the way in')
+
+        -- Walking back to where the previous point is: the last one is no longer holding
+        -- anything and comes up, which is what a hose does rather than dragging its length.
+        t.equal(Hose.trailStep(trail, at(3.1, 0), 3.0), 'removed', 'coming back consumes a point')
+        t.equal(#trail, 2, 'and the trail shortens')
+
+        t.describe('with hysteresis, or it flickers')
+
+        -- Dropping and consuming at the same distance makes a point appear and vanish with every
+        -- step near the boundary, and each flicker is a rope built and torn down. Consuming
+        -- happens at 0.6 of the spacing, so there is a band where neither fires.
+        local steady = { at(0, 0), at(3, 0) }
+        t.equal(Hose.trailStep(steady, at(2.2, 0), 3.0), 'none',
+            'a point 0.73 of the spacing back is in the dead band')
+        t.equal(#steady, 2, 'so nothing moves')
+
+        t.describe('and it will not grow without limit')
+
+        local capped = { at(0, 0) }
+        t.equal(Hose.trailStep(capped, at(9, 0), 3.0, 1), 'none', 'the cap refuses a new point')
+        t.equal(#capped, 1, 'leaving the trail alone')
+
+        t.describe('length is measured along the path, not across it')
+
+        -- The honest number. A line walked around a corner has spent its length going round the
+        -- corner, and the straight line back to the rig would claim hose that is not there.
+        local corner = { at(0, 0), at(10, 0), at(10, 10) }
+        t.near(Hose.trailLength(corner), 20.0, 0.01, 'two ten metre legs are twenty metres')
+        t.near(Hose.trailLength(corner, at(10, 15)), 25.0, 0.01,
+            'and the nozzle beyond the last point counts too')
+
+        t.equal(Hose.trailLength({}), 0.0, 'an empty trail is nothing')
+        t.equal(Hose.trailLength(nil), 0.0, 'and neither is no trail at all')
+    end
+
+    -- -----------------------------------------------------------------------
+
     t.describe('the bezel has ends')
 
     -- The point of this function is what happens at the stops. Opening a fog fully and finding

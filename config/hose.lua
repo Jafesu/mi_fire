@@ -441,7 +441,17 @@ MIFireHose.visuals = {
     ---     /fire nozzlestream nudge rz 15
     ---
     --- nil falls back to `stream`, so a half-tuned setup is imperfect rather than broken.
-    streamAiming = nil,
+    streamAiming = {
+        --- **Only the differences.** `asset`, `name`, `scale` and `ry` are identical to `stream`
+        --- and fall through, which leaves what aiming actually changes visible at a glance: the
+        --- hand turns about 79 degrees one way in pitch and 90 the other in yaw, and the emitter
+        --- moves 10 cm up and 10 cm inboard.
+        ---
+        --- The full set as measured was
+        ---     x = 0.060, y = 0.010, z = 0.200, rx = 232.5, ry = 11.1, rz = 310.0, scale = 1.20
+        x = 0.060, y = 0.010, z = 0.200,
+        rx = 232.5, rz = 310.0,
+    },
 
     --- What each agent looks like coming out, over the top of `stream` above.
     ---

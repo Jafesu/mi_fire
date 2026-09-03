@@ -3133,3 +3133,55 @@ stream = { asset = 'core', name = 'water_cannon_jet', scale = 1.20,
 - `streamAiming`, which is what the next session is for. `/fire nozzlegrip aim` holds the pose and
   `/fire nozzlestream fire` holds the stream, so both hands are free.
 
+---
+
+## 2026-09-03 — the aiming stream, and a config block deleted by a careless match
+
+**Scope:** `ASSET-001` closes. Both stream placements are found.
+
+```lua
+stream       = { x = 0.160, y = -0.030, z = 0.100, rx = 311.1, ry = 11.1, rz = 220.0, scale = 1.20 }
+streamAiming = { x = 0.060, y =  0.010, z = 0.200, rx = 232.5,             rz = 310.0 }
+```
+
+`streamAiming` carries only the differences; `asset`, `name`, `scale` and `ry` fall through. What
+aiming actually changes is then legible: about 79 degrees of pitch one way, 90 of yaw the other,
+and the emitter 10 cm up and 10 cm inboard.
+
+**A mistake worth recording, because it nearly shipped.** The patch that wrote those values
+matched on the comment `--- The same, for while the player is aiming.` -- wording used by **both**
+`nozzleGripAiming` and `streamAiming`. `string.index` found the first, so the replacement deleted
+everything between them: `nozzleGripAiming`, `nozzleProp`, `nozzleClipset`, `nozzleStrafeClipset`,
+`borrowed` and `stream` all went, and the file still parsed.
+
+It was caught only because a verification line printed the resolved values and one of them was
+nil. Without that it would have been committed, and the symptom would have been no water, no
+fallback prop and no aiming grip -- three unrelated-looking failures from one edit.
+
+**Two things came out of it:**
+
+- **Match on the assignment, not the prose.** Comments repeat; `streamAiming = nil,` does not. The
+  patch now asserts it found exactly one occurrence before touching anything.
+
+- **A test that would have caught it instantly.** `conventions_spec` scans every client file for
+  `MIFireHose.visuals.<key>` and asserts each one is assigned in `config/hose.lua`. Against the
+  **text**, not the loaded table -- most of these are allowed to be nil, so the loaded value
+  proves nothing; what must not happen is the line vanishing. Mutation tested by deleting the
+  `stream` block, which fails it by name.
+
+  This is the third silent-failure class this nozzle has produced: a weapon that never appears, a
+  stream that never starts, and now a config key that quietly stops existing. All three now say
+  something.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1145 passed, 0 failed** (was 1123).
+- The config restored from HEAD and re-patched; all seventeen `visuals` keys present.
+- `streamAiming` resolves to exactly the measured numbers.
+
+**Open:**
+
+- Water has still never been put on a fire. Everything upstream of that now works: the nozzle is
+  held, aimed, and sprays, and the server applies the agent matrix when a charged line flows. The
+  next session is a fire and a knockdown.
+

@@ -254,6 +254,44 @@ return function(t)
 
     -- -----------------------------------------------------------------------
 
+    t.describe('every visuals key the client reads is in the config')
+
+    -- A key that quietly disappears from `config/hose.lua` is invisible: `MIFireHose.visuals.x`
+    -- on a missing key is `nil`, which is a legal value for most of these, so nothing errors and
+    -- the feature simply stops. That happened -- an edit matched a comment appearing twice in the
+    -- file and deleted the block between the two, taking `stream`, `nozzleProp`,
+    -- `nozzleGripAiming` and three others with it. The only symptom was that no water came out.
+    --
+    -- Checked against the config **text** rather than the loaded table, because most of these are
+    -- allowed to be nil. What must not happen is the line vanishing.
+    do
+        local config = read('config/hose.lua') or ''
+        local seen = {}
+
+        for _, path in ipairs(clientFiles) do
+            local source = read(path)
+
+            if source then
+                for key in source:gmatch('MIFireHose%.visuals%.([%w_]+)') do
+                    seen[key] = true
+                end
+            end
+        end
+
+        local names = {}
+        for key in pairs(seen) do names[#names + 1] = key end
+        table.sort(names)
+
+        t.ok(#names > 0, 'the client reads at least one visuals key')
+
+        for _, key in ipairs(names) do
+            t.ok(config:find('%f[%w_]' .. key .. '%s*=') ~= nil,
+                ('config/hose.lua defines visuals.%s, which the client reads'):format(key))
+        end
+    end
+
+    -- -----------------------------------------------------------------------
+
     t.describe('the stream placements are usable numbers')
 
     -- Found by nudging in game across several sessions, one of which was lost to a crash and one

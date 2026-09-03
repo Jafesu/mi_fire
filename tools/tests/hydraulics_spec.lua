@@ -210,17 +210,34 @@ return function(t)
 
     t.describe('cavitation')
 
-    local ok1 = H.isCavitating(50, 500, 1000)
+    -- The fourth argument is whether a supply line is feeding the intake. It matters more than
+    -- it looks: off a tank the intake sits at essentially zero **by design**, because it is a
+    -- gravity feed, so reading low intake as starvation made cavitation permanently true.
+    -- Nothing raises intake pressure until supply lines land, so the panel read CAVITATING beside
+    -- "0 gpm total" and a full tank for a whole session, and the one genuine case was buried
+    -- under a warning that never went away.
+
+    local ok1 = H.isCavitating(50, 500, 1000, true)
     t.equal(ok1, false, 'good intake pressure with spare supply is not cavitating')
 
-    local bad1, sev1 = H.isCavitating(50, 1500, 1000)
+    local bad1, sev1 = H.isCavitating(50, 1500, 1000, true)
     t.equal(bad1, true, 'drawing more than the supply can give cavitates')
     t.ok(sev1 > 0.0, 'and reports a severity')
 
-    local bad2 = H.isCavitating(10, 500, 1000)
-    t.equal(bad2, true, 'so does an intake below 20 psi even with nominal supply')
+    local bad2 = H.isCavitating(10, 500, 1000, true)
+    t.equal(bad2, true, 'an intake below 20 psi cavitates when a supply line is feeding it')
 
-    local bad3, sev3 = H.isCavitating(0, 500, 0)
+    local tank = H.isCavitating(0, 500, 1000, false)
+    t.equal(tank, false,
+        'but the same intake off a tank does not -- a gravity feed has no intake pressure to lose')
+
+    local idle = H.isCavitating(0, 0, 1000, false)
+    t.equal(idle, false, 'and nothing being drawn cannot cavitate at all')
+
+    local idleSupplied = H.isCavitating(0, 0, 1000, true)
+    t.equal(idleSupplied, false, 'even with a supply line and no intake pressure')
+
+    local bad3, sev3 = H.isCavitating(0, 500, 0, false)
     t.equal(bad3, true, 'pumping with no supply at all cavitates')
     t.equal(sev3, 1.0, 'at full severity')
 

@@ -3222,3 +3222,59 @@ the one person who needs to know, whoever is on the nozzle, was the only one not
 - The test itself. A Class A fire should go down; **a Class B fire should get worse**, which is
   the one that proves the agent matrix is wired to the hose rather than merely present.
 
+---
+
+## 2026-09-03 (third) — the bale was never opened
+
+**Scope:** no water, with a charged line, a full tank and the gate wide open.
+
+**The diagnostic paid for itself.** One command gave the answer:
+
+```
+line: state=charged gpm=0.0 usable=false yours=true
+Master discharge 219 psi - 0 gpm total - tank 1000/1000 - CAVITATING
+```
+
+Charged, pressurised, full tank, zero flow. Two separate bugs.
+
+**One: nothing ever opened the bale.**
+
+`HoseServer.setBail` has existed since the hose module was written, with a net event behind it.
+No client ever called it. `line.bail` starts at `0.0`, the pump gives a line no flow while its
+bale is shut, so every line ever charged has had zero flow.
+
+It is a deadlock rather than a missed line. The obvious place to open the bale is beside the
+water send, which sits behind `flowing` -- and `flowing` needs `gpm > 0`, which needs the bale
+open. Anything written in the natural place would not have worked either. It now sits against
+`holding`, outside that branch entirely.
+
+It reads the **real control**, not the `open` that `/fire nozzlestream fire` forces: a tuning aid
+must not put water through a line or empty a tank. And it fires on the edge, because that loop
+runs every frame and the bale is server state.
+
+**Two: cavitation was permanently true.**
+
+```lua
+if intake < 20.0 then starved = (20 - intake) / 20 end
+local severity = math.max(overdraw, starved)
+```
+
+Off a tank the intake sits at essentially zero **by design** -- it is a gravity feed -- and
+nothing raises `intakePsi` until supply lines land in Phase 5. So `starved` was always 1.0 and
+the panel read CAVITATING beside "0 gpm total" and a full tank. The one genuine case, drawing
+harder than the tank can feed, was buried under a warning that never went away.
+
+Two corrections: nothing being drawn cannot cavitate, which is obvious once written down; and the
+intake term only counts when something is feeding the intake. What limits a tank draw is the
+pump's own capacity against demand, which `overdraw` already covered.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1148 passed, 0 failed**.
+- One existing assertion failed and was right to: it encoded the old behaviour. It now passes the
+  supply-line flag and says so, and the tank case and the idle case are asserted beside it.
+
+**Open:**
+
+- Water on a fire, still. But the reason it was not flowing is now understood rather than guessed.
+

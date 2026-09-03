@@ -999,6 +999,9 @@ CreateThread(function()
 
     local lastSend = 0
 
+    --- Whether the server has been told the bale is open. Edge-triggered; see below.
+    local bailOpen = false
+
     while true do
         local line = mine and lines[mine]
 
@@ -1042,6 +1045,27 @@ CreateThread(function()
         if holding then
             DisableControlAction(0, ATTACK_CONTROL, true)
             DisableControlAction(0, ATTACK_CONTROL_ALT, true)
+        end
+
+        -- **Open the bale.**
+        --
+        -- This is what was missing, and it deadlocked: the pump gives a line no flow until its
+        -- bale is open, `flowing` needs flow, and the bale was only ever going to be opened from
+        -- inside a branch that `flowing` guarded. So the pump reported 0 gpm for ever, the line
+        -- read as unusable, and nothing came out no matter what was done at the panel.
+        --
+        -- It sits out here against `holding` rather than `ready` for exactly that reason.
+        --
+        -- The real control, not `open`: `/fire nozzlestream fire` forces the particle for tuning
+        -- and must not put water through a line or empty a tank.
+        local pressed = holding and (IsControlPressed(0, ATTACK_CONTROL)
+            or IsDisabledControlPressed(0, ATTACK_CONTROL))
+
+        -- On the edge only. This runs every frame while a nozzle is held, and the bale is server
+        -- state -- telling it the same thing sixty times a second is how a net event budget goes.
+        if pressed ~= bailOpen then
+            bailOpen = pressed
+            TriggerServerEvent('mi_fire:server:setHoseBail', pressed and 1.0 or 0.0)
         end
 
         if not ready then

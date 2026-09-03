@@ -366,20 +366,33 @@ Hydraulics.CAVITATION_INTAKE_PSI = 20.0
 ---@param supplyGpm number What the source can deliver.
 ---@return boolean cavitating
 ---@return number severity 0-1, how far past the limit
-function Hydraulics.isCavitating(intakePsi, demandGpm, supplyGpm)
+function Hydraulics.isCavitating(intakePsi, demandGpm, supplyGpm, fromSupplyLine)
     local intake = tonumber(intakePsi) or 0
     local demand = tonumber(demandGpm) or 0
     local supply = tonumber(supplyGpm) or 0
 
+    -- Nothing being drawn cannot cavitate. Obvious once written down, and the panel spent a
+    -- session reading CAVITATING beside "0 gpm total" and a full tank because it was not.
+    if demand <= 0 then return false, 0.0 end
+
     local overdraw = 0.0
     if supply > 0 and demand > supply then
         overdraw = (demand - supply) / supply
-    elseif supply <= 0 and demand > 0 then
+    elseif supply <= 0 then
         overdraw = 1.0
     end
 
+    -- Intake starvation only means anything when something is feeding the intake.
+    --
+    -- **Off a tank there is no intake pressure by design.** It is a gravity feed, and a rig
+    -- pumping its own tank sits at essentially zero intake while working perfectly well. Reading
+    -- that as starvation made cavitation permanently true, since nothing raises `intakePsi`
+    -- until supply lines land in Phase 5 -- so the one genuine case, drawing harder than the
+    -- tank can feed, was buried under a warning that never went away.
+    --
+    -- What limits a tank draw is the pump's own capacity against demand, which is `overdraw`.
     local starved = 0.0
-    if intake < Hydraulics.CAVITATION_INTAKE_PSI then
+    if fromSupplyLine and intake < Hydraulics.CAVITATION_INTAKE_PSI then
         starved = (Hydraulics.CAVITATION_INTAKE_PSI - intake) / Hydraulics.CAVITATION_INTAKE_PSI
     end
 

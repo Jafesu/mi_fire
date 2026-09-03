@@ -244,11 +244,15 @@ local function solvePump(entity, state, lines, dt)
 
     -- --- Cavitation ---------------------------------------------------------------------
 
-    -- Off the tank there is no intake pressure to speak of, so a rig drafting its own tank at
-    -- more than the tank can feed is exactly the case this catches. A supply line raises the
-    -- intake, which is Phase 5.
+    -- Off the tank there is no intake pressure to speak of, so the intake term is not consulted
+    -- and what catches a rig drawing harder than it can feed is its own capacity against demand.
+    -- A supply line raises the intake and makes that term meaningful, which is Phase 5 -- at
+    -- which point this passes `true`.
+    local fromSupplyLine = (state.intakePsi or 0) > 0
+
     local wasCavitating = state.cavitating
-    state.cavitating = MIFire.Hydraulics.isCavitating(state.intakePsi, wanted, available)
+    state.cavitating = MIFire.Hydraulics.isCavitating(
+        state.intakePsi, wanted, available, fromSupplyLine)
 
     if state.cavitating and not wasCavitating then
         for i = 1, #demands do

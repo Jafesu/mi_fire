@@ -86,7 +86,7 @@ Five things that had to be right, each of which cost a round of testing:
 `conventions_spec` now holds the last two as tests, along with the model name agreeing across
 all three files.
 
-### `HOSE-010` — the hose should lie where it was walked, parked
+### `HOSE-010` — the hose lies where it was walked. Written, untested in game.
 
 Working, but the rope follows the firefighter rather than staying where it was laid. Pulling a
 line away from the rig drags the whole hose with you instead of leaving it on the ground
@@ -113,8 +113,14 @@ Worth doing at the same time: a **dropped** line currently is not drawn at all, 
 records where it is when nobody is holding it. The trail solves that too -- the last point is
 where the nozzle was put down.
 
-`Supply-Line` on this drive lays a hose along a road and may already do the trail part; read it
-before writing this, the way SmartHose should have been read before the rope.
+**`Supply-Line` was read first, and has no answer to borrow.** Its main files are escrow
+encrypted, but the readable half shows it pinning vertex 0 to a hand and three vertices at the
+hydrant -- the same technique used here, with the same limitation. Worth knowing rather than
+assuming either way.
+
+**Written, not yet tested in game.** The trail logic is in `shared/hose.lua` with its own tests;
+the rendering is a chain of short ropes, one per trail point. If it misbehaves, the rendering is
+a single commit and revertible on its own.
 
 **This and the texture problem have the same answer.** A hose that stays where it was walked is
 a *path*, and a path is rendered as a chain of segments rather than as a rope -- at which point

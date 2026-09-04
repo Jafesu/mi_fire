@@ -432,6 +432,31 @@ local function sourceCoords(line)
     return apparatus().portCoords(entity, port), entity, port
 end
 
+--- One length of hose, between two points on the trail.
+---
+--- Short on purpose. A GTA rope cannot describe a path -- type 6 comes back with three vertices
+--- however long it is made -- so a walked line is a chain of short ropes rather than one long
+--- one, and each of these spans a single segment.
+---
+--- Returns immediately. A rope has no vertices until it has simulated a frame, and the pinning
+--- skips any that is not ready rather than yielding here: yielding inside the loop that walks
+--- `drawn` is how that table gets rewritten underneath the walk.
+---@param entry table
+---@param at table
+---@return integer|nil rope
+local function segmentRope(entry, at)
+    local spacing = (MIFireHose.visuals.trail or {}).spacing or 3.0
+
+    local rope = AddRope(at.x, at.y, at.z, 0.0, 0.0, 0.0,
+        spacing * 3.0, entry.ropeType, spacing * 1.15, 0.5, 1.0,
+        false, true, false, 1.0, false, 0)
+
+    if not rope or rope == 0 then return nil end
+
+    ActivatePhysics(rope)
+    return rope
+end
+
 ---@param id string
 ---@param line table
 local function draw(id, line)
@@ -470,63 +495,15 @@ local function draw(id, line)
     -- Vertex count follows length, so a short rope is a rope with nothing in the middle.
     local initial = MIFireHose.visuals.initialLength or 25.0
 
-    local rope = AddRope(from.x, from.y, from.z, 0.0, 0.0, 0.0,
-        maxLength, ropeType, math.min(initial, maxLength), 0.5, 1.0,
-        false, true, false, 1.0, false, 0)
-
-    if not rope or rope == 0 then
-        Util.warn('AddRope failed for line %s -- check the rope type in config/hose.lua', id)
-        drawn[id] = nil
-        return
-    end
-
-    -- The claim was already staked by the caller; fill in what it needs to tear this down if
-    -- the build fails partway.
-    drawn[id] = drawn[id] or {}
-    drawn[id].rope = rope
-    drawn[id].vehicle = vehicle
-    drawn[id].pending = true
-
-    -- A rope has no vertices until it has been simulated once.
-    --
-    -- How many it ends up with is the rope *type's* business, not the length's -- type 6 comes
-    -- back with three however long it is made. Demanding eight and refusing to draw below that
-    -- meant the thickest type could never be used, which was the wrong lesson to draw from a
-    -- rope that shook: the shaking was pinning every vertex there was, and the fix is to pin
-    -- fewer rather than to insist on more.
-    local vertices = 0
-    local waited = 0
-
-    while vertices < 2 and waited < 500 do
-        Wait(0)
-        vertices = GetRopeVertexCount(rope) or 0
-        waited = waited + 16
-    end
-
-    if vertices < 2 then
-        Util.warn('rope for line %s never simulated', id)
-        if DoesRopeExist(rope) then DeleteRope(rope) end
-        drawn[id] = nil
-        return
-    end
-
-    if not lines[id] or not DoesEntityExist(holderPed) then
-        if DoesRopeExist(rope) then DeleteRope(rope) end
-        drawn[id] = nil
-        return
-    end
-
-    -- Simulated, or it draws as a straight taut line between its ends.
-    ActivatePhysics(rope)
-
+    -- No rope yet. The reconcile loop builds one segment per trail point, and the trail begins
+    -- as a single point at the coupling -- everything else is laid as the crew walks out.
     drawn[id] = {
-        rope = rope,
+        ropes = {},
+        trail = { { x = from.x, y = from.y, z = from.z } },
         vehicle = vehicle,
-        nozzle = nil,
         holder = holderPed,
-        vertices = vertices,
-        length = math.min(initial, maxLength),
         maxLength = maxLength,
+        ropeType = ropeType,
         port = port,
     }
 
@@ -537,7 +514,10 @@ local function undraw(id)
     local entry = drawn[id]
     if not entry then return end
 
-    if entry.rope and DoesRopeExist(entry.rope) then DeleteRope(entry.rope) end
+    for i = 1, #(entry.ropes or {}) do
+        local rope = entry.ropes[i]
+        if rope and DoesRopeExist(rope) then DeleteRope(rope) end
+    end
 
     drawn[id] = nil
 end
@@ -718,7 +698,7 @@ CreateThread(function()
                     -- Still building. Pinning now would use vertex 0, which is the end the
                     -- firefighter is on.
 
-                elseif entry and (not entry.rope or not DoesRopeExist(entry.rope)) then
+                elseif entry and not entry.trail then
                     -- The rope went away underneath us. Drop the record and let this loop
                     -- build a new one next frame rather than leaving the line invisible.
                     drawn[id] = nil
@@ -758,47 +738,90 @@ CreateThread(function()
                             hand = GetEntityCoords(holder)
                         end
 
-                        PinRopeVertex(entry.rope, 0, hand.x, hand.y, hand.z)
+                        local cfg = MIFireHose.visuals.trail or {}
+                        local spacing = cfg.spacing or 3.0
+                        local trail = entry.trail
+                        local ropes = entry.ropes
 
-                        local axis = portAxis(entry.vehicle, entry.port)
-                        local last = entry.vertices - 1
+                        -- The coupling can move: a rig is an entity and entities get nudged.
+                        trail[1] = { x = from.x, y = from.y, z = from.z }
 
-                        PinRopeVertex(entry.rope, last, from.x, from.y, from.z)
+                        -- Lay and take up. Capped by what is on the bed rather than by a point
+                        -- count, so a longer line genuinely reaches further.
+                        local maxPoints = math.min(cfg.maxPoints or 40,
+                            math.max(2, math.floor(entry.maxLength / spacing)))
 
-                        -- The guide vertex, which makes the hose leave the fitting straight
-                        -- rather than at whatever angle the physics settles on -- but only
-                        -- when there is a vertex to spare.
-                        --
-                        -- With four or fewer, pinning it would leave nothing free between the
-                        -- two ends, and a rope with no free vertices is a taut line that
-                        -- shakes as its pins disagree. Whatever the rope has left over is what
-                        -- hangs, so it never gets spent.
-                        if entry.vertices >= 5 then
-                            PinRopeVertex(entry.rope, last - 1,
-                                from.x + axis.x * 0.3,
-                                from.y + axis.y * 0.3,
-                                from.z + axis.z * 0.3)
+                        Hose.trailStep(trail, hand, spacing, maxPoints)
+
+                        -- One rope per trail point: rope i runs from trail[i] out to trail[i+1],
+                        -- and the last runs to the hand. Built and dropped to match, so walking
+                        -- out lays hose and walking back picks it up.
+                        for i = #ropes + 1, #trail do
+                            ropes[i] = segmentRope(entry, trail[i])
                         end
 
-                        -- Pay the line out as the crew walks and haul it in as they return,
-                        -- capped at what is on the bed.
+                        for i = #ropes, #trail + 1, -1 do
+                            if ropes[i] and DoesRopeExist(ropes[i]) then DeleteRope(ropes[i]) end
+                            ropes[i] = nil
+                        end
+
+                        local axis = portAxis(entry.vehicle, entry.port)
+
+                        for i = 1, #trail do
+                            local rope = ropes[i]
+
+                            if rope and DoesRopeExist(rope) then
+                                local verts = GetRopeVertexCount(rope) or 0
+
+                                -- Skip one that has not simulated yet. It is ready next frame,
+                                -- and pinning nothing beats pinning vertex -1.
+                                if verts >= 2 then
+                                    local near = trail[i]
+                                    local far = trail[i + 1] or hand
+
+                                    PinRopeVertex(rope, 0, far.x, far.y, far.z)
+                                    PinRopeVertex(rope, verts - 1, near.x, near.y, near.z)
+
+                                    -- The guide vertex, on the first segment only, so the hose
+                                    -- leaves the fitting straight rather than at whatever angle
+                                    -- the physics settles on. Only where there is a vertex to
+                                    -- spare: with four or fewer, pinning it leaves nothing free
+                                    -- between the ends, and a rope with no free vertices is a
+                                    -- taut line that shakes as its pins disagree.
+                                    if i == 1 and verts >= 5 then
+                                        PinRopeVertex(rope, verts - 2,
+                                            near.x + axis.x * 0.3,
+                                            near.y + axis.y * 0.3,
+                                            near.z + axis.z * 0.3)
+                                    end
+                                end
+                            end
+                        end
+
+                        -- Only the last segment changes length as the crew moves. The ones
+                        -- behind it are pinned between two fixed points and stay as laid, which
+                        -- is the whole point of recording the path.
                         --
                         -- Not every frame. A walking ped's hand moves several centimetres a
-                        -- frame, so the distance never settles, and reshaping a rope four
-                        -- times a second is plenty -- doing it sixty is its own source of
-                        -- shaking.
+                        -- frame so the distance never settles, and reshaping four times a second
+                        -- is plenty -- sixty is its own source of shaking.
                         local now = GetGameTimer()
 
-                        if now - (entry.lengthAt or 0) > 250 then
+                        if now - (entry.lengthAt or 0) > 250 and #trail > 0 then
                             entry.lengthAt = now
 
-                            local slack = 1.0 + (MIFireHose.visuals.slack or 0.35)
-                            local wanted = math.min(entry.maxLength,
-                                math.max(4.0, #(from - hand) * slack))
+                            local tail = ropes[#trail]
+                            local anchor = trail[#trail]
 
-                            if math.abs(wanted - (entry.length or 0)) > 1.0 then
-                                RopeForceLength(entry.rope, wanted)
-                                entry.length = wanted
+                            if tail and DoesRopeExist(tail) then
+                                local slack = 1.0 + (MIFireHose.visuals.slack or 0.35)
+                                local span = #(vector3(anchor.x, anchor.y, anchor.z) - hand)
+                                local wanted = math.max(1.0, span * slack)
+
+                                if math.abs(wanted - (entry.tailLength or 0)) > 0.5 then
+                                    RopeForceLength(tail, wanted)
+                                    entry.tailLength = wanted
+                                end
                             end
                         end
                     end

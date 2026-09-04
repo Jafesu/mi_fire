@@ -474,6 +474,25 @@ MIFireHose.visuals = {
         foam = { scale = 1.8 },
     },
 
+    --- How a laid line is recorded.
+    ---
+    --- A GTA rope cannot describe a path: type 6 comes back with three vertices however long it
+    --- is made, so pinning the ends leaves everything between as a free-hanging curve that moves
+    --- whenever either end does. That is why a line used to follow the firefighter around, and
+    --- why adding slack never helped -- more slack is a longer curve between the same two moving
+    --- points.
+    ---
+    --- So a walked line is a **chain of short ropes**, one per trail point, and the path is
+    --- recorded as the crew walks rather than left to physics.
+    ---
+    --- `spacing` is metres between points: smaller lays a smoother hose and costs more ropes.
+    --- The count is capped by what is on the bed, so a longer line reaches further rather than
+    --- laying finer.
+    trail = {
+        spacing = 3.0,
+        maxPoints = 40,
+    },
+
     couplingProp = 'prop_fire_hosebox_01',
     reelProp = 'prop_fire_hosereel',
 

@@ -3278,3 +3278,61 @@ pump's own capacity against demand, which `overdraw` already covered.
 
 - Water on a fire, still. But the reason it was not flowing is now understood rather than guessed.
 
+---
+
+## 2026-09-03 (fourth) — the hose lies where it was walked
+
+**Scope:** `HOSE-010`, the rendering half.
+
+**Changed:** the rope is now a chain. `segmentRope` builds one short rope per trail point;
+`draw` starts a trail at the coupling and builds nothing; the reconcile loop lays and takes up
+segments as the crew moves.
+
+**Decisions:**
+
+- **One rope per segment, because one rope cannot do it.** Type 6 comes back with three vertices
+  however long it is made. Pin both ends and there is a single point in the middle, so everything
+  between is a free-hanging curve that moves whenever either end does -- which is exactly the
+  symptom, and why more slack never helped.
+
+- **Only the last segment changes length.** The ones behind it are pinned between two fixed
+  points and stay as laid. That is the whole point: a hose that has been walked round a corner
+  stays round the corner.
+
+- **The segment builder does not yield.** `draw` yields waiting for a rope to simulate, which is
+  why it runs on its own thread -- yielding inside the loop that walks `drawn` is how that table
+  gets rewritten underneath the walk. A new segment simply has no vertices for a frame, and the
+  pinning skips it rather than pinning vertex -1.
+
+- **The point count is capped by what is on the bed**, not by a fixed number, so a longer line
+  reaches further rather than laying finer.
+
+- **`Supply-Line` was read first**, as the note said to. Its main files are escrowed, but the
+  readable half pins vertex 0 to a hand and three vertices at the hydrant -- the same technique,
+  with the same limitation. No answer to borrow, which is worth knowing rather than assuming.
+
+**A near miss worth recording:** the first attempt at this patch computed its end boundary by
+searching for a string after another string, landed past the block, and removed structural `end`s
+-- the file stopped parsing. The second attempt spliced by line number with three assertions
+checking the boundaries first. The third failed to match anything at all because it opened the
+file with `newline=""`, preserving CRLF, so every `
+` in its search strings missed. Nothing was
+written that time, because the failure came before the write.
+
+Two of those three were caught only by a parse check running immediately afterwards. Large
+mechanical edits to a working file want a syntax check in the same breath, not at the end.
+
+**Verified:**
+
+- `lua tools/run_tests.lua` — **1165 passed, 0 failed**.
+- No references to the old single rope remain anywhere in the client.
+- **Not tested in game**, and deliberately its own commit: the previous rendering worked, so this
+  is revertible without losing the trail logic underneath it.
+
+**Open:**
+
+- Whether it looks right. Expect to tune `spacing` -- 3 metres is a guess, and smaller lays a
+  smoother hose at the cost of more ropes.
+- A dropped line still is not drawn: nothing records where a nozzle was put down. The trail is
+  the natural place to hold that, and now exists.
+
